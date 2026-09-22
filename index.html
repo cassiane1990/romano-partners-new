@@ -27,7 +27,7 @@
 
 <div id="app" class="app hidden"><aside class="side"><div class="side-brand"><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
 <nav class="nav" id="masterNav"></nav></aside>
-<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
+<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
 <div id="modal" class="modal hidden"><div class="card modal-card"><div class="panel-head"><h3 id="modalTitle"></h3><button class="btn" onclick="closeModal()">Cerrar</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 
@@ -73,10 +73,10 @@ const MASTER_PRICES={
 function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}
 function buildMasterNav(){
  const allowed={
-  admin:["dashboard","operations","services","newservice","calendar","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","ai","audit","privacy","security","profile"],
-  supervisor:["dashboard","operations","services","newservice","calendar","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","ai","audit","privacy","security","profile"],
-  employee:["dashboard","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","profile"],
-  client:["dashboard","services","newservice","calendar","properties","documents","chat","notifications","finance","invoices","receipts","emergency","profile"]
+  admin:["dashboard","operations","services","newservice","calendar","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
+  supervisor:["dashboard","operations","services","newservice","calendar","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
+  employee:["dashboard","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
+  client:["dashboard","services","newservice","calendar","properties","documents","chat","notifications","finance","invoices","receipts","emergency","sync","profile"]
  };
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
@@ -87,7 +87,7 @@ function buildMasterNav(){
   ["SERVICIOS · PRECIOS",[["recurring","↻","Servicios recurrentes"],["catalog","€","Tipologías y Precios"],["quotes","◇","Presupuestos"]]],
   ["FINANZAS",[["finance","€","Finanzas"],["receipts","▧","Recibos / Comprobantes"],["invoices","▤","Facturas"]]],
   ["DOCUMENTOS · COMUNICACIÓN",[["documents","▤","Documentos / Contratos"],["chat","◌","Chat"],["notifications","!","Alertas"],["search","⌕","Pesquisa global"]]],
-  ["GESTIÓN",[["reports","▥","Relatórios"],["ai","✦","ROMANO IA"],["audit","◫","Auditoría"],["privacy","◇","Privacidad / RGPD"],["security","⌘","Seguridad / MFA"],["profile","◎","Mi perfil"]]]
+  ["GESTIÓN",[["reports","▥","Relatórios"],["sync","⇄","Sincronización offline"],["ai","✦","ROMANO IA"],["audit","◫","Auditoría"],["privacy","◇","Privacidad / RGPD"],["security","⌘","Seguridad / MFA"],["profile","◎","Mi perfil"]]]
  ];
  const ok=allowed[role()]||allowed.client;let h="";
  groups.forEach(g=>{const items=g[1].filter(i=>ok.includes(i[0]));if(!items.length)return;h+='<div class="master-group">'+g[0]+'</div>';items.forEach(i=>h+='<button data-page="'+i[0]+'"><span style="display:inline-block;width:24px;color:#e2c27a">'+i[1]+'</span><span>'+i[2]+'</span></button>')});
@@ -141,9 +141,96 @@ const $=id=>document.getElementById(id); let currentUser=null,currentProfile=nul
 const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"};
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 
-const pages={dashboard:["Dashboard 360",renderDashboardMaster],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
+const pages={dashboard:["Dashboard 360",renderDashboardMaster],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+
+const OFFLINE_DB_NAME="romano-partners-offline-v1";
+const OFFLINE_STORE="mutations";
+let __offlineDb=null;
+let __offlineSyncing=false;
+let __offlineListenersReady=false;
+
+function offlineDb(){
+ return new Promise((resolve,reject)=>{
+  if(__offlineDb)return resolve(__offlineDb);
+  const req=indexedDB.open(OFFLINE_DB_NAME,1);
+  req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(OFFLINE_STORE)){const s=db.createObjectStore(OFFLINE_STORE,{keyPath:"id"});s.createIndex("user_status",["userId","localStatus"]);s.createIndex("created_at","createdAt")}};
+  req.onsuccess=()=>{__offlineDb=req.result;resolve(__offlineDb)};
+  req.onerror=()=>reject(req.error);
+ });
+}
+async function offlinePut(item){
+ const db=await offlineDb();
+ return new Promise((resolve,reject)=>{const tx=db.transaction(OFFLINE_STORE,"readwrite");tx.objectStore(OFFLINE_STORE).put(item);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+}
+async function offlineAll(){
+ const db=await offlineDb();
+ return new Promise((resolve,reject)=>{const tx=db.transaction(OFFLINE_STORE,"readonly");const req=tx.objectStore(OFFLINE_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});
+}
+async function offlineDelete(id){
+ const db=await offlineDb();
+ return new Promise((resolve,reject)=>{const tx=db.transaction(OFFLINE_STORE,"readwrite");tx.objectStore(OFFLINE_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+}
+function networkError(error){const m=String(error?.message||error||"").toLowerCase();return !navigator.onLine||/failed to fetch|network|offline|load failed|fetch error|connection/i.test(m)}
+async function queueOfflineMutation(mutationType,payload,baseUpdatedAt=null){
+ if(!currentUser||!currentProfile)throw new Error("Sesión no disponible para guardar offline.");
+ const item={id:crypto.randomUUID(),userId:currentUser.id,companyId:currentProfile.company_id,mutationType,payload,baseUpdatedAt,localStatus:"pending",createdAt:new Date().toISOString(),attempts:0,lastError:null};
+ await offlinePut(item);updateOfflineIndicator();return item;
+}
+async function syncOfflineQueue(){
+ if(__offlineSyncing||!navigator.onLine||!currentUser||!currentProfile)return;
+ __offlineSyncing=true;updateOfflineIndicator("Sincronizando…");
+ try{
+  const all=await offlineAll();
+  const pending=all.filter(x=>x.userId===currentUser.id&&x.localStatus==="pending").sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  for(const item of pending){
+   try{
+    const ins=await sb.from("offline_mutations").insert({id:item.id,company_id:item.companyId,user_id:item.userId,mutation_type:item.mutationType,payload:item.payload,base_updated_at:item.baseUpdatedAt,status:"pending"}).select("id,status,last_error,attempts,applied_at").single();
+    let row=ins.data;
+    if(ins.error&&ins.error.code!=="23505")throw ins.error;
+    if(!row){
+      const q=await sb.from("offline_mutations").select("id,status,last_error,attempts,applied_at").eq("id",item.id).single();
+      if(q.error)throw q.error; row=q.data;
+    }
+    item.localStatus=row.status;item.lastError=row.last_error||null;item.attempts=(row.attempts||item.attempts||0);item.syncedAt=row.applied_at||new Date().toISOString();
+    await offlinePut(item);
+    if(row.status==="applied"){await offlineDelete(item.id)}
+   }catch(err){
+    item.attempts=(item.attempts||0)+1;item.lastError=err.message||String(err);
+    await offlinePut(item);
+    if(networkError(err))break;
+   }
+  }
+ }finally{__offlineSyncing=false;updateOfflineIndicator()}
+}
+async function pendingOfflineCount(){
+ const all=await offlineAll().catch(()=>[]);
+ return all.filter(x=>x.userId===currentUser?.id&&x.localStatus==="pending").length;
+}
+async function updateOfflineIndicator(override){
+ const el=$("syncStatus");if(!el)return;
+ const n=await pendingOfflineCount();
+ el.textContent=override||(!navigator.onLine?("OFFLINE · "+n+" pendientes"):(n?("ONLINE · "+n+" pendientes"):"ONLINE · sincronizado"));
+ el.classList.toggle("gold",!navigator.onLine||n>0);
+}
+async function showSyncCenter(){
+ const all=(await offlineAll().catch(()=>[])).filter(x=>x.userId===currentUser?.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,50);
+ const pending=all.filter(x=>x.localStatus==="pending").length;
+ const conflicts=all.filter(x=>x.localStatus==="conflict").length;
+ const failed=all.filter(x=>["failed","rejected"].includes(x.localStatus)).length;
+ openModal("Sincronización offline","<div class='panel' style='margin:0'><div class='master-kpis' style='grid-template-columns:repeat(3,1fr)'><div class='master-kpi'><small>Pendientes</small><strong>"+pending+"</strong></div><div class='master-kpi'><small>Conflictos</small><strong>"+conflicts+"</strong></div><div class='master-kpi'><small>Errores</small><strong>"+failed+"</strong></div></div><div class='notice'>La cola offline guarda únicamente operaciones pendientes en IndexedDB. No sustituye PostgreSQL, RLS ni la sesión de Supabase.</div><div class='actions' style='margin-top:12px'><button class='btn gold' onclick='syncOfflineQueue();setTimeout(showSyncCenter,900)'>⇄ Sincronizar ahora</button><button class='btn' onclick='closeModal()'>Cerrar</button></div><div style='margin-top:14px'>"+(all.length?all.map(x=>"<div class='line-item'><span><b>"+esc(x.mutationType)+"</b><br><small>"+esc(new Date(x.createdAt).toLocaleString("es-ES"))+"</small></span><span class='pill'>"+esc(x.localStatus)+(x.lastError?" · "+esc(x.lastError.slice(0,80)):"")+"</span></div>").join(""):"<div class='empty'>No hay operaciones offline registradas.</div>")+"</div></div>");
+}
+async function renderSyncPremium(){
+ const all=(await offlineAll().catch(()=>[])).filter(x=>x.userId===currentUser?.id);
+ const pending=all.filter(x=>x.localStatus==="pending").length,conflicts=all.filter(x=>x.localStatus==="conflict").length,failed=all.filter(x=>["failed","rejected"].includes(x.localStatus)).length;
+ $("content").innerHTML="<div class='panel'><div class='panel-head'><div><h3>Sincronización offline</h3><div class='muted'>Cola local segura para operaciones cuando no hay red · servidor sigue siendo la fuente de verdad</div></div><button class='btn gold' onclick='syncOfflineQueue()'>⇄ Sincronizar</button></div><div class='master-kpis' style='grid-template-columns:repeat(3,1fr)'><div class='master-kpi'><small>Pendientes</small><strong>"+pending+"</strong></div><div class='master-kpi'><small>Conflictos</small><strong>"+conflicts+"</strong></div><div class='master-kpi'><small>Errores</small><strong>"+failed+"</strong></div></div><div class='notice'>Los cambios de estado de servicios usan control de versión: si el servicio cambió mientras el dispositivo estaba offline, el servidor no sobrescribe el cambio y marca un conflicto para revisión.</div></div><div class='panel'><div class='panel-head'><h3>Historial de sincronización</h3></div>"+(all.length?all.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,100).map(x=>"<div class='line-item'><span><b>"+esc(x.mutationType)+"</b><br><small>"+esc(new Date(x.createdAt).toLocaleString("es-ES"))+"</small></span><span class='pill'>"+esc(x.localStatus)+(x.lastError?" · "+esc(x.lastError.slice(0,100)):"")+"</span></div>").join(""):"<div class='empty'>Sin operaciones.</div>")+"</div>";
+ updateOfflineIndicator();
+}
+window.addEventListener("online",()=>{updateOfflineIndicator();syncOfflineQueue()});
+window.addEventListener("offline",()=>updateOfflineIndicator());
+async function initOfflineSync(){if(__offlineListenersReady)return;__offlineListenersReady=true;await updateOfflineIndicator();if(navigator.onLine)syncOfflineQueue()}
+
 function toast(t){$("toast").textContent=t;$("toast").classList.remove("hidden");setTimeout(()=>$("toast").classList.add("hidden"),3000)}
 function openModal(t,html){$("modalTitle").textContent=t;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden")}
@@ -197,11 +284,20 @@ async function viewService(id){
  '</div>');
 }
 async function setServiceStatusPremium(id,status){
- const patch={status,updated_at:new Date().toISOString()};
- if(status==="in_progress")patch.started_at=new Date().toISOString();
- if(status==="completed")patch.finished_at=new Date().toISOString();
- const r=await sb.from("services").update(patch).eq("id",id);
- if(r.error)toast(r.error.message);else{toast("Estado actualizado");closeModal();renderServicesMaster()}
+ const now=new Date().toISOString();
+ const current=await sb.from("services").select("id,updated_at").eq("id",id).single();
+ if(current.error){toast(current.error.message);return}
+ const patch={status,updated_at:now};
+ if(status==="in_progress")patch.started_at=now;
+ if(status==="completed")patch.finished_at=now;
+ if(!navigator.onLine){
+   await queueOfflineMutation("service_status",{service_id:id,status,started_at:patch.started_at||null,finished_at:patch.finished_at||null},current.data.updated_at);
+   toast("Sin conexión · estado guardado para sincronizar");
+   return;
+ }
+ const r=await sb.from("services").update(patch).eq("id",id).eq("updated_at",current.data.updated_at);
+ if(r.error){if(networkError(r.error)){await queueOfflineMutation("service_status",{service_id:id,status,started_at:patch.started_at||null,finished_at:patch.finished_at||null},current.data.updated_at);toast("Red interrumpida · estado puesto en cola")}else toast(r.error.message);return}
+ toast("Estado actualizado");closeModal();renderServicesMaster();updateOfflineIndicator()
 }
 async function uploadServiceMedia(serviceId){
  const file=$("serviceMediaFile")?.files?.[0];if(!file)return;
@@ -245,7 +341,7 @@ async function startRealtime(){
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},()=>{const active=document.querySelector("#masterNav button.active")?.dataset.page||"";if(active==="notifications")openPage("notifications")})
  .subscribe();
 }
-function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();buildMasterNav();startRealtime();openPage("dashboard")}
+function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();buildMasterNav();startRealtime();initOfflineSync();openPage("dashboard")}
 function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){const p=pages[key];if(!p)return;$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}currentUser=r.data.user;try{await profileLoad();if(!(await ensureMFA()))return;showApp()}catch(err){await sb.auth.signOut();showLogin(err.message)}});
@@ -305,10 +401,12 @@ async function newQualityChecklist(){
 }
 async function saveQualityChecklist(e){
  e.preventDefault();
- const score=Math.max(0,Math.min(100,Number($("qScore").value||0)));
- const r=await sb.from("quality_checklists").insert({company_id:currentProfile.company_id,service_id:$("qService").value,checklist_type:$("qType").value,score,passed:$("qPassed").value==="true",observations:$("qObs").value.trim()||null,completed_by:currentUser.id,completed_at:new Date().toISOString()});
- if(r.error){toast(r.error.message);return}
- closeModal();toast("Checklist guardado");quality();
+ const score=Math.max(0,Math.min(100,Number($("qScore").value||0))),id=crypto.randomUUID(),completedAt=new Date().toISOString();
+ const payload={id,service_id:$("qService").value,checklist_type:$("qType").value,score,passed:$("qPassed").value==="true",observations:$("qObs").value.trim()||null,completed_at:completedAt};
+ if(!navigator.onLine){await queueOfflineMutation("quality_create",payload);closeModal();toast("Sin conexión · checklist guardado para sincronizar");return}
+ const r=await sb.from("quality_checklists").insert({company_id:currentProfile.company_id,...payload,completed_by:currentUser.id});
+ if(r.error){if(networkError(r.error)){await queueOfflineMutation("quality_create",payload);closeModal();toast("Red interrumpida · checklist puesto en cola")}else toast(r.error.message);return}
+ closeModal();toast("Checklist guardado");quality();updateOfflineIndicator();
 }
 async function emergency(){
  const r=await sb.from("occurrences").select("id,service_id,property_id,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100);
@@ -326,21 +424,28 @@ async function saveEmergency(e){
  const serviceId=$("eService").value||null;
  let propertyId=null;
  if(serviceId){const s=await sb.from("services").select("property_id").eq("id",serviceId).single();if(s.error){toast(s.error.message);return}propertyId=s.data.property_id}
- const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,service_id:serviceId,property_id:propertyId,created_by:currentUser.id,category:$("eCat").value,priority:$("ePriority").value,description:$("eDesc").value.trim(),status:"open"});
- if(r.error){toast(r.error.message);return}
- closeModal();toast("Incidencia registrada y enviada a supervisión");emergency();
+ const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,category:$("eCat").value,priority:$("ePriority").value,description:$("eDesc").value.trim(),status:"open"};
+ if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · incidencia guardada para sincronizar");return}
+ const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
+ if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · incidencia puesta en cola")}else toast(r.error.message);return}
+ closeModal();toast("Incidencia registrada y enviada a supervisión");emergency();updateOfflineIndicator();
 }
 async function resolveEmergency(id){
  const resolution=prompt("Resolución / acción realizada:");if(!resolution)return;
- const r=await sb.from("occurrences").update({status:"resolved",resolution:resolution.trim(),resolved_at:new Date().toISOString()}).eq("id",id);
- if(r.error)toast(r.error.message);else{toast("Incidencia resuelta");emergency()}
+ const payload={occurrence_id:id,resolution:resolution.trim(),resolved_at:new Date().toISOString()};
+ if(!navigator.onLine){await queueOfflineMutation("occurrence_resolve",payload);toast("Sin conexión · resolución guardada para sincronizar");return}
+ const r=await sb.from("occurrences").update({status:"resolved",resolution:payload.resolution,resolved_at:payload.resolved_at}).eq("id",id);
+ if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_resolve",payload);toast("Red interrumpida · resolución puesta en cola")}else toast(r.error.message);return}
+ toast("Incidencia resuelta");emergency();updateOfflineIndicator()
 }
 async function startServiceGPS(serviceId){
  if(!navigator.geolocation){toast("El navegador no permite geolocalización.");return}
  if(window.__romanoWatchId!=null)navigator.geolocation.clearWatch(window.__romanoWatchId);
  const push=async pos=>{
-   const r=await sb.from("employee_locations").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,service_id:serviceId,latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy_m:pos.coords.accuracy});
-   if(r.error)toast(r.error.message);
+   const payload={id:crypto.randomUUID(),service_id:serviceId,latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy_m:pos.coords.accuracy,recorded_at:new Date().toISOString()};
+   if(!navigator.onLine){await queueOfflineMutation("location_insert",payload);return}
+   const r=await sb.from("employee_locations").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,company_id:currentProfile.company_id,...payload});
+   if(r.error){if(networkError(r.error)){await queueOfflineMutation("location_insert",payload)}else toast(r.error.message)}
  };
  navigator.geolocation.getCurrentPosition(push,()=>toast("No fue posible obtener la ubicación."),{enableHighAccuracy:true,timeout:10000,maximumAge:0});
  window.__romanoWatchId=navigator.geolocation.watchPosition(push,()=>{}, {enableHighAccuracy:true,maximumAge:15000,timeout:20000});
