@@ -52,6 +52,31 @@ async function savePremiumService(){
  const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5}});
  if(ev.error)toast(ev.error.message);closeModal();toast("Pedido "+code+" criado · janela de aceitação 5 min");renderServicesMaster();
 }
+
+async function renderChatPremium(){
+ const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\\''+x.id+'\\',\\''+esc(x.title||"Conversación")+'\\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
+}
+async function newChatPremium(){
+ const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
+ openModal("Nuevo chat","<form onsubmit='saveChatPremium(event)'><div class='field'><label>Título</label><input id='ctTitle' required></div><div class='field'><label>Participante</label><select id='ctPerson'>"+(r.data||[]).filter(x=>x.id!==currentUser.id).map(x=>"<option value='"+x.id+"'>"+esc(x.full_name||x.email)+" · "+esc(roleNames[x.role]||x.role)+"</option>").join("")+"</select></div><button class='primary'>Criar conversa</button></form>");
+}
+async function saveChatPremium(e){
+ e.preventDefault();
+ const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title:$("ctTitle").value.trim(),thread_type:"direct",created_by:currentUser.id}).select("id").single();
+ if(t.error){toast(t.error.message);return}
+ const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:$("ctPerson").value}]);
+ if(m.error)toast(m.error.message);else{closeModal();toast("Chat creado");renderChatPremium()}
+}
+async function openChatPremium(id,title){
+ const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
+ openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\\''+id+'\\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
+}
+async function sendChatPremium(e,id){
+ e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
+ const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:id,sender_id:currentUser.id,body});
+ if(r.error)toast(r.error.message);else{toast("Mensaje enviado");openChatPremium(id,$("modalTitle").textContent)}
+}
 </script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f2e9;color:#1c1c19}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -186,7 +211,7 @@ async function aiDispatch(){const r=await sb.from("service_dispatch_attempts").s
 const SUPABASE_URL="https://ztjfvqcutwlfbqmtclyv.supabase.co";
 const SUPABASE_KEY="sb_publishable_OwekejMFUr_3hdujnJzxOw_SI-5vEJj";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const $=id=>document.getElementById(id); let currentUser=null,currentProfile=null;
+const $=id=>document.getElementById(id); let currentUser=null,currentProfile=null,demoMode=false;
 const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"};
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 
@@ -198,6 +223,9 @@ function openModal(t,html){$("modalTitle").textContent=t;$("modalBody").innerHTM
 function closeModal(){$("modal").classList.add("hidden")}
 function role(){return currentProfile?.role}
 function canManage(){return ["admin","supervisor"].includes(role())}
+function canSeeFinance(){return ["admin","client"].includes(role())}
+function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
+function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
 async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
 async function ensureMFA(){const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(a.error)throw a.error;if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){$("mfa").classList.remove("hidden");return false}return true}
@@ -250,6 +278,7 @@ function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add(
 async function openPage(key){const p=pages[key];if(!p)return;$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}currentUser=r.data.user;try{await profileLoad();if(!(await ensureMFA()))return;showApp()}catch(err){await sb.auth.signOut();showLogin(err.message)}});
 $("logout").onclick=async()=>{await sb.auth.signOut();currentUser=null;currentProfile=null;showLogin()};
+$("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
 (async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
