@@ -585,7 +585,6 @@ async function sendChatPremium(e,id){
 }
 
 
-<script>
 /* ROMANO PREMIUM EXPERIENCE — role-aware demonstration and real profile photos */
 function activeDemoRole(){return window.__romanoDemoRole||"admin"}
 function role(){return demoMode&&window.__romanoDemoRole?window.__romanoDemoRole:(currentProfile?.role)}
@@ -717,7 +716,7 @@ setTimeout(()=>{
  const sf=document.querySelector(".side-footer");
  if(sf&&!document.getElementById("profileQuick")){const q=document.createElement("div");q.id="profileQuick";q.className="sf-logout";q.textContent="◉ Mi perfil";q.onclick=()=>openMyProfile();sf.insertBefore(q,sf.lastElementChild);}
 },0);
-</script></script></body></html>
+</script></body></html>
 
 // ===== DEMONSTRACIÓN 360: dados fictícios + fluxo de dispatch =====
 const DEMO_CLIENTS_FULL=[
