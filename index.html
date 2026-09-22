@@ -293,7 +293,7 @@ function canSeeFinance(){return ["admin","client"].includes(role())}
 function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
 function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
-async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
+async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
 async function ensureMFA(){const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(a.error)throw a.error;if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){$("mfa").classList.remove("hidden");return false}return true}
 async function mfaVerify(){const code=$("mfaCode").value.trim();if(!code)return;$("mfaMsg").classList.add("hidden");const f=await sb.auth.mfa.listFactors();if(f.error||!f.data.totp.length){$("mfaMsg").textContent="No se encontró un factor TOTP activo.";$("mfaMsg").classList.remove("hidden");return}const factorId=f.data.totp[0].id;const c=await sb.auth.mfa.challenge({factorId});if(c.error){$("mfaMsg").textContent=c.error.message;$("mfaMsg").classList.remove("hidden");return}const v=await sb.auth.mfa.verify({factorId,challengeId:c.data.id,code});if(v.error){$("mfaMsg").textContent=v.error.message;$("mfaMsg").classList.remove("hidden");return}$("mfa").classList.add("hidden");showApp()}
 $("mfaBtn").onclick=mfaVerify;
@@ -398,7 +398,7 @@ async function startRealtime(){
  .subscribe();
 }
 function doLogout(){sb.auth.signOut()}
-function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();buildMasterNav();startRealtime();initOfflineSync();openPage("dashboard")}
+function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();buildMasterNav();renderProfileVisual();startRealtime();initOfflineSync();openPage("dashboard")}
 function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}currentUser=r.data.user;try{await profileLoad();if(!(await ensureMFA()))return;showApp()}catch(err){await sb.auth.signOut();showLogin(err.message)}});
@@ -584,7 +584,140 @@ async function sendChatPremium(e,id){
  if(r.error)toast(r.error.message);else{toast("Mensaje enviado");openChatPremium(id,$("modalTitle").textContent)}
 }
 
-</script></body></html>
+
+<script>
+/* ROMANO PREMIUM EXPERIENCE — role-aware demonstration and real profile photos */
+function activeDemoRole(){return window.__romanoDemoRole||"admin"}
+function role(){return demoMode&&window.__romanoDemoRole?window.__romanoDemoRole:(currentProfile?.role)}
+function demoRoleData(r){
+ const d={
+  admin:{name:"Rita Romano",role:"admin",avatar:"👩🏻‍💼",headline:"Centro de comando ROMANO PROPERTY CARE",sub:"Controle completo da empresa, operação, financeiro e segurança.",focus:["Operação em vivo","Financeiro","Alertas críticos"]},
+  supervisor:{name:"Marta Fernández",role:"supervisor",avatar:"👩🏻‍💼",headline:"Supervisão operacional em tempo real",sub:"Equipa, agenda, qualidade, dispatch e incidências sob controle.",focus:["Dispatch","Qualidade","Minha equipa"]},
+  employee:{name:"Ana Silva",role:"employee",avatar:"👩🏻‍🧹",headline:"Minha jornada · meus serviços",sub:"Tudo o que precisa para trabalhar, registrar, executar e comprovar.",focus:["Minha jornada","Serviços atribuídos","Materiais"]},
+  client:{name:"Alehost",role:"client",avatar:"🏨",headline:"Seu portfólio de propriedades",sub:"Acompanhe serviços, propriedades, pedidos e documentos em um só lugar.",focus:["Mis propiedades","Mis servicios","Facturação"]}
+ };
+ return d[r]||d.admin;
+}
+async function profileSignedUrl(path){
+ if(!path)return "";
+ if(/^https?:/i.test(path))return path;
+ const q=await sb.storage.from("profile-media").createSignedUrl(path,3600);
+ return q.data?.signedUrl||"";
+}
+async function renderProfileVisual(){
+ const p=demoMode?demoRoleData(activeDemoRole()):currentProfile;
+ const side=$("sideUserName"), sr=$("sideUserRole"), av=$("avatar");
+ if(side)side.textContent=p?.name||p?.full_name||currentUser?.email||"Usuario";
+ if(sr)sr.textContent=roleNames[p?.role||role()]||role();
+ if(av)av.textContent=(p?.name||p?.full_name||"R").charAt(0).toUpperCase();
+ const sf=document.querySelector(".sf-avatar");
+ if(sf){
+   if(demoMode){sf.innerHTML=p.avatar||"👩🏻‍💼";}
+   else{
+     const url=await profileSignedUrl(currentProfile?.avatar_url);
+     sf.innerHTML=url?'<img class="profile-photo" src="'+esc(url)+'" alt="Perfil">':"👩🏻‍💼";
+   }
+ }
+ const rb=$("roleBadge");if(rb)rb.textContent=roleNames[p?.role||role()]||role();
+}
+async function openMyProfile(){
+ const p=demoMode?demoRoleData(activeDemoRole()):currentProfile;
+ const url=demoMode?"":await profileSignedUrl(currentProfile?.avatar_url);
+ const image=url?'<img class="profile-photo large" src="'+esc(url)+'" alt="Perfil">':'<div class="profile-photo large" style="display:grid;place-items:center;background:linear-gradient(145deg,#f3dfba,#c69a50);font-size:45px">👤</div>';
+ openModal("Mi perfil · ROMANO PROPERTY CARE",
+   '<div class="profile-modal-grid"><div>'+image+'</div><div><div class="role-demo-chip">'+esc(roleNames[p?.role||role()]||role())+'</div><h2 style="margin:9px 0 3px;font:23px Georgia">'+esc(p?.name||p?.full_name||"Usuario")+'</h2><div class="muted">'+esc(p?.email||currentUser?.email||"")+'</div></div></div>'+
+   (demoMode?'<div class="notice" style="margin-top:16px">Modo DEMOSTRACIÓN: esta ficha es ficticia y no modifica usuarios reales.</div>':
+   '<form onsubmit="saveMyProfile(event)"><div class="field"><label>Nombre</label><input id="profileName" value="'+esc(currentProfile?.full_name||"")+'" required></div><div class="field"><label>Foto de perfil</label><input id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/heic"></div><div class="notice">La foto fica privada. O arquivo é guardado no Storage protegido e a referência fica vinculada apenas ao seu perfil.</div><button class="primary">Guardar perfil</button></form>')
+ );
+}
+async function saveMyProfile(e){
+ e.preventDefault();
+ const name=$("profileName").value.trim();
+ const file=$("profileAvatarFile").files?.[0];
+ if(!name)return;
+ let avatarPath=currentProfile?.avatar_url||null;
+ if(file){
+   const ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+   avatarPath="profiles/"+currentUser.id+"/avatar."+ext;
+   const up=await sb.storage.from("profile-media").upload(avatarPath,file,{upsert:true,contentType:file.type});
+   if(up.error){toast(up.error.message);return}
+ }
+ const up=await sb.from("profiles").update({full_name:name,avatar_url:avatarPath}).eq("id",currentUser.id);
+ if(up.error){toast(up.error.message);return}
+ await profileLoad();await renderProfileVisual();closeModal();toast("Perfil atualizado.");
+}
+function showDemoRolePicker(){
+ const roles=["admin","supervisor","employee","client"];
+ const cards=roles.map(r=>{
+   const d=demoRoleData(r);
+   return '<button class="demo-role-card '+(activeDemoRole()===r?"active":"")+'" onclick="selectDemoRole(\''+r+'\')"><div class="role-art">'+d.avatar+'</div><b>'+esc(roleNames[r])+'</b><small>'+esc(d.sub)+'</small></button>';
+ }).join("");
+ openModal("Experiência DEMONSTRAÇÃO · escolher perfil",
+   '<div class="demo-flag">DADOS FICTÍCIOS · NUNCA GRAVADOS NA PRODUÇÃO</div>'+
+   '<p class="muted" style="margin:10px 0 0">Teste exatamente a experiência que cada pessoa verá ao entrar no ROMANO PARTNERS.</p>'+
+   '<div class="demo-role-grid">'+cards+'</div>'+
+   '<div class="actions" style="margin-top:14px"><button class="btn gold" onclick="closeModal();openPage(\'dashboard\')">Abrir este perfil</button><button class="btn" onclick="demoMode=false;window.__romanoDemoRole=\'admin\';buildMasterNav();renderProfileVisual();closeModal();openPage(\'dashboard\');toast(\'Modo produção ativado\')">Voltar aos dados reais</button></div>');
+}
+function selectDemoRole(r){
+ window.__romanoDemoRole=r;
+ buildMasterNav();
+ renderProfileVisual();
+ closeModal();
+ openPage("dashboard");
+ toast("Demonstração: "+roleNames[r]);
+}
+function demoRoleDashboardData(r){
+ const base={
+  admin:{
+   kpis:[["Serviços hoje","8","3 em andamento"],["Clientes","5","Ativos"],["Propriedades","12","Em serviço"],["Funcionários","16","Disponíveis"],["Faturado (mês)","€ 4.250","↑ 12%"],["Pendentes","2","Atenção"]],
+   actions:[["Novo serviço","Criar pedido e iniciar dispatch","newservice"],["Novo cliente","Ficha 360 do cliente","clients"],["Nova propriedade","Adicionar apartamento","properties"],["Novo funcionário","Ficha e RH","employees"],["Centro operativo","Mapa + radar + dispatch","operations"],["Alertas","Resolver pendências","notifications"]]
+  },
+  supervisor:{
+   kpis:[["Serviços hoje","8","5 atribuídos"],["Em curso","3","Tempo real"],["Equipa","8","No seu escopo"],["Pendentes","2","Atenção"],["Qualidade","94%","Aprovado"],["Emergências","1","24H"]],
+   actions:[["Criar serviço","Pedido operacional","newservice"],["Minha equipa","Agenda e plano mensal","teams"],["Radar","Mapa em tempo real","locations"],["Qualidade","Checklists e rework","quality"],["Materiais","Solicitações da equipa","materialsreq"],["Emergência 24H","Atender chamado","emergency"]]
+  },
+  employee:{
+   kpis:[["Serviços hoje","4","2 concluídos"],["Próximo","12:00","T2 · Madrid"],["Minha jornada","07:58","Em curso"],["Fotos","12","Evidências"],["Checklist","92%","Qualidade"],["Materiais","2","Solicitados"]],
+   actions:[["Minha jornada","Entrada / saída / GPS","journey"],["Meus serviços","Só serviços atribuídos","services"],["Abrir rota","Mapa do meu serviço","locations"],["Checklist","Qualidade do serviço","quality"],["Pedir material","Saco, vidro, banheiro...","materialsreq"],["Ocorrência","Registrar problema","emergency"]]
+  },
+  client:{
+   kpis:[["Propriedades","4","Ativas"],["Serviços hoje","2","Em andamento"],["Próximo check-in","14:00","T2 · Madrid"],["Concluídos","18","Este mês"],["Faturação","€ 1.280","Este mês"],["Pendentes","1","Atenção"]],
+   actions:[["Minha propriedade","Ver imóveis","properties"],["Pedir limpeza","Novo serviço","newservice"],["Acompanhar","Estados em tempo real","services"],["Adiantar check-in","Solicitar alteração","services"],["Documentos","Contratos e faturas","documents"],["Emergência 24H","Pedir manutenção","emergency"]]
+  }
+ };
+ return base[r]||base.admin;
+}
+async function renderDashboardReference(){
+ if(!demoMode)return renderDashboardMaster();
+ const r=activeDemoRole(), d=demoRoleData(r), dd=demoRoleDashboardData(r);
+ const services=DEMO_SERVICES.slice(0,5);
+ const faces=["👩🏻‍🧹","👩🏻‍🧹","👩🏻‍💼","👨🏻‍🎨","👨🏻‍🔧"];
+ const places=["Apartamento T2 · Málaga","Villa T4 · Marbella","Apartamento T1 · Madrid","Pintura · Madrid Centro","Clínica · Retiro"];
+ const rows=services.map((s,i)=>'<div class="dash-service"><div class="dash-avatar">'+faces[i]+'</div><div><b>'+esc(s.employee_name||["Ana Silva","Carla Santos","Laura Mendes","Pedro Costa","João Martins"][i])+'</b><small>⌖ '+esc(s.service_type)+' · '+esc(s.typology)+'</small><small>⌂ '+places[i]+'</small></div><div><div class="dash-time">'+new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})+'</div><span class="dash-pill '+(s.status==="on_the_way"?"dp-way":s.status==="supervised"?"dp-super":s.status==="completed"?"dp-done":"dp-work")+'">'+esc(statusNames[s.status])+'</span></div></div>').join("");
+ const next=services.slice(0,4).map((s,i)=>'<div class="next-row"><div class="next-time">'+new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})+'</div><div><b>'+esc(s.service_type)+' '+esc(s.typology)+'</b><small>'+places[i]+'</small></div><div class="next-arrow">›</div></div>').join("");
+ const kpis=dd.kpis.map(x=>'<div class="dash-kpi"><div class="ki">'+(x[0].includes("€")?"€":x[0].includes("jornada")?"◷":x[0].includes("Propr")?"⌂":x[0].includes("Serv")?"▣":"♟")+'</div><div><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><em>'+esc(x[2])+'</em></div></div>').join("");
+ const actions=dd.actions.map(a=>'<button class="role-action" onclick="openPage(\''+a[2]+'\')"><strong>'+esc(a[0])+'</strong>'+esc(a[1])+'</button>').join("");
+ const heroArt=r==="employee"?"👩🏻‍🧹":r==="client"?"🏨":r==="supervisor"?"👩🏻‍💼":"👑";
+ const financeNote=(r==="admin"||r==="client")?"Financeiro autorizado · valores com IVA / sem IVA":"Valores financeiros ocultos para este perfil";
+ $("content").innerHTML='<div class="dashboard-shell">'+
+ '<div class="dashboard-header"><div class="dashboard-welcome"><h1>☼&nbsp; '+esc(greeting())+', '+esc(d.name)+'</h1><p>'+esc(d.sub)+'</p><div class="verse">“Confia no Senhor tudo o que fazes, e teus planos serão bem-sucedidos.”<br><span>Provérbios 16:3</span></div></div><div class="dashboard-actions"><input id="dashSearch" class="dash-search" placeholder="⌕  Buscar..."><button id="dashBell" class="dash-bell">♟<i>3</i></button><div class="dash-brand-badge"><strong>♛ R</strong><small>ROMANO PARTNERS</small></div></div><div class="dashboard-date">'+new Date().toLocaleDateString("es-ES",{weekday:"long",day:"2-digit",month:"long"})+'<strong>'+new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})+'</strong></div></div>'+
+ '<div class="dash-hero"><div class="dash-hero-copy"><div class="eyebrow">ROMANO PROPERTY CARE · MANAGEMENT</div><h2>PROPIEDADES IMPECABLES<br>CLIENTES SATISFECHOS</h2><p>Experiência premium · operação '+(r==="client"?"do seu portfólio":"em tempo real")+'</p></div><div class="room-art"><div class="room-window"></div><div class="room-sofa"></div><div class="room-table"></div><div class="room-plant">🌿</div></div></div>'+
+ '<div class="dash-kpis">'+kpis+'</div>'+
+ '<div class="role-dashboard-hero"><div class="rdh-copy"><h2>'+esc(d.headline)+'</h2><p>'+esc(d.sub)+' · <span class="role-live"><i></i> sistema online</span></p></div><div class="rdh-art">'+heroArt+'</div></div>'+
+ '<div class="dash-grid" style="margin-top:13px"><div class="dash-card"><div class="dash-card-head"><h3>♧ '+(r==="employee"?"Meus serviços":"Operação em tempo real")+'</h3><span>DEMONSTRACIÓN</span></div><div class="dash-list">'+rows+'</div></div><div class="dash-card"><div class="dash-card-head"><h3>⌖ '+(r==="client"?"Minhas propriedades":"Mapa da equipa")+'</h3><span class="role-live"><i></i> Tiempo real</span></div><div class="dash-map-wrap"><div id="dashMap" class="dash-map"></div></div></div><div><div class="dash-card"><div class="dash-card-head"><h3>▣ Próximos serviços</h3><span>Agenda</span></div><div class="dash-next">'+next+'</div></div><div class="dash-devotional"><h4>▣ Devocional del día</h4><p>“Confía al Señor todo lo que haces, y tus planes serán bien-sucedidos.”</p><small>Proverbios 16:3</small></div></div></div>'+
+ '<div class="panel" style="margin-top:13px"><div class="panel-head"><div><h3>Acesso rápido · '+esc(roleNames[r])+'</h3><div class="muted">'+esc(financeNote)+'</div></div><span class="role-demo-chip">DEMONSTRACIÓN · '+esc(roleNames[r])+'</span></div><div class="role-action-grid">'+actions+'</div></div>'+
+ '<div class="dash-bottom"><div class="dash-brand-panel"><strong>Excelência<br>em cada detalhe</strong><span>♛ R</span><small>ROMANO PROPERTY CARE · MANAGEMENT</small><div class="dash-cleaner">'+heroArt+'</div></div><div class="dash-support"><div class="wa">◉</div><b>Comunicação ROMANO</b><small>Chat interno · suporte dentro do app</small><button onclick="openPage(\'chat\')">Abrir comunicação →</button></div></div></div>';
+ $("dashSearch").onkeydown=e=>{if(e.key==="Enter")openPage("search")};$("dashBell").onclick=()=>openPage("notifications");
+ if(window.L){const m=L.map("dashMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);[[40.425,-3.695,"Ana Silva · A camino"],[40.415,-3.69,"Pedro Costa · En servicio"],[40.405,-3.72,"Laura Mendes · Supervisado"],[40.43,-3.68,"Apartamento · DEMO"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));}
+}
+function selectDemoRoleFromHeader(){if(!demoMode){demoMode=true;window.__romanoDemoRole="admin";$("demoBtn").textContent="DEMO ACTIVO";$("demoBtn").classList.add("gold");buildMasterNav();renderProfileVisual();}showDemoRolePicker();}
+setTimeout(()=>{
+ const b=$("demoBtn");
+ if(b)b.onclick=()=>selectDemoRoleFromHeader();
+ const sf=document.querySelector(".side-footer");
+ if(sf&&!document.getElementById("profileQuick")){const q=document.createElement("div");q.id="profileQuick";q.className="sf-logout";q.textContent="◉ Mi perfil";q.onclick=()=>openMyProfile();sf.insertBefore(q,sf.lastElementChild);}
+},0);
+</script></script></body></html>
 
 // ===== DEMONSTRACIÓN 360: dados fictícios + fluxo de dispatch =====
 const DEMO_CLIENTS_FULL=[
