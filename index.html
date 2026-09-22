@@ -1,2 +1,93 @@
 <!doctype html>
-<html lang="pt-PT"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ROMANO PARTNERS</title></head><body><div id="root"></div><script>document.documentElement.dataset.status='base-uploaded';</script></body></html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROMANO PARTNERS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f2e9;color:#1c1c19}
+button,input{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+.login{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,#d4b06a22,transparent 35%),linear-gradient(135deg,#1c1c19,#2a2a26)}
+.card{background:#fffdf9;border:1px solid #e5dac8;border-radius:28px;box-shadow:0 30px 80px #0005}
+.login-card{width:min(440px,100%);padding:38px}.brand{text-align:center}.logo{width:82px;height:82px;border-radius:24px;margin:auto;background:linear-gradient(145deg,#b7893f,#d4b06a);color:#fff;display:grid;place-items:center;font-family:Georgia,serif;font-size:46px;font-weight:700;box-shadow:0 12px 30px #b7893f55}.brand h1{font:32px Georgia,serif;letter-spacing:3px;margin:20px 0 5px}.brand p{margin:0;color:#777;font-size:12px;letter-spacing:3px}.field{margin-top:18px}.field label{display:block;font-size:12px;margin-bottom:7px}.field input{width:100%;height:46px;border:1px solid #e5dac8;border-radius:13px;padding:0 14px;background:#fff;outline:none}.field input:focus{border-color:#b7893f;box-shadow:0 0 0 3px #b7893f18}.primary{width:100%;height:48px;border:0;border-radius:999px;background:#1c1c19;color:white;font-weight:700;margin-top:22px}.msg{margin-top:14px;padding:11px 13px;border-radius:12px;background:#fff3df;color:#79561e;font-size:12px;line-height:1.4}
+.app{min-height:100vh;display:flex}.side{width:250px;background:#1c1c19;color:white;padding:24px 16px;position:fixed;inset:0 auto 0 0}.side-brand{padding:4px 10px 26px;border-bottom:1px solid #ffffff18}.side-brand strong{font:25px Georgia,serif;letter-spacing:2px}.side-brand span{display:block;color:#d4b06a;font-size:9px;letter-spacing:3px;margin-top:4px}.nav{padding-top:18px}.nav button{width:100%;border:0;background:transparent;color:#fff9;text-align:left;padding:12px 13px;border-radius:12px;margin:3px 0;font-size:13px}.nav button.active,.nav button:hover{background:#b7893f;color:white}.main{margin-left:250px;flex:1}.top{height:76px;background:#fffdf9;border-bottom:1px solid #e5dac8;display:flex;align-items:center;justify-content:space-between;padding:0 30px;position:sticky;top:0;z-index:5}.top h2{margin:0;font:25px Georgia,serif}.user{display:flex;align-items:center;gap:10px;font-size:12px}.avatar{width:36px;height:36px;border-radius:50%;background:#b7893f;color:white;display:grid;place-items:center;font-weight:700}.content{padding:30px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.stat{padding:20px;background:#fffdf9;border:1px solid #e5dac8;border-radius:18px}.stat small{color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px}.stat strong{display:block;font-size:28px;margin-top:8px}.panel{margin-top:20px;background:#fffdf9;border:1px solid #e5dac8;border-radius:20px;padding:20px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.panel h3{margin:0;font-size:15px}.pill{padding:5px 9px;border-radius:999px;background:#f7f2e9;color:#79561e;font-size:10px}.table{width:100%;border-collapse:collapse;font-size:12px}.table th,.table td{text-align:left;padding:12px 8px;border-bottom:1px solid #eee7dc}.muted{color:#888}.empty{padding:35px;text-align:center;color:#999;font-size:12px}.logout{margin-top:20px;color:#fff8!important}
+@media(max-width:900px){.side{width:72px;padding:18px 10px}.side-brand strong{font-size:0}.side-brand strong:after{content:"R";font-size:27px}.side-brand span,.nav button span{display:none}.nav button{text-align:center}.main{margin-left:72px}.grid{grid-template-columns:repeat(2,1fr)}.content{padding:18px}}
+@media(max-width:560px){.grid{grid-template-columns:1fr}.top{padding:0 16px}.content{padding:14px}.login-card{padding:28px}}
+</style>
+</head>
+<body>
+<div id="login" class="login">
+  <div class="card login-card">
+    <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
+    <form id="loginForm">
+      <div class="field"><label>Correo electrónico</label><input id="email" type="email" autocomplete="username" required placeholder="admin@empresa.com"></div>
+      <div class="field"><label>Contraseña</label><input id="password" type="password" autocomplete="current-password" required placeholder="••••••••"></div>
+      <button class="primary" type="submit">Entrar al sistema</button>
+      <div id="loginMsg" class="msg hidden"></div>
+    </form>
+  </div>
+</div>
+<div id="app" class="app hidden">
+  <aside class="side">
+    <div class="side-brand"><strong>ROMANO</strong><span>PARTNERS</span></div>
+    <nav class="nav">
+      <button class="active" data-page="dashboard">◈ <span>Dashboard</span></button>
+      <button data-page="clients">♙ <span>Clientes</span></button>
+      <button data-page="properties">⌂ <span>Propiedades</span></button>
+      <button data-page="services">◉ <span>Servicios</span></button>
+      <button data-page="employees">♧ <span>Funcionarios</span></button>
+      <button data-page="calendar">▦ <span>Calendario</span></button>
+      <button data-page="documents">▤ <span>Documentos</span></button>
+      <button data-page="finance">€ <span>Finanzas</span></button>
+      <button data-page="notifications">! <span>Alertas</span></button>
+      <button id="logout" class="logout">↪ <span>Cerrar sesión</span></button>
+    </nav>
+  </aside>
+  <main class="main">
+    <header class="top"><h2 id="pageTitle">Dashboard</h2><div class="user"><div id="userEmail"></div><div class="avatar">R</div></div></header>
+    <section id="content" class="content"></section>
+  </main>
+</div>
+<script>
+const SUPABASE_URL="https://ztjfvqcutwlfbqmtclyv.supabase.co";
+const SUPABASE_KEY="sb_publishable_OwekejMFUr_3hdujnJzxOw_SI-5vEJj";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+let currentUser=null;
+const pages={
+ dashboard:{title:"Dashboard",render:renderDashboard},
+ clients:{title:"Clientes",render:()=>renderTable("Clientes","clients",["id","nome","email"])},
+ properties:{title:"Propiedades",render:()=>renderTable("Propiedades","properties",["id","nome","endereco"])},
+ services:{title:"Servicios",render:()=>renderTable("Servicios","services",["id","status","fecha"])},
+ employees:{title:"Funcionarios",render:()=>renderTable("Funcionarios","employee_profiles",["id","nome","cargo"])},
+ calendar:{title:"Calendario",render:()=>simple("Calendario","La agenda y asignación de jornadas se conectará a servicios reales de PostgreSQL.")},
+ documents:{title:"Documentos",render:()=>simple("Documentos","Área segura para contratos, recibos, facturas y archivos. El acceso se controlará mediante Storage + RLS.")},
+ finance:{title:"Finanzas",render:()=>simple("Finanzas","Flujo previsto: servicio → factura → pago → costes → margen → beneficio.")},
+ notifications:{title:"Alertas",render:()=>simple("Alertas","Centro de alertas para incidencias, materiales, vencimientos y supervisión.")}
+};
+function simple(t,d){$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>'+t+'</h3><span class="pill">PRODUCCIÓN</span></div><p class="muted">'+d+'</p></div>'}
+async function count(table){const r=await sb.from(table).select("*",{count:"exact",head:true});return r.count||0}
+async function renderDashboard(){
+  const tables=[["Clientes","clients"],["Propiedades","properties"],["Servicios","services"],["Funcionarios","employee_profiles"]];
+  const counts=await Promise.all(tables.map(x=>count(x)));
+  $("content").innerHTML='<div class="grid">'+counts.map((n,i)=>'<div class="stat"><small>'+tables[i][0]+'</small><strong>'+n+'</strong></div>').join("")+'</div><div class="panel"><div class="panel-head"><h3>ROMANO PARTNERS</h3><span class="pill">Supabase conectado</span></div><div class="empty">Base limpia y lista para datos reales. Los módulos dejarán de usar localStorage y trabajarán con PostgreSQL + RLS.</div></div>';
+}
+async function renderTable(title,table,cols){
+  const r=await sb.from(table).select(cols.join(",")).limit(50);
+  if(r.error){$("content").innerHTML='<div class="panel"><h3>'+title+'</h3><div class="msg">'+escapeHtml(r.error.message)+'</div></div>';return}
+  const rows=r.data||[];
+  $("content").innerHTML='<div class="panel"><div class="panel-head"><h3>'+title+'</h3><span class="pill">'+rows.length+' registros</span></div>'+ (rows.length?'<table class="table"><thead><tr>'+cols.map(c=>'<th>'+c+'</th>').join("")+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+cols.map(c=>'<td>'+escapeHtml(row[c]??"—")+'</td>').join("")+'</tr>').join("")+'</tbody></table>':'<div class="empty">No hay registros todavía.</div>')+'</div>';
+}
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function showApp(){ $("login").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";openPage("dashboard")}
+function showLogin(msg){$("app").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
+async function openPage(key){const p=pages[key];if(!p)return;$("pageTitle").textContent=p.title;document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));await p.render()}
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error){$("loginMsg").textContent=error.message;$("loginMsg").classList.remove("hidden");return}currentUser=data.user;showApp()});
+$("logout").addEventListener("click",async()=>{await sb.auth.signOut();currentUser=null;showLogin()});
+document.querySelectorAll(".nav button[data-page]").forEach(b=>b.addEventListener("click",()=>openPage(b.dataset.page)));
+sb.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;if(currentUser)showApp();else showLogin()});
+(async()=>{const {data}=await sb.auth.getSession();currentUser=data.session?.user||null;if(currentUser)showApp();})();
+</script>
+</body>
+</html>
