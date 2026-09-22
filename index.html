@@ -3,81 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ROMANO PARTNERS · Property Care</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-async function renderClientsPremium(){return renderClients()}
-async function renderPropertiesPremium(){return renderProperties()}
-async function renderEmployeesPremium(){return renderEmployees()}
-async function renderUnitsPremium(){return units()}
-async function renderTeamsPremium(){return teams()}
-async function renderStockPremium(){return renderStock()}
-async function renderLinenPremium(){return linen()}
-async function renderLaundryPremium(){return laundry()}
-async function renderAmenitiesPremium(){return amenities()}
-async function renderRecurringPremium(){return recurring()}
-async function renderQuotesPremium(){return quotes()}
-async function renderFinancePremium(){return renderFinance()}
-async function renderDocumentsPremium(){return renderDocuments()}
-async function renderSearchPremium(){return searchPage()}
-async function renderReportsPremium(){return reports()}
-async function renderAuditPremium(){return audit()}
-async function renderPrivacyPremium(){return privacy()}
-async function renderProfilePremium(){return profile()}
-async function renderNotificationsPremium(){return renderNotifications()}
-async function renderMaintenancePremium(){return maintenance()}
-async function renderQualityPremium(){return quality()}
-async function renderEmergencyPremium(){return emergency()}
-async function newServicePremium(){
- const p=await sb.from("properties").select("id,name,code,client_id,property_type").order("name");
- const c=await sb.from("clients").select("id,name").order("name");
- const clientOptions=(c.data||[]).map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
- openModal("Nuevo servicio · pedido completo","<div class='wizard-grid'><div><div class='step'><b>1</b><strong>Cliente → apartamento</strong></div><div class='two'><div class='field'><label>Cliente</label><select id='mpClient' onchange='masterFilterProperties()'>"+clientOptions+"</select></div><div class='field'><label>Propiedad</label><select id='mpProperty' onchange='masterRecalc()'>"+(p.data||[]).map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+"</option>").join("")+"</select></div></div><div class='step' style='margin-top:15px'><b>2</b><strong>Limpieza</strong></div><div class='two'><div class='field'><label>Tipo de servicio</label><select id='mpType'><option value='limpieza_alojamiento'>Limpieza</option><option value='check_in'>Check-in</option><option value='check_out'>Check-out</option><option value='airbnb_alojamiento_local'>Airbnb / Alojamiento Local</option><option value='hotel_5_estrellas'>Hotel 5 estrellas</option></select></div><div class='field'><label>Tipología</label><select id='mpCleaning' onchange='masterRecalc()'>"+MASTER_PRICES.cleaning.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+(x.price==null?" · Consultar":" · "+masterMoney(x.price))+"</option>").join("")+"</select></div></div><div class='two'><div class='field'><label>Fecha y hora</label><input id='mpDate' type='datetime-local'></div><div class='field'><label>Prioridad</label><select id='mpPriority'><option value='normal'>Normal</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div><div class='step' style='margin-top:15px'><b>3</b><strong>Ropa de cama / baño</strong></div><div class='choice-grid'>"+MASTER_PRICES.linen.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-name='"+esc(x.name)+"' data-price='"+x.price+"' data-tax='1' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+masterMoney(x.price)+" · IVA incluido</small></label>").join("")+"</div><div class='step' style='margin-top:15px'><b>4</b><strong>Lavandería / Amenities</strong></div><div class='choice-grid'>"+MASTER_PRICES.laundry.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-name='"+esc(x.name)+"' data-price='"+x.price+"' data-tax='0' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+masterMoney(x.price)+" · sin IVA</small></label>").join("")+MASTER_PRICES.amenities.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-name='"+esc(x.name)+"' data-price='"+(x.price||0)+"' data-tax='1' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+(x.price?masterMoney(x.price):"Consultar")+"</small></label>").join("")+"</div><div class='step' style='margin-top:15px'><b>5</b><strong>Mantenimiento adicional</strong></div><div class='two'><div class='field'><label>Tipo</label><select id='mpMaint' onchange='masterRecalc()'><option value=''>Sem manutenção</option>"+MASTER_PRICES.maintenance.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+" · "+masterMoney(x.price)+"</option>").join("")+"</select></div><div class='field'><label>Observación</label><input id='mpMaintNote' placeholder='Pintura, reparación, silicone, instalación...'></div></div><div class='field'><label>Observaciones generales</label><textarea id='mpNotes'></textarea></div></div><div><div class='panel'><div class='panel-head'><h3>Nota del servicio</h3><span class='pill'>Admin / Cliente</span></div><div class='field'><label>País fiscal</label><select id='mpVat' onchange='masterRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='mpLines'></div><div class='line-item'><span>Sin IVA</span><b id='mpSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='mpTax'>0,00 €</b></div><div class='line-item'><span class='big-total'>Total</span><b id='mpTotal' class='big-total'>0,00 €</b></div><div class='notice'>Limpieza y lavandería: sin IVA. Mantenimiento, ropa y amenities: IVA incluido conforme à proposta. T5 e Premium: consultar.</div><button class='primary' onclick='savePremiumService()'>Crear pedido y activar dispatch</button></div></div></div>");
- $("mpDate").value=new Date(Date.now()+3600000).toISOString().slice(0,16);masterRecalc();
-}
-function masterFilterProperties(){const cid=$("mpClient").value;document.querySelectorAll("#mpProperty option").forEach(o=>o.hidden=false);masterRecalc()}
-function masterRecalc(){
- const vat=Number($("mpVat")?.value||21)/100,lines=[];const cl=MASTER_PRICES.cleaning.find(x=>x.code===$("mpCleaning")?.value);if(cl&&cl.price!=null)lines.push({name:cl.name,price:cl.price,tax:cl.tax});
- document.querySelectorAll(".mpItem:checked").forEach(x=>{const p=Number(x.dataset.price||0);if(p>0)lines.push({name:x.dataset.name,price:p,tax:x.dataset.tax==="1"})});
- const mt=MASTER_PRICES.maintenance.find(x=>x.code===$("mpMaint")?.value);if(mt)lines.push({name:mt.name,price:mt.price,tax:true});
- let sub=0,tax=0,total=0;lines.forEach(x=>{const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;total+=gross}});
- $("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Añada elementos.</div>";
- $("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);$("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total;
-}
-async function savePremiumService(){
- const prop=$("mpProperty").value;if(!prop){toast("Seleccione una propiedad.");return}
- const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}
- const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0),rate=Number($("mpVat").value||21),code="SRV-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6);
- const s=await sb.from("services").insert({company_id:currentProfile.company_id,client_id:pr.data.client_id,property_id:prop,code,service_type:$("mpType").value,typology:($("mpCleaning").value||"T1").split("-")[0],priority:$("mpPriority").value,scheduled_at:new Date($("mpDate").value).toISOString(),instructions:$("mpNotes").value.trim()||null,notes:$("mpMaintNote").value.trim()||null,status:"requested",client_requested_at:new Date().toISOString(),response_deadline_at:new Date(Date.now()+300000).toISOString()}).select("id").single();
- if(s.error){toast(s.error.message);return}
- if(role()==="admin"){const f=await sb.from("service_financials").insert({company_id:currentProfile.company_id,service_id:s.data.id,subtotal:sub,tax_rate:rate,tax_amount:tax,total,created_by:currentUser.id});if(f.error)toast(f.error.message)}
- const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5}});
- if(ev.error)toast(ev.error.message);closeModal();toast("Pedido "+code+" criado · janela de aceitação 5 min");renderServicesMaster();
-}
-
-async function renderChatPremium(){
- const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\\''+x.id+'\\',\\''+esc(x.title||"Conversación")+'\\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
-}
-async function newChatPremium(){
- const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
- openModal("Nuevo chat","<form onsubmit='saveChatPremium(event)'><div class='field'><label>Título</label><input id='ctTitle' required></div><div class='field'><label>Participante</label><select id='ctPerson'>"+(r.data||[]).filter(x=>x.id!==currentUser.id).map(x=>"<option value='"+x.id+"'>"+esc(x.full_name||x.email)+" · "+esc(roleNames[x.role]||x.role)+"</option>").join("")+"</select></div><button class='primary'>Criar conversa</button></form>");
-}
-async function saveChatPremium(e){
- e.preventDefault();
- const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title:$("ctTitle").value.trim(),thread_type:"direct",created_by:currentUser.id}).select("id").single();
- if(t.error){toast(t.error.message);return}
- const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:$("ctPerson").value}]);
- if(m.error)toast(m.error.message);else{closeModal();toast("Chat creado");renderChatPremium()}
-}
-async function openChatPremium(id,title){
- const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
- openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\\''+id+'\\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
-}
-async function sendChatPremium(e,id){
- e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
- const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:id,sender_id:currentUser.id,body});
- if(r.error)toast(r.error.message);else{toast("Mensaje enviado");openChatPremium(id,$("modalTitle").textContent)}
-}
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f2e9;color:#1c1c19}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
 .login{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,#d4b06a30,transparent 35%),linear-gradient(135deg,#191916,#2c2a25)}
@@ -282,4 +208,79 @@ $("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
 (async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
+
+async function renderClientsPremium(){return renderClients()}
+async function renderPropertiesPremium(){return renderProperties()}
+async function renderEmployeesPremium(){return renderEmployees()}
+async function renderUnitsPremium(){return units()}
+async function renderTeamsPremium(){return teams()}
+async function renderStockPremium(){return renderStock()}
+async function renderLinenPremium(){return linen()}
+async function renderLaundryPremium(){return laundry()}
+async function renderAmenitiesPremium(){return amenities()}
+async function renderRecurringPremium(){return recurring()}
+async function renderQuotesPremium(){return quotes()}
+async function renderFinancePremium(){return renderFinance()}
+async function renderDocumentsPremium(){return renderDocuments()}
+async function renderSearchPremium(){return searchPage()}
+async function renderReportsPremium(){return reports()}
+async function renderAuditPremium(){return audit()}
+async function renderPrivacyPremium(){return privacy()}
+async function renderProfilePremium(){return profile()}
+async function renderNotificationsPremium(){return renderNotifications()}
+async function renderMaintenancePremium(){return maintenance()}
+async function renderQualityPremium(){return quality()}
+async function renderEmergencyPremium(){return emergency()}
+async function newServicePremium(){
+ const p=await sb.from("properties").select("id,name,code,client_id,property_type").order("name");
+ const c=await sb.from("clients").select("id,name").order("name");
+ const clientOptions=(c.data||[]).map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
+ openModal("Nuevo servicio · pedido completo","<div class='wizard-grid'><div><div class='step'><b>1</b><strong>Cliente → apartamento</strong></div><div class='two'><div class='field'><label>Cliente</label><select id='mpClient' onchange='masterFilterProperties()'>"+clientOptions+"</select></div><div class='field'><label>Propiedad</label><select id='mpProperty' onchange='masterRecalc()'>"+(p.data||[]).map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+"</option>").join("")+"</select></div></div><div class='step' style='margin-top:15px'><b>2</b><strong>Limpieza</strong></div><div class='two'><div class='field'><label>Tipo de servicio</label><select id='mpType'><option value='limpieza_alojamiento'>Limpieza</option><option value='check_in'>Check-in</option><option value='check_out'>Check-out</option><option value='airbnb_alojamiento_local'>Airbnb / Alojamiento Local</option><option value='hotel_5_estrellas'>Hotel 5 estrellas</option></select></div><div class='field'><label>Tipología</label><select id='mpCleaning' onchange='masterRecalc()'>"+MASTER_PRICES.cleaning.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+(x.price==null?" · Consultar":" · "+masterMoney(x.price))+"</option>").join("")+"</select></div></div><div class='two'><div class='field'><label>Fecha y hora</label><input id='mpDate' type='datetime-local'></div><div class='field'><label>Prioridad</label><select id='mpPriority'><option value='normal'>Normal</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div><div class='step' style='margin-top:15px'><b>3</b><strong>Ropa de cama / baño</strong></div><div class='choice-grid'>"+MASTER_PRICES.linen.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-name='"+esc(x.name)+"' data-price='"+x.price+"' data-tax='1' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+masterMoney(x.price)+" · IVA incluido</small></label>").join("")+"</div><div class='step' style='margin-top:15px'><b>4</b><strong>Lavandería / Amenities</strong></div><div class='choice-grid'>"+MASTER_PRICES.laundry.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-name='"+esc(x.name)+"' data-price='"+x.price+"' data-tax='0' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+masterMoney(x.price)+" · sin IVA</small></label>").join("")+MASTER_PRICES.amenities.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-name='"+esc(x.name)+"' data-price='"+(x.price||0)+"' data-tax='1' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+(x.price?masterMoney(x.price):"Consultar")+"</small></label>").join("")+"</div><div class='step' style='margin-top:15px'><b>5</b><strong>Mantenimiento adicional</strong></div><div class='two'><div class='field'><label>Tipo</label><select id='mpMaint' onchange='masterRecalc()'><option value=''>Sem manutenção</option>"+MASTER_PRICES.maintenance.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+" · "+masterMoney(x.price)+"</option>").join("")+"</select></div><div class='field'><label>Observación</label><input id='mpMaintNote' placeholder='Pintura, reparación, silicone, instalación...'></div></div><div class='field'><label>Observaciones generales</label><textarea id='mpNotes'></textarea></div></div><div><div class='panel'><div class='panel-head'><h3>Nota del servicio</h3><span class='pill'>Admin / Cliente</span></div><div class='field'><label>País fiscal</label><select id='mpVat' onchange='masterRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='mpLines'></div><div class='line-item'><span>Sin IVA</span><b id='mpSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='mpTax'>0,00 €</b></div><div class='line-item'><span class='big-total'>Total</span><b id='mpTotal' class='big-total'>0,00 €</b></div><div class='notice'>Limpieza y lavandería: sin IVA. Mantenimiento, ropa y amenities: IVA incluido conforme à proposta. T5 e Premium: consultar.</div><button class='primary' onclick='savePremiumService()'>Crear pedido y activar dispatch</button></div></div></div>");
+ $("mpDate").value=new Date(Date.now()+3600000).toISOString().slice(0,16);masterRecalc();
+}
+function masterFilterProperties(){const cid=$("mpClient").value;document.querySelectorAll("#mpProperty option").forEach(o=>o.hidden=false);masterRecalc()}
+function masterRecalc(){
+ const vat=Number($("mpVat")?.value||21)/100,lines=[];const cl=MASTER_PRICES.cleaning.find(x=>x.code===$("mpCleaning")?.value);if(cl&&cl.price!=null)lines.push({name:cl.name,price:cl.price,tax:cl.tax});
+ document.querySelectorAll(".mpItem:checked").forEach(x=>{const p=Number(x.dataset.price||0);if(p>0)lines.push({name:x.dataset.name,price:p,tax:x.dataset.tax==="1"})});
+ const mt=MASTER_PRICES.maintenance.find(x=>x.code===$("mpMaint")?.value);if(mt)lines.push({name:mt.name,price:mt.price,tax:true});
+ let sub=0,tax=0,total=0;lines.forEach(x=>{const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;total+=gross}});
+ $("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Añada elementos.</div>";
+ $("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);$("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total;
+}
+async function savePremiumService(){
+ const prop=$("mpProperty").value;if(!prop){toast("Seleccione una propiedad.");return}
+ const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}
+ const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0),rate=Number($("mpVat").value||21),code="SRV-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6);
+ const s=await sb.from("services").insert({company_id:currentProfile.company_id,client_id:pr.data.client_id,property_id:prop,code,service_type:$("mpType").value,typology:($("mpCleaning").value||"T1").split("-")[0],priority:$("mpPriority").value,scheduled_at:new Date($("mpDate").value).toISOString(),instructions:$("mpNotes").value.trim()||null,notes:$("mpMaintNote").value.trim()||null,status:"requested",client_requested_at:new Date().toISOString(),response_deadline_at:new Date(Date.now()+300000).toISOString()}).select("id").single();
+ if(s.error){toast(s.error.message);return}
+ if(role()==="admin"){const f=await sb.from("service_financials").insert({company_id:currentProfile.company_id,service_id:s.data.id,subtotal:sub,tax_rate:rate,tax_amount:tax,total,created_by:currentUser.id});if(f.error)toast(f.error.message)}
+ const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5}});
+ if(ev.error)toast(ev.error.message);closeModal();toast("Pedido "+code+" criado · janela de aceitação 5 min");renderServicesMaster();
+}
+
+async function renderChatPremium(){
+ const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\\''+x.id+'\\',\\''+esc(x.title||"Conversación")+'\\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
+}
+async function newChatPremium(){
+ const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
+ openModal("Nuevo chat","<form onsubmit='saveChatPremium(event)'><div class='field'><label>Título</label><input id='ctTitle' required></div><div class='field'><label>Participante</label><select id='ctPerson'>"+(r.data||[]).filter(x=>x.id!==currentUser.id).map(x=>"<option value='"+x.id+"'>"+esc(x.full_name||x.email)+" · "+esc(roleNames[x.role]||x.role)+"</option>").join("")+"</select></div><button class='primary'>Criar conversa</button></form>");
+}
+async function saveChatPremium(e){
+ e.preventDefault();
+ const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title:$("ctTitle").value.trim(),thread_type:"direct",created_by:currentUser.id}).select("id").single();
+ if(t.error){toast(t.error.message);return}
+ const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:$("ctPerson").value}]);
+ if(m.error)toast(m.error.message);else{closeModal();toast("Chat creado");renderChatPremium()}
+}
+async function openChatPremium(id,title){
+ const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
+ openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\\''+id+'\\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
+}
+async function sendChatPremium(e,id){
+ e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
+ const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:id,sender_id:currentUser.id,body});
+ if(r.error)toast(r.error.message);else{toast("Mensaje enviado");openChatPremium(id,$("modalTitle").textContent)}
+}
+
 </script></body></html>
