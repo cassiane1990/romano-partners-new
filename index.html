@@ -188,7 +188,7 @@ async function viewService(id){
  openModal("Ficha del servicio",
  '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
  '<div class="field"><label>Instrucciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
- (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(\''+x.id+'\',\''+s+'\')">'+esc(statusNames[s])+'</button>').join("")+'</div>':"")+
+ (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(\''+x.id+'\',\''+s+'\')">'+esc(statusNames[s])+'</button>').join("")+((role()==="employee"||role()==="supervisor")?'<button class="btn" onclick="startServiceGPS(\''+x.id+'\')">◎ Activar GPS</button><button class="btn" onclick="stopServiceGPS()">Detener GPS</button>':'')+'<button class="btn" onclick="openPage(\'quality\')">✓ Checklist</button><button class="btn" onclick="openPage(\'emergency\')">⚠ Incidencia</button></div>':"")+
  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+
  ((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+
  '</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div>'+
@@ -288,6 +288,65 @@ async function renderPrivacyPremium(){return privacy()}
 async function renderProfilePremium(){return profile()}
 async function renderNotificationsPremium(){return renderNotifications()}
 async function renderMaintenancePremium(){return maintenance()}
+async function quality(){
+ const r=await sb.from("quality_checklists").select("id,service_id,checklist_type,score,passed,observations,completed_by,completed_at,created_at").order("created_at",{ascending:false}).limit(100);
+ const svc=await sb.from("services").select("id,code,service_type,typology,status").order("scheduled_at",{ascending:false}).limit(100);
+ const canWrite=["admin","supervisor","employee"].includes(role());
+ let h='<div class="panel"><div class="panel-head"><div><h3>Control de calidad</h3><div class="muted">Checklist por servicio · revisión · evidencia · trazabilidad</div></div>'+(canWrite?'<button class="btn gold" onclick="newQualityChecklist()">＋ Nuevo checklist</button>':'')+'</div>';
+ h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?'<table class="table"><thead><tr><th>Servicio</th><th>Tipo</th><th>Puntuación</th><th>Resultado</th><th>Observaciones</th><th>Fecha</th></tr></thead><tbody>'+r.data.map(x=>{
+   const s=(svc.data||[]).find(z=>z.id===x.service_id);
+   return '<tr><td><b>'+esc(s?.code||x.service_id.slice(0,8))+'</b></td><td>'+esc(x.checklist_type)+'</td><td>'+esc(x.score==null?'—':x.score+' / 100')+'</td><td><span class="status '+(x.passed?'approved':'urgent')+'">'+(x.passed?'Aprobado':'Revisión')+'</span></td><td>'+esc(x.observations||'—')+'</td><td>'+esc(x.completed_at?new Date(x.completed_at).toLocaleString('es-ES'):'—')+'</td></tr>'
+ }).join('')+'</tbody></table>':'<div class="empty">No hay checklists registrados.</div>');
+ h+='</div>';$("content").innerHTML=h;
+}
+async function newQualityChecklist(){
+ const r=await sb.from("services").select("id,code,service_type,typology,status").order("scheduled_at",{ascending:false}).limit(100);
+ openModal("Nuevo checklist de calidad",'<form onsubmit="saveQualityChecklist(event)"><div class="field"><label>Servicio</label><select id="qService" required>'+(r.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.code)+' · '+esc(x.service_type)+' · '+esc(x.typology||'')+'</option>').join('')+'</select></div><div class="two"><div class="field"><label>Tipo</label><select id="qType"><option value="standard">Estándar</option><option value="hotel_5_estrellas">Hotel 5 estrellas</option><option value="checkout">Check-out</option><option value="checkin">Check-in</option><option value="maintenance">Mantenimiento</option></select></div><div class="field"><label>Puntuación (0–100)</label><input id="qScore" type="number" min="0" max="100" step="1" value="100" required></div></div><div class="field"><label>Resultado</label><select id="qPassed"><option value="true">Aprobado</option><option value="false">Requiere revisión</option></select></div><div class="field"><label>Observaciones</label><textarea id="qObs" placeholder="Detalles encontrados, revisión, acciones correctivas..."></textarea></div><button class="primary">Guardar checklist</button></form>');
+}
+async function saveQualityChecklist(e){
+ e.preventDefault();
+ const score=Math.max(0,Math.min(100,Number($("qScore").value||0)));
+ const r=await sb.from("quality_checklists").insert({company_id:currentProfile.company_id,service_id:$("qService").value,checklist_type:$("qType").value,score,passed:$("qPassed").value==="true",observations:$("qObs").value.trim()||null,completed_by:currentUser.id,completed_at:new Date().toISOString()});
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Checklist guardado");quality();
+}
+async function emergency(){
+ const r=await sb.from("occurrences").select("id,service_id,property_id,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100);
+ const canWrite=["admin","supervisor","employee","client"].includes(role());
+ let h='<div class="panel"><div class="panel-head"><div><h3>Emergencia 24H · Incidencias</h3><div class="muted">Ocurrencia urgente vinculada al servicio o propiedad</div></div>'+(canWrite?'<button class="btn gold" onclick="newEmergency()">＋ Registrar incidencia</button>':'')+'</div>';
+ h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':'approved')+'">'+esc(x.status)+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="resolveEmergency(\''+x.id+'\')">Marcar resuelta</button></div>':'')+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
+ h+='</div>';$("content").innerHTML=h;
+}
+async function newEmergency(){
+ const s=await sb.from("services").select("id,code,property_id").order("scheduled_at",{ascending:false}).limit(100);
+ openModal("Registrar incidencia / emergencia",'<form onsubmit="saveEmergency(event)"><div class="field"><label>Servicio relacionado (opcional)</label><select id="eService"><option value="">Sin servicio</option>'+(s.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.code)+'</option>').join('')+'</select></div><div class="two"><div class="field"><label>Categoría</label><select id="eCat"><option value="general">General</option><option value="damage">Daño</option><option value="client_request">Solicitud cliente</option><option value="safety">Seguridad</option><option value="maintenance">Mantenimiento</option><option value="quality">Calidad</option></select></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div></div><div class="field"><label>Descripción</label><textarea id="eDesc" required placeholder="Describa exactamente la incidencia..."></textarea></div><button class="primary">Registrar incidencia</button></form>');
+}
+async function saveEmergency(e){
+ e.preventDefault();
+ const serviceId=$("eService").value||null;
+ let propertyId=null;
+ if(serviceId){const s=await sb.from("services").select("property_id").eq("id",serviceId).single();if(s.error){toast(s.error.message);return}propertyId=s.data.property_id}
+ const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,service_id:serviceId,property_id:propertyId,created_by:currentUser.id,category:$("eCat").value,priority:$("ePriority").value,description:$("eDesc").value.trim(),status:"open"});
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Incidencia registrada y enviada a supervisión");emergency();
+}
+async function resolveEmergency(id){
+ const resolution=prompt("Resolución / acción realizada:");if(!resolution)return;
+ const r=await sb.from("occurrences").update({status:"resolved",resolution:resolution.trim(),resolved_at:new Date().toISOString()}).eq("id",id);
+ if(r.error)toast(r.error.message);else{toast("Incidencia resuelta");emergency()}
+}
+async function startServiceGPS(serviceId){
+ if(!navigator.geolocation){toast("El navegador no permite geolocalización.");return}
+ if(window.__romanoWatchId!=null)navigator.geolocation.clearWatch(window.__romanoWatchId);
+ const push=async pos=>{
+   const r=await sb.from("employee_locations").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,service_id:serviceId,latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy_m:pos.coords.accuracy});
+   if(r.error)toast(r.error.message);
+ };
+ navigator.geolocation.getCurrentPosition(push,()=>toast("No fue posible obtener la ubicación."),{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+ window.__romanoWatchId=navigator.geolocation.watchPosition(push,()=>{}, {enableHighAccuracy:true,maximumAge:15000,timeout:20000});
+ toast("GPS del servicio activado");
+}
+function stopServiceGPS(){if(window.__romanoWatchId!=null){navigator.geolocation.clearWatch(window.__romanoWatchId);window.__romanoWatchId=null;toast("GPS del servicio detenido")}}
 async function renderQualityPremium(){return quality()}
 async function renderEmergencyPremium(){return emergency()}
 async function newServicePremium(){
