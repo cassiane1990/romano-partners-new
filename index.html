@@ -178,7 +178,7 @@ async function saveService(e){e.preventDefault();const prop=$("sProp").value;con
 
 async function viewClient(id){const r=await sb.from("clients").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}const x=r.data;openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div>')}
 async function viewProperty(id){const r=await sb.from("properties").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}const x=r.data;openModal("Ficha de propiedad",'<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Nombre</small><p>'+esc(x.name)+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.property_type||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(x.status||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Dirección</small><p>'+esc([x.address,x.city,x.country].filter(Boolean).join(", ")||"—")+'</p></div></div>')}
-async async function viewService(id){
+async function viewService(id){
  const r=await sb.from("services").select("*").eq("id",id).single();
  if(r.error){toast(r.error.message);return}
  const x=r.data;
