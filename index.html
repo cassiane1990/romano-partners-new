@@ -260,7 +260,7 @@ async function savePremiumService(){
 
 async function renderChatPremium(){
  const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\\''+x.id+'\\',\\''+esc(x.title||"Conversación")+'\\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
 }
 async function newChatPremium(){
  const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
@@ -275,7 +275,7 @@ async function saveChatPremium(e){
 }
 async function openChatPremium(id,title){
  const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
- openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\\''+id+'\\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
+ openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\''+id+'\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
 }
 async function sendChatPremium(e,id){
  e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
