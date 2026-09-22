@@ -269,6 +269,7 @@ async function viewService(id){
  const r=await sb.from("services").select("*").eq("id",id).single();
  if(r.error){toast(r.error.message);return}
  const x=r.data;
+ window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  const media=await sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false});
  const dispatch=await sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10);
  const canUpdate=["admin","supervisor","employee"].includes(role());
@@ -285,16 +286,18 @@ async function viewService(id){
 }
 async function setServiceStatusPremium(id,status){
  const now=new Date().toISOString();
- const current=await sb.from("services").select("id,updated_at").eq("id",id).single();
- if(current.error){toast(current.error.message);return}
  const patch={status,updated_at:now};
  if(status==="in_progress")patch.started_at=now;
  if(status==="completed")patch.finished_at=now;
+ const cachedBase=window.__romanoServiceVersions?.[id]||null;
  if(!navigator.onLine){
-   await queueOfflineMutation("service_status",{service_id:id,status,started_at:patch.started_at||null,finished_at:patch.finished_at||null},current.data.updated_at);
+   if(!cachedBase){toast("Abra la ficha del servicio antes de trabajar sin conexión.");return}
+   await queueOfflineMutation("service_status",{service_id:id,status,started_at:patch.started_at||null,finished_at:patch.finished_at||null},cachedBase);
    toast("Sin conexión · estado guardado para sincronizar");
    return;
  }
+ const current=await sb.from("services").select("id,updated_at").eq("id",id).single();
+ if(current.error){toast(current.error.message);return}
  const r=await sb.from("services").update(patch).eq("id",id).eq("updated_at",current.data.updated_at);
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("service_status",{service_id:id,status,started_at:patch.started_at||null,finished_at:patch.finished_at||null},current.data.updated_at);toast("Red interrumpida · estado puesto en cola")}else toast(r.error.message);return}
  toast("Estado actualizado");closeModal();renderServicesMaster();updateOfflineIndicator()
