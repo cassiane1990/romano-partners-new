@@ -444,7 +444,7 @@ async function startServiceGPS(serviceId){
  const push=async pos=>{
    const payload={id:crypto.randomUUID(),service_id:serviceId,latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy_m:pos.coords.accuracy,recorded_at:new Date().toISOString()};
    if(!navigator.onLine){await queueOfflineMutation("location_insert",payload);return}
-   const r=await sb.from("employee_locations").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,company_id:currentProfile.company_id,...payload});
+   const r=await sb.from("employee_locations").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,...payload});
    if(r.error){if(networkError(r.error)){await queueOfflineMutation("location_insert",payload)}else toast(r.error.message)}
  };
  navigator.geolocation.getCurrentPosition(push,()=>toast("No fue posible obtener la ubicación."),{enableHighAccuracy:true,timeout:10000,maximumAge:0});
