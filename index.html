@@ -178,7 +178,46 @@ async function saveService(e){e.preventDefault();const prop=$("sProp").value;con
 
 async function viewClient(id){const r=await sb.from("clients").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}const x=r.data;openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div>')}
 async function viewProperty(id){const r=await sb.from("properties").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}const x=r.data;openModal("Ficha de propiedad",'<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Nombre</small><p>'+esc(x.name)+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.property_type||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(x.status||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Dirección</small><p>'+esc([x.address,x.city,x.country].filter(Boolean).join(", ")||"—")+'</p></div></div>')}
-async function viewService(id){const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}const x=r.data;openModal("Ficha del servicio",'<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(statusNames[x.status]||x.status||"—")+'</p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div><div class="field"><label>Instrucciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>')}
+async async function viewService(id){
+ const r=await sb.from("services").select("*").eq("id",id).single();
+ if(r.error){toast(r.error.message);return}
+ const x=r.data;
+ const media=await sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false});
+ const dispatch=await sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10);
+ const canUpdate=["admin","supervisor","employee"].includes(role());
+ openModal("Ficha del servicio",
+ '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
+ '<div class="field"><label>Instrucciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
+ (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(\''+x.id+'\',\''+s+'\')">'+esc(statusNames[s])+'</button>').join("")+'</div>':"")+
+ '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+
+ ((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+
+ '</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div>'+
+ '<input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(\''+x.id+'\')">'+
+ ((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(\''+m.storage_path+'\')">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+
+ '</div>');
+}
+async function setServiceStatusPremium(id,status){
+ const patch={status,updated_at:new Date().toISOString()};
+ if(status==="in_progress")patch.started_at=new Date().toISOString();
+ if(status==="completed")patch.finished_at=new Date().toISOString();
+ const r=await sb.from("services").update(patch).eq("id",id);
+ if(r.error)toast(r.error.message);else{toast("Estado actualizado");closeModal();renderServicesMaster()}
+}
+async function uploadServiceMedia(serviceId){
+ const file=$("serviceMediaFile")?.files?.[0];if(!file)return;
+ const ext=(file.name.split(".").pop()||"bin").toLowerCase();
+ const type=file.type.startsWith("video")?"video":file.type.startsWith("audio")?"audio":"photo";
+ const path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
+ const up=await sb.storage.from("service-media").upload(path,file,{upsert:false,contentType:file.type});
+ if(up.error){toast(up.error.message);return}
+ const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:type,storage_path:path,file_name:file.name,mime_type:file.type,size_bytes:file.size});
+ if(ins.error){await sb.storage.from("service-media").remove([path]);toast(ins.error.message);return}
+ toast("Evidencia guardada");viewService(serviceId)
+}
+async function downloadServiceMedia(path){
+ const r=await sb.storage.from("service-media").createSignedUrl(path,300);
+ if(r.error)toast(r.error.message);else window.open(r.data.signedUrl,"_blank","noopener")
+}
 function reloadCurrentPage(){const active=document.querySelector(".nav button.active");openPage(active?.dataset.page||"dashboard")}
 
 async function renderCalendar(){const r=await sb.from("services").select("code,service_type,typology,status,scheduled_at").not("scheduled_at","is",null).order("scheduled_at",{ascending:true}).limit(100);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario operativo</h3><span class="pill">Servicios programados</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(statusNames[x.status]||x.status)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios programados.</div>')+'</div>'}
@@ -199,7 +238,14 @@ async function renderSecurity(){const f=await sb.auth.mfa.listFactors();const en
 async function enrollMFA(){const e=await sb.auth.mfa.enroll({factorType:"totp",friendlyName:"ROMANO PARTNERS"});if(e.error){toast(e.error.message);return}$("mfaSetup").innerHTML='<div class="panel"><h3>Escanea el QR</h3><img style="width:220px;margin:15px 0" src="data:image/svg+xml;utf8,'+encodeURIComponent(e.data.totp.qr_code)+'"><div class="muted">Si no puedes escanearlo, usa el secreto: <strong>'+esc(e.data.totp.secret)+'</strong></div><div class="field"><label>Código del autenticador</label><input id="enrollCode" inputmode="numeric" maxlength="6"></div><button class="primary" onclick="verifyEnrollment(\''+e.data.id+'\')">Activar MFA</button></div>'}
 async function verifyEnrollment(id){const c=await sb.auth.mfa.challenge({factorId:id});if(c.error){toast(c.error.message);return}const v=await sb.auth.mfa.verify({factorId:id,challengeId:c.data.id,code:$("enrollCode").value.trim()});if(v.error){toast(v.error.message);return}toast("MFA activado");renderSecurity()}
 
-function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();buildMasterNav();openPage("dashboard")}
+async function startRealtime(){
+ if(window.__romanoChannel)sb.removeChannel(window.__romanoChannel);
+ window.__romanoChannel=sb.channel("romano-live-"+(currentProfile?.company_id||currentUser?.id))
+ .on("postgres_changes",{event:"*",schema:"public",table:"services"},()=>{if(document.querySelector("#content")){const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page;if(["dashboard","services","calendar","locations"].includes(active))openPage(active)}})
+ .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},()=>{const active=document.querySelector("#masterNav button.active")?.dataset.page||"";if(active==="notifications")openPage("notifications")})
+ .subscribe();
+}
+function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();buildMasterNav();startRealtime();openPage("dashboard")}
 function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){const p=pages[key];if(!p)return;$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}currentUser=r.data.user;try{await profileLoad();if(!(await ensureMFA()))return;showApp()}catch(err){await sb.auth.signOut();showLogin(err.message)}});
