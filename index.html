@@ -18,7 +18,7 @@
 <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
 <form id="loginForm"><div class="field"><label>Correo electrónico</label><input id="email" type="email" autocomplete="username" required></div>
 <div class="field"><label>Contraseña</label><input id="password" type="password" autocomplete="current-password" required></div>
-<button class="primary">Entrar al sistema</button><div id="loginMsg" class="msg hidden"></div></form>
+<button class="primary">Entrar al sistema</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
 </div></div>
 
 <div id="mfa" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>VERIFICACIÓN</h1><p>SEGURIDAD ROMANO PARTNERS</p></div>
@@ -250,6 +250,19 @@ function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add(
 async function openPage(key){const p=pages[key];if(!p)return;$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}currentUser=r.data.user;try{await profileLoad();if(!(await ensureMFA()))return;showApp()}catch(err){await sb.auth.signOut();showLogin(err.message)}});
 $("logout").onclick=async()=>{await sb.auth.signOut();currentUser=null;currentProfile=null;showLogin()};
+$("signupBtn").onclick=async()=>{
+ const email=$("email").value.trim(),password=$("password").value;
+ if(!email||password.length<8){toast("Informe email e uma contraseña de mínimo 8 caracteres.");return}
+ const name=prompt("Nombre completo para el primer acceso:");
+ const r=await sb.auth.signUp({email,password,options:{data:{full_name:name||"ROMANO User"}}});
+ if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}
+ toast("Cuenta creada. Si el proyecto exige confirmación, revise el correo.");
+};
+$("resetBtn").onclick=async()=>{
+ const email=$("email").value.trim();if(!email){toast("Informe o email.");return}
+ const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+ if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
+};
 $("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
