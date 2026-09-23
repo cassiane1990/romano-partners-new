@@ -307,6 +307,13 @@ async function renderDashboardReference(){
  $("dashSearch").onkeydown=e=>{if(e.key==="Enter")openPage("search")};$("dashBell").onclick=()=>openPage("notifications");$("dashAll").onclick=()=>openPage("services");$("dashAgenda").onclick=()=>openPage("calendar");$("dashChat").onclick=()=>openPage("chat");
  if(window.L){const m=L.map("dashMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);[[40.425,-3.695,"Ana Silva · A camino"],[40.415,-3.69,"Pedro Costa · En servicio"],[40.405,-3.72,"Laura Mendes · Supervisado"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));}
 }
+async function rejectServiceRequest(id){
+ if(!["admin","supervisor"].includes(role()))return;
+ if(!confirm("Recusar este pedido?"))return;
+ const q=await sb.rpc("admin_reject_service_request",{p_service_id:id});
+ if(q.error){toast("No se pudo rechazar: "+q.error.message);return}
+ toast("Pedido rechazado.");await renderServicesMaster();
+}
 async function acceptServiceRequest(id){
  if(!id)return;
  if(!confirm("Aceptar esta solicitud de servicio?"))return;
@@ -772,14 +779,22 @@ async function viewService(id){
  }
  const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
  const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
- const media=await sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false});
- const dispatch=await sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10);
+ const [media,dispatch,clientQ,propQ]=await Promise.all([
+  sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false}),
+  sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
+  sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
+  sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle()
+ ]);
+ const client=clientQ.data,prop=propQ.data;
  const canUpdate=["admin","supervisor","employee"].includes(role());
+ const isPendingAdmin=["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visual y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- openModal("Ficha del servicio",
-  '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
-  '<div class="field"><label>Observaciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+clientAdvanceButton+
+ openModal(isPendingAdmin?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
+  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise os dados antes de aceitar. A aceitação ficará registrada no seu perfil.</div>':"")+
+  '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
+  '<div class="field"><label>Descrição / observações</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
+  (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+clientAdvanceButton+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])])+'</div></div>'+
   (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(&#39;'+x.id+'&#39;,&#39;'+s+'&#39;)">'+esc(statusNames[s])+'</button>').join("")+'</div>':"")+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div><input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)">'+((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(&#39;'+m.storage_path+'&#39;)">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+'</div>');
@@ -979,7 +994,7 @@ async function notificationAction(id,title,body){
    const m=b.match(/SRV-[A-Z0-9-]+/i);
    if(m){
      const q=await sb.from("services").select("id,status").eq("code",m[0]).maybeSingle();
-     if(q.data?.id&&q.data.status==="requested"){await acceptServiceRequest(q.data.id);return}
+     if(q.data?.id&&["requested","scheduled"].includes(q.data.status)&&!q.data.accepted_at){await viewService(q.data.id);return}
    }
    openPage("services");return;
  }
