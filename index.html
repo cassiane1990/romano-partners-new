@@ -797,7 +797,7 @@ async function saveServiceAdvance(e,serviceId){
  let attachments=[];
  try{
    if(files.length)attachments=await uploadChangeRequestMedia(serviceId,requestId,files);
-   const r=await sb.from("service_change_requests").insert({id:requestId,company_id:currentProfile.company_id,service_id:serviceId,property_id:s.data.property_id,requested_by:currentUser.id,request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments});
+   const r=await sb.from("service_change_requests").insert({id:requestId,company_id:currentProfile.company_id,service_id:serviceId,property_id:service.property_id,requested_by:currentUser.id,request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments});
    if(r.error)throw r.error;
  }catch(err){toast(err.message||"No fue possible enviar la solicitud.");return}
  closeModal();toast("Solicitud enviada · supervisor y administrador fueron notificados");openPage("change_requests");
