@@ -76,7 +76,7 @@
 
 <div id="app" class="app hidden"><aside class="side"><div class="side-brand"><div class="crown-r">R</div><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
 <nav class="nav" id="masterNav"></nav><div class="side-footer"><div class="sf-user"><div class="sf-avatar">👩🏻‍💼</div><div><div class="sf-name" id="sideUserName">Rita Romano</div><div class="sf-role" id="sideUserRole">Administrador</div></div></div><div class="sf-logout" onclick="doLogout()">↪ Cerrar sesión</div></div></aside>
-<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
+<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoLoginBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
 <div id="modal" class="modal hidden"><div class="card modal-card"><div class="panel-head"><h3 id="modalTitle"></h3><button class="btn" onclick="closeModal()">Cerrar</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 
@@ -331,8 +331,50 @@ function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<1
 function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
 async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
-async function ensureMFA(){const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(a.error)throw a.error;if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){$("mfa").classList.remove("hidden");return false}return true}
-async function mfaVerify(){const code=$("mfaCode").value.trim();if(!code)return;$("mfaMsg").classList.add("hidden");const f=await sb.auth.mfa.listFactors();if(f.error||!f.data.totp.length){$("mfaMsg").textContent="No se encontró un factor TOTP activo.";$("mfaMsg").classList.remove("hidden");return}const factorId=f.data.totp[0].id;const c=await sb.auth.mfa.challenge({factorId});if(c.error){$("mfaMsg").textContent=c.error.message;$("mfaMsg").classList.remove("hidden");return}const v=await sb.auth.mfa.verify({factorId,challengeId:c.data.id,code});if(v.error){$("mfaMsg").textContent=v.error.message;$("mfaMsg").classList.remove("hidden");return}$("mfa").classList.add("hidden");showApp()}
+async function ensureMFA(){
+ const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+ if(a.error)throw a.error;
+ const factors=await sb.auth.mfa.listFactors();
+ if(factors.error)throw factors.error;
+ const verifiedTotp=(factors.data?.totp||[]).filter(x=>x.status==="verified");
+ if(verifiedTotp.length===0){
+   $("mfa").classList.add("hidden");
+   return true;
+ }
+ if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){
+   $("mfa").classList.remove("hidden");
+   $("login").classList.add("hidden");
+   $("mfaCode").value="";
+   setTimeout(()=>$("mfaCode")?.focus(),50);
+   return false;
+ }
+ $("mfa").classList.add("hidden");
+ return true;
+}
+async function mfaVerify(){
+ const code=$("mfaCode").value.trim();
+ if(!/^\d{6}$/.test(code)){
+   $("mfaMsg").textContent="Introduce un código MFA de 6 dígitos.";
+   $("mfaMsg").classList.remove("hidden");
+   return;
+ }
+ $("mfaMsg").classList.add("hidden");
+ const f=await sb.auth.mfa.listFactors();
+ if(f.error){$("mfaMsg").textContent=f.error.message;$("mfaMsg").classList.remove("hidden");return}
+ const verifiedTotp=(f.data?.totp||[]).filter(x=>x.status==="verified");
+ if(!verifiedTotp.length){
+   $("mfa").classList.add("hidden");
+   await showApp();
+   return;
+ }
+ const factorId=verifiedTotp[0].id;
+ const ch=await sb.auth.mfa.challenge({factorId});
+ if(ch.error){$("mfaMsg").textContent=ch.error.message;$("mfaMsg").classList.remove("hidden");return}
+ const v=await sb.auth.mfa.verify({factorId,challengeId:ch.data.id,code});
+ if(v.error){$("mfaMsg").textContent=v.error.message;$("mfaMsg").classList.remove("hidden");return}
+ $("mfa").classList.add("hidden");
+ await showApp();
+}
 $("mfaBtn").onclick=mfaVerify;
 
 async function count(table){const r=await sb.from(table).select("*",{count:"exact",head:true});return r.count||0}
@@ -453,7 +495,7 @@ $("resetBtn").onclick=async()=>{
  const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
  if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
 };
-$("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
+$("demoLoginBtn").onclick=()=>{demoMode=!demoMode;$("demoLoginBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoLoginBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
 (async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
@@ -746,9 +788,9 @@ async function renderDashboardReference(){
  $("dashSearch").onkeydown=e=>{if(e.key==="Enter")openPage("search")};$("dashBell").onclick=()=>openPage("notifications");
  if(window.L){const m=L.map("dashMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);[[40.425,-3.695,"Ana Silva · A camino"],[40.415,-3.69,"Pedro Costa · En servicio"],[40.405,-3.72,"Laura Mendes · Supervisado"],[40.43,-3.68,"Apartamento · DEMO"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));}
 }
-function selectDemoRoleFromHeader(){if(!demoMode){demoMode=true;window.__romanoDemoRole="admin";$("demoBtn").textContent="DEMO ACTIVO";$("demoBtn").classList.add("gold");buildMasterNav();renderProfileVisual();}showDemoRolePicker();}
+function selectDemoRoleFromHeader(){if(!demoMode){demoMode=true;window.__romanoDemoRole="admin";$("demoLoginBtn").textContent="DEMO ACTIVO";$("demoLoginBtn").classList.add("gold");buildMasterNav();renderProfileVisual();}showDemoRolePicker();}
 setTimeout(()=>{
- const b=$("demoBtn");
+ const b=$("demoLoginBtn");
  if(b)b.onclick=()=>selectDemoRoleFromHeader();
  const sf=document.querySelector(".side-footer");
  if(sf&&!document.getElementById("profileQuick")){const q=document.createElement("div");q.id="profileQuick";q.className="sf-logout";q.textContent="◉ Mi perfil";q.onclick=()=>openMyProfile();sf.insertBefore(q,sf.lastElementChild);}
@@ -759,7 +801,7 @@ function enterDemoExperience(){
  demoMode=true;window.__romanoDemoRole="admin";
  $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");
  $("userEmail").textContent="modo demostración · datos ficticios";
- $("demoBtn").textContent="DEMO ACTIVO";$("demoBtn").classList.add("gold");
+ $("demoLoginBtn").textContent="DEMO ACTIVO";$("demoLoginBtn").classList.add("gold");
  buildMasterNav();renderProfileVisual();openPage("dashboard");
  toast("Experiência DEMONSTRAÇÃO iniciada · nenhum dado real será alterado.");
 }
