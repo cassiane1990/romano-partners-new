@@ -1127,7 +1127,7 @@ async function emergency(){
  const r=await sb.from("occurrences").select("id,service_id,property_id,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100);
  const canWrite=["admin","supervisor","employee","client"].includes(role());
  let h='<div class="panel"><div class="panel-head"><div><h3>Emergencia 24H · Incidencias</h3><div class="muted">Ocurrencia urgente vinculada al servicio o propiedad</div></div>'+(canWrite?'<button class="btn gold" onclick="newEmergency()">＋ Registrar incidencia</button>':'')+'</div>';
- h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':'approved')+'">'+esc(x.status)+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'&&x.category==='expedite_request'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="decideServiceAdvance(\''+x.id+'\',true)">✓ Aceptar cambio</button><button class="btn" onclick="decideServiceAdvance(\''+x.id+'\',false)">✕ Rechazar</button></div>':(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="resolveEmergency(\''+x.id+'\')">Marcar resuelta</button></div>':''))+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
+ h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':x.status==='accepted'?'approved':'approved')+'">'+esc(x.status==='open'?'Pendiente de aceptación':x.status==='accepted'?'Recibido':'Resuelta')+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="acceptOccurrence(\''+x.id+'\')">✓ Aceptar como recibido</button></div>':(canManage()&&x.status==='accepted'?'<div class="muted">✓ Recebido. Pendiente de designación a mantenimiento.</div>':''))+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
  h+='</div>';$("content").innerHTML=h;
 }
 async function newEmergency(){
@@ -1305,13 +1305,27 @@ async function renderServiceChangeRequests(){
  let h='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de cambio de horario</h3><div class="muted">'+(role()==="client"?"Acompanhe suas solicitações de cambio de horario.":"Solicitudes recibidas para análisis y decisión de horario.")+'</div></div></div>';
  h+=rows.length?rows.map(x=>{
    const s=services[x.service_id],p=props[x.property_id],u=profiles[x.requested_by],att=Array.isArray(x.attachments)?x.attachments:[];
-   const actions=canManageChange&&x.status==="requested"?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideServiceChangeRequest(\''+x.id+'\',true)">✓ Aceptar cambio</button><button class="btn" onclick="decideServiceChangeRequest(\''+x.id+'\',false)">✕ Rechazar</button></div>':"";
+   const actions=canManageChange&&x.status==="requested"?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceChangeRequest(\''+x.id+'\')">✓ Aceptar pedido</button><button class="btn" onclick="decideServiceChangeRequest(\''+x.id+'\',false)">✕ Rechazar</button></div>':"";
    return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(s?.code||"Servicio")+'</strong><div class="muted">'+esc(p?.name||p?.code||"Apartamento")+' · '+esc(u?.full_name||u?.email||"Cliente")+'</div></div><span class="status '+(x.status==="requested"?"urgent":x.status==="approved"?"approved":x.status==="rejected"?"rejected":"")+'">'+esc(serviceChangeStatusLabel(x.status))+'</span></div>'+
    '<div class="two"><div><small class="muted">Horario actual</small><p>'+esc(s?.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Nuevo horario solicitado</small><p><strong>'+esc(new Date(x.requested_for).toLocaleString("es-ES"))+'</strong></p></div><div><small class="muted">Urgencia</small><p>'+esc(serviceChangePriorityLabel(x.priority))+'</p></div><div><small class="muted">Servicio</small><p>'+esc(s?.service_type||"—")+'</p></div></div>'+
    '<div class="field"><label>Motivo / emergencia</label><div class="notice">'+esc(x.notes||"—")+'</div></div>'+
    '<div class="muted">Adjuntos: '+att.length+(att.length?" · "+att.map(a=>esc(a.file_name)).join(", "):" · ninguno")+'</div>'+actions+'</div>';
  }).join(""):'<div class="empty">No hay solicitudes de cambio de horario.</div>';
  h+='</div>';$("content").innerHTML=h;
+}
+async function acceptServiceChangeRequest(id){
+ if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede aceptar.");return}
+ const r=await sb.rpc("admin_accept_service_change_request",{p_request_id:id});
+ if(r.error){toast("No se pudo aceptar: "+r.error.message);return}
+ toast("✓ Pedido recibido. Queda pendiente de programación.");
+ renderServiceChangeRequests();
+}
+async function acceptOccurrence(id){
+ if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede aceptar.");return}
+ const r=await sb.rpc("admin_accept_occurrence",{p_occurrence_id:id});
+ if(r.error){toast("No se pudo aceptar: "+r.error.message);return}
+ toast("✓ Incidencia recibida. Queda pendiente de designación a mantenimiento.");
+ renderEmergencyPremium();
 }
 async function decideServiceChangeRequest(id,approved){
  if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede decidir.");return}
