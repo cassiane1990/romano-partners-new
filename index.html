@@ -460,14 +460,8 @@ async function downloadServiceMedia(path){
 }
 function reloadCurrentPage(){const active=document.querySelector(".nav button.active");openPage(active?.dataset.page||"dashboard")}
 
-async function renderCalendar(){
- const r=await sb.from("services").select("id,code,service_type,typology,status,scheduled_at,property_id").not("scheduled_at","is",null).order("scheduled_at",{ascending:true}).limit(200);
- if(role()!=="client"){$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario operativo</h3><span class="pill">Servicios programados</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(statusNames[x.status]||x.status)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios programados.</div>')+'</div>';return}
- const now=new Date(),start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-(start.getDay()||7)+1);
- const days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});
- const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisionado",completed:"Finalizado"};
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Calendario semanal de servicios</h3><div class="muted">Sus servicios programados de lunes a domingo</div></div><span class="pill">Semana actual</span></div><div style="display:grid;grid-template-columns:repeat(7,minmax(125px,1fr));gap:8px;overflow:auto">'+days.map(d=>{const key=d.toLocaleDateString("en-CA");const items=(r.data||[]).filter(x=>x.scheduled_at&&new Date(x.scheduled_at).toLocaleDateString("en-CA")===key);return '<div style="min-width:125px;border:1px solid #e5dac8;border-radius:14px;background:#fffdf9;padding:10px"><b>'+d.toLocaleDateString("es-ES",{weekday:"short"})+'</b><div class="muted" style="font-size:10px;margin-bottom:8px">'+d.toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit"})+'</div>'+(items.length?items.map(s=>'<button class="btn" style="width:100%;text-align:left;margin-bottom:6px" onclick="viewService(\''+s.id+'\')"><b>'+new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})+'</b><br>'+esc(s.service_type||"Servicio")+'<br><small>'+esc(s.code||"")+' · '+esc(labels[s.status]||s.status||"")+'</small></button>').join(""):'<div class="empty" style="padding:12px 2px">Sin servicios</div>')+'</div>'}).join("")+'</div></div>';
-}
+async function renderCalendar(){const r=await sb.from("services").select("code,service_type,typology,status,scheduled_at").not("scheduled_at","is",null).order("scheduled_at",{ascending:true}).limit(100);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario operativo</h3><span class="pill">Servicios programados</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(statusNames[x.status]||x.status)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios programados.</div>')+'</div>'}
+
 async function renderEmployees(){
  const r=demoMode?{data:DEMO_EMPLOYEES,error:null}:{data:null,error:null};
  if(!demoMode){const q=await sb.from("employee_profiles").select("id,employee_code,phone,email,nif_nie,hire_date,function_title,salary,active").order("created_at",{ascending:false});r.data=q.data;r.error=q.error}
@@ -538,9 +532,9 @@ async function startRealtime(){
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},(payload)=>{
    const active=document.querySelector("#masterNav button.active")?.dataset.page||"";
    if(active==="notifications")openPage("notifications");
-   if(payload.new){
-    const notify=role()==="client"||["admin","supervisor"].includes(role());
-    if(notify){toast("🔔 "+(payload.new.title||"Nueva alerta"));try{const C=window.AudioContext||window.webkitAudioContext;if(C){const ac=new C(),o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.3);}}catch(e){}}
+   if(["admin","supervisor"].includes(role())&&payload.new){
+    toast("🔔 "+(payload.new.title||"Nueva alerta"));
+    try{const C=window.AudioContext||window.webkitAudioContext;if(C){const ac=new C(),o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.25);}}catch(e){}
    }
  })
  .subscribe();
@@ -686,19 +680,21 @@ async function resolveEmergency(id){
  toast("Incidencia resuelta");emergency();updateOfflineIndicator()
 }
 async function requestServiceAdvance(serviceId){
- const s=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,client_id").eq("id",serviceId).single();if(s.error){toast(s.error.message);return}
- const p=await sb.from("properties").select("id,name,code").eq("id",s.data.property_id).single();const prop=p.data?.name||p.data?.code||"apartamento";
+ const s=await sb.from("services").select("id,code,property_id,service_type,scheduled_at").eq("id",serviceId).single();
+ if(s.error){toast(s.error.message);return}
+ const p=await sb.from("properties").select("id,name,code").eq("id",s.data.property_id).single();
+ const prop=p.data?.name||p.data?.code||"apartamento";
  openModal("Pedir adelantar servicio",'<div class="notice"><strong>Cliente:</strong> '+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'<br><strong>Inmueble:</strong> '+esc(prop)+'</div><form onsubmit="saveServiceAdvance(event,\''+serviceId+'\')"><div class="field"><label>Urgencia</label><select id="advPriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>¿Por qué necesita adelantar el servicio?</label><textarea id="advReason" required placeholder="Explique la emergencia o motivo..."></textarea></div><button class="primary">Enviar solicitud</button></form>');
 }
 async function saveServiceAdvance(e,serviceId){
- e.preventDefault();const reason=$("advReason").value.trim(),priority=$("advPriority").value;if(!reason)return;
- const s=await sb.from("services").select("id,property_id,client_id").eq("id",serviceId).single();if(s.error){toast(s.error.message);return}
- if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",s.data.client_id).eq("profile_id",currentUser.id).maybeSingle();if(own.error||!own.data){toast("No se pudo validar el servicio de este cliente.");return}}
- const insert={company_id:currentProfile.company_id,service_id:serviceId,property_id:s.data.property_id,created_by:currentUser.id,category:"expedite_request",priority,description:reason,status:"open"};
- if(!navigator.onLine){await queueOfflineMutation("occurrence_create",insert);closeModal();toast("Sin conexión · solicitud guardada para sincronizar");return}
- const r=await sb.from("occurrences").insert(insert).select("id").single();
- if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",insert);closeModal();toast("Red interrumpida · solicitud puesta en cola")}else toast("No se pudo guardar la solicitud: "+r.error.message);return}
- closeModal();toast("Solicitud de adelanto guardada y enviada al supervisor y al administrador");updateOfflineIndicator();
+ e.preventDefault();
+ const reason=$("advReason").value.trim(),priority=$("advPriority").value;if(!reason)return;
+ const s=await sb.from("services").select("property_id").eq("id",serviceId).single();if(s.error){toast(s.error.message);return}
+ const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:s.data.property_id,category:"expedite_request",priority,description:reason,status:"open"};
+ if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · solicitud guardada para sincronizar");return}
+ const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
+ if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · solicitud puesta en cola")}else toast(r.error.message);return}
+ closeModal();toast("Solicitud enviada al supervisor y al administrador");updateOfflineIndicator();
 }
 async function startServiceGPS(serviceId){
  if(!navigator.geolocation){toast("El navegador no permite geolocalización.");return}
@@ -741,19 +737,8 @@ function masterRecalc(){const vat=Number($("mpVat")?.value||21)/100,clean=master
 async function savePremiumService(){const prop=$("mpProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}const clean=masterSelectedCleaning(),items=masterItemRows(),maintenance=$("mpMaintenance")?.value||"none",maintenanceRate=$("mpMaintenanceRate")?.value||"normal",maintenanceHours=Math.max(1,Number($("mpMaintenanceHours")?.value||1)),additional=items.filter(x=>x.category==="additional"),code="SRV-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),clientId=$("mpClient").value;const payload={id:demoMode?"demo-"+code.toLowerCase():undefined,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,priority:$("mpPriority").value,scheduled_at:new Date($("mpDate").value).toISOString(),status:"requested",requested_items:items,instructions:$("mpNotes").value.trim()||null,notes:JSON.stringify({maintenance,maintenance_rate:maintenanceRate,maintenance_hours:maintenanceHours,maintenance_note:$("mpMaintenanceNote")?.value.trim()||null}),tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",additional_items:additional,pricing:{cleaning_original:clean.price,cleaning_quantity:clean.qty,cleaning_basis:clean.cat.basis,maintenance_rate:maintenanceRate,maintenance_hours:maintenanceHours,sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:payload.id,...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio ficticio creado · "+code);renderServicesMaster();return}const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}payload.company_id=currentProfile.company_id;payload.client_id=pr.data.client_id;delete payload.id;const s=await sb.from("services").insert(payload).select("id").single();if(s.error){toast(s.error.message);return}const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5,pricing_source:"service_catalog"}});if(ev.error){toast(ev.error.message);return}closeModal();toast("Servicio "+code+" creado · dispatch activo");renderServicesMaster()}
 async function renderChatPremium(){
  const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
- let contact="";
- if(role()==="client")contact='<div class="panel"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Fale diretamente com a nossa equipa.</div></div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail da empresa</a></div><div class="actions" style="margin-top:10px"><button class="btn dark" onclick="startRoleChat('supervisor')">◌ Falar com Supervisor</button><button class="btn" onclick="startRoleChat('admin')">◌ Falar com Administrador</button></div></div>';
+ const contact=role()==="client"?'<div class="panel"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Comuníquese directamente con la empresa.</div></div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
  $("content").innerHTML=contact+'<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
-}
-async function startRoleChat(targetRole){
- const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).order("full_name").limit(1).single();
- if(r.error||!r.data){toast(targetRole==="supervisor"?"No hay supervisor disponible.":"No hay administrador disponible.");return}
- const title=targetRole==="supervisor"?"Cliente · Supervisor":"Cliente · Administrador";
- const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title,thread_type:"direct",created_by:currentUser.id}).select("id").single();
- if(t.error){toast(t.error.message);return}
- const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:r.data.id}]);
- if(m.error){toast(m.error.message);return}
- toast("Chat iniciado con "+(r.data.full_name||r.data.email));openChatPremium(t.data.id,title);
 }
 async function newChatPremium(){
  const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
