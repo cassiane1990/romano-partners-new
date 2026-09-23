@@ -350,11 +350,20 @@ async function openServiceAssignment(serviceId){
    '<div class="muted" style="margin:10px 0">Funcionários ativos · primeiro aparecem os que têm localização mais próxima. A designação não inicia o serviço: o funcionário ainda precisa aceitar.</div>'+
    '<div>'+(employees.length?employees.map(e=>'<div class="panel" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>'+esc(e.full_name||e.email||"Funcionario")+'</strong><div class="muted">'+(e.distance!=null?e.distance.toFixed(1)+" km da propriedade":"Localização GPS não disponível")+(e.location?.recorded_at?" · "+new Date(e.location.recorded_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"")+'</div></div><button class="btn gold" onclick="assignServiceEmployee(\''+s.data.id+'\',\''+e.id+'\')">Designar</button></div>').join(""):'<div class="empty">Nenhum funcionário ativo disponível.</div>')+'</div>');
 }
-async function assignServiceEmployee(serviceId,employeeId){
+async function assignServiceEmployee(serviceId,employeeId,force=false){
  if(!["admin","supervisor"].includes(role()))return;
- const r=await sb.rpc("assign_service_employee",{p_service_id:serviceId,p_employee_id:employeeId});
- if(r.error){toast("Não foi possível designar: "+r.error.message);return}
- closeModal();toast("✓ Funcionário designado. Aguardando aceitação dele.");await renderServicesMaster();
+ const r=await sb.rpc("assign_service_employee",{p_service_id:serviceId,p_employee_id:employeeId,p_force:force});
+ if(r.error){
+   const msg=String(r.error.message||"");
+   if(msg.startsWith("DIVERGENCIA_HORARIO:")&&!force){
+     const detail=msg.replace("DIVERGENCIA_HORARIO:","").trim();
+     if(confirm("⚠️ Divergência de horário.\\n\\n"+detail+"\\n\\nDeseja usar DESIGNAR EXTRA e enviar mesmo assim para o funcionário?")){
+       return assignServiceEmployee(serviceId,employeeId,true);
+     }
+   }
+   toast("Não foi possível designar: "+msg.replace("DIVERGENCIA_HORARIO:","").trim());return
+ }
+ closeModal();toast(r.data?.extra?"✓ Designação EXTRA enviada. O funcionário verá o conflito e decidirá se pode aceitar.":"✓ Funcionário designado. Aguardando aceitação dele.");await renderServicesMaster();
 }
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
