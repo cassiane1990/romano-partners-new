@@ -311,7 +311,7 @@ function romanoMadridInputValue(date=new Date()){
 function romanoMadridOffsetMinutes(date=new Date()){
  const p=new Intl.DateTimeFormat("en-US",{timeZone:ROMANO_TIME_ZONE,timeZoneName:"shortOffset",hour:"2-digit"}).formatToParts(date);
  const z=p.find(x=>x.type==="timeZoneName")?.value||"GMT";
- const m=z.match(/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/);
+ const m=z.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
  if(!m)return 0;
  return (m[1]==="-"?-1:1)*(Number(m[2])*60+Number(m[3]||0));
 }
@@ -1090,14 +1090,8 @@ async function requestServiceAdvance(serviceId){
   '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)">'+
   '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>La hora se calcula siempre con Europe/Madrid, independientemente del reloj del iPad/iPhone.</small></div>'+
   '<div class="notice" style="margin-top:12px"><strong>Horario actual del servicio:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
-  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" min="'+romanoMadridInputValue(new Date(now.getTime()+60000))+'" required><small class="muted">Puede adelantar o retrasar el servicio. El horario se interpreta siempre como hora de España.</small></div>'+
-  '<div class="field"><label>Ajuste rápido respecto al horario actual</label><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px">'+
-  '<button type="button" class="btn" onclick="setAdvanceOffset(-120)">−2 h</button>'+
-  '<button type="button" class="btn" onclick="setAdvanceOffset(-60)">−1 h</button>'+
-  '<button type="button" class="btn" onclick="setAdvanceOffset(-30)">−30 min</button>'+
-  '<button type="button" class="btn" onclick="setAdvanceOffset(30)">+30 min</button>'+
-  '<button type="button" class="btn" onclick="setAdvanceOffset(60)">+1 h</button>'+
-  '<button type="button" class="btn gold" onclick="setAdvanceOffset(120)">+2 h</button></div></div>'+
+  '<div class="field"><label>Hora de entrada del huésped</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" min="'+romanoMadridInputValue(new Date(now.getTime()+60000))+'" required><small class="muted">Indique únicamente la hora en que el huésped desea entrar. El horario se interpreta siempre como hora de España.</small></div>'+
+  '
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
   '<div class="field"><label>Motivo</label><textarea id="advReason" required placeholder="Explique por qué necesita cambiar el horario..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
