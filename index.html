@@ -404,12 +404,13 @@ async function viewService(id){
   let note={};try{note=JSON.parse(x.notes||"{}")}catch(e){}
   const items=x.requested_items||[];
   const itemHtml=items.length?items.map(i=>"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span><b>"+masterMoney((i.unit_price||0)*(i.quantity||1))+"</b></div>").join(""):"<div class='empty'>Sem adicionais.</div>";
+  const demoAdvanceButton=x.status!=="completed"&&x.status!=="cancelled"?("<div class=\"notice\" style=\"margin-top:12px\"><strong>⚡ Solicitud de adelanto</strong><br>Puede probar aquí el flujo de check-in adelantado.</div><div class=\"actions\"><button class=\"btn gold\" onclick=\"requestServiceAdvance('"+x.id+"')\">⚡ Pedir adelantar check-in</button></div>"):"";
   openModal("Ficha del servicio · DEMOSTRACIÓN",
    "<div class='demo-flag'>DATOS FICTICIOS · NO PRODUCCIÓN</div><div class='master-hero'><h1>"+esc(x.code)+"</h1><p>"+esc(client?.name||"")+" · "+esc(prop?.name||"")+"</p><div class='master-sign'>"+esc(x.service_type)+" · "+esc(x.typology)+" · "+esc(statusNames[x.status]||x.status)+"</div></div>"+
    "<div class='two'><div><small class='muted'>Cliente</small><p><strong>"+esc(client?.name||"—")+"</strong></p></div><div><small class='muted'>Apartamento</small><p>"+esc(prop?.name||"—")+"</p></div><div><small class='muted'>Limpieza</small><p>"+esc(x.service_type||"—")+"</p></div><div><small class='muted'>Tipología</small><p>"+esc(x.typology||"—")+"</p></div></div>"+
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Ropa · lavandería · amenities</h3></div>"+itemHtml+"<div class='line-item'><span>Lavandería</span><b>"+(x.laundry?"Sí":"No")+"</b></div><div class='line-item'><span>Kit de bienvenida</span><b>"+(x.welcome_kit?"Sí · "+x.welcome_kit_quantity+" · "+masterMoney(x.welcome_kit_value):"No")+"</b></div></div>"+
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Mantenimiento</h3></div><div class='line-item'><span>"+esc(note.maintenance==="none"?"No":note.maintenance||"No")+"</span><b>"+(note.maintenance==="other"?masterMoney(items.find(i=>i.category==="maintenance")?.unit_price||0):"—")+"</b></div><p class='muted'>"+esc(note.maintenance_note||"Sem observações de manutenção.")+"</p></div>"+
-   "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sem observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"
+   "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sem observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
  const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
