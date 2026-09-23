@@ -754,10 +754,14 @@ function simStatusStep(s){
  return false;
 }
 function simDispatchTick(){
+ const z=window.ROMANO_LIVE_SIM;
  DEMO_SERVICES.filter(s=>["requested","scheduled"].includes(s.status)).forEach(s=>{
    const q=demoEnsureDispatch(s),c=demoCurrentCandidate(s.id);
-   if(c&&c.response==="pending"&&Date.now()>=c.expiresAt){
-     demoMoveNext(s.id,"expired");simAddEvent(s.code,"5 min sem resposta → próximo funcionário");
+   if(c&&c.response==="pending"){
+     if(c._simExpiresAt==null)c._simExpiresAt=z.minutes+5;
+     if(z.minutes>=c._simExpiresAt){
+       demoMoveNext(s.id,"expired");simAddEvent(s.code,"5 min sem resposta → próximo funcionário");
+     }
    }
  });
 }
@@ -781,13 +785,19 @@ function simTick(){
 function toggleLiveSimulation(){
  const z=window.ROMANO_LIVE_SIM;z.running=!z.running;
  if(z.running){
-   if(!z.events.length)simAddEvent("ROMANO PARTNERS","Operação diária iniciada · dados fictícios");
+   if(!z.events.length){
+   simAddEvent("ROMANO PARTNERS","Operação diária iniciada · dados fictícios");
+   if(!DEMO_SERVICES.some(x=>x.id==="demo-s6")){
+     DEMO_SERVICES.push({id:"demo-s6",code:"DEMO-SRV-006",service_type:"Limpieza Check-out",typology:"T2",status:"requested",priority:"normal",scheduled_at:new Date(Date.now()+7200000).toISOString(),assigned_employee_id:null,property_id:"demo-p6",employee_name:null,demo_total:40});
+   }
+ }
    z.timer=setInterval(simTick,8000);toast("Simulação ao vivo iniciada");
  }else{clearInterval(z.timer);z.timer=null;toast("Simulação pausada")}
  openPage("dashboard");
 }
 function resetLiveSimulation(){
  const z=window.ROMANO_LIVE_SIM;clearInterval(z.timer);z.timer=null;z.running=false;z.minutes=0;z.events=[];
+ DEMO_SERVICES.splice(5);
  DEMO_SERVICES.forEach((s,i)=>{if(i===0){s.status="on_the_way";s.assigned_employee_id="demo-e1";s.employee_name="Ana Silva"}if(i===1){s.status="in_progress";s.assigned_employee_id="demo-e2";s.employee_name="Carla Santos"}if(i===2){s.status="supervised";s.assigned_employee_id="demo-e9";s.employee_name="Marta Fernández"}if(i===3){s.status="in_progress";s.assigned_employee_id="demo-e3";s.employee_name="Pedro Costa"}if(i===4){s.status="completed";s.assigned_employee_id="demo-e4";s.employee_name="João Martins"}});
  toast("Simulação restaurada");openPage("dashboard");
 }
