@@ -221,6 +221,34 @@ function photoPreview(inputId,previewId,name){const f=$(inputId)?.files?.[0];if(
 function readDemoPhoto(inputId){return new Promise(resolve=>{const f=$(inputId)?.files?.[0];if(!f)return resolve("");const rd=new FileReader();rd.onload=()=>{const img=new Image();img.onload=()=>{const size=320,scale=Math.min(1,size/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale)),cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);resolve(cv.toDataURL("image/jpeg",.82))};img.src=rd.result};rd.readAsDataURL(f)})}
 function demoFindClient(id){return DEMO_CLIENTS.find(x=>x.id===id)}
 function demoFindProperty(id){return DEMO_PROPERTIES.find(x=>x.id===id)}
+const ROMANO_TIME_ZONE="Europe/Madrid";
+const ROMANO_TIME_LOCALE="es-ES";
+function romanoMadridParts(date=new Date()){
+ const parts=new Intl.DateTimeFormat("en-CA",{timeZone:ROMANO_TIME_ZONE,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(date);
+ return Object.fromEntries(parts.filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+}
+function romanoMadridLabel(date=new Date()){
+ return new Intl.DateTimeFormat(ROMANO_TIME_LOCALE,{timeZone:ROMANO_TIME_ZONE,dateStyle:"short",timeStyle:"medium"}).format(date);
+}
+function romanoMadridInputValue(date=new Date()){
+ const p=romanoMadridParts(date);
+ return p.year+"-"+p.month+"-"+p.day+"T"+p.hour+":"+p.minute;
+}
+function romanoMadridOffsetMinutes(date=new Date()){
+ const p=new Intl.DateTimeFormat("en-US",{timeZone:ROMANO_TIME_ZONE,timeZoneName:"shortOffset",hour:"2-digit"}).formatToParts(date);
+ const z=p.find(x=>x.type==="timeZoneName")?.value||"GMT";
+ const m=z.match(/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/);
+ if(!m)return 0;
+ return (m[1]==="-"?-1:1)*(Number(m[2])*60+Number(m[3]||0));
+}
+function romanoMadridInputToDate(value){
+ const m=String(value||"").match(/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/);
+ if(!m)return null;
+ const base=Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),0);
+ let guess=new Date(base);
+ for(let i=0;i<3;i++)guess=new Date(base-romanoMadridOffsetMinutes(guess)*60000);
+ return guess;
+}
 function romanoServiceScheduleKind(serviceType){
  const t=String(serviceType||"").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");
  if(/check[ -]?in|entrada/.test(t))return "checkin";
@@ -235,27 +263,14 @@ function romanoValidateServiceTime(serviceType,iso){
  const hour=romanoRequiredHour(serviceType);
  if(hour==null||!iso)return null;
  const d=new Date(iso);
- const ok=d.getHours()===hour&&d.getMinutes()===0;
+ const madridHour=Number(romanoMadridParts(d).hour),madridMinute=Number(romanoMadridParts(d).minute);
+ const ok=madridHour===hour&&madridMinute===0;
  return ok?null:(romanoServiceScheduleKind(serviceType)==="checkin"?"El check-in debe programarse a las 15:00.":"El check-out debe programarse a las 11:00.");
 }
 function romanoAdvanceDefault(scheduledAt){
- const now=new Date();
- let scheduled=scheduledAt?new Date(scheduledAt):null;
- if(!scheduled||Number.isNaN(scheduled.getTime())||scheduled<=now){
-   scheduled=new Date(now);
-   scheduled.setDate(scheduled.getDate()+1);
-   const fixedHour=romanoRequiredHour(arguments[1]);
-   if(fixedHour!=null)scheduled.setHours(fixedHour,0,0,0);
-   else scheduled.setMinutes(scheduled.getMinutes()+60);
- }
- let desired=new Date(scheduled.getTime()-60*60000);
- if(desired<=now){
-   desired=new Date(now.getTime()+15*60000);
-   if(desired>=scheduled){
-     scheduled.setDate(scheduled.getDate()+1);
-     desired=new Date(scheduled.getTime()-60*60000);
-   }
- }
+ const now=new Date(),scheduled=scheduledAt?new Date(scheduledAt):null;
+ if(!scheduled||Number.isNaN(scheduled.getTime())||scheduled<=now)return {scheduled,desired:null};
+ const desired=new Date(scheduled.getTime()-60*60000);
  return {scheduled,desired};
 }
 const DEMO_CHANGE_REQUESTS=[];
@@ -521,6 +536,14 @@ async function viewProperty(id){
  const x=r.data;
  openModal("Ficha de propiedad",'<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Nombre</small><p>'+esc(x.name)+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.property_type||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(x.status||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Dirección</small><p>'+esc([x.address,x.city,x.country].filter(Boolean).join(", ")||"—")+'</p></div></div>')
 }
+function renderServiceItemsPremium(items){
+ const rows=(items||[]).filter(x=>x&&x.name).map(x=>{
+   const qty=Math.max(1,Number(x.quantity||1)),unit=Number(x.unit_price||0),total=unit*qty;
+   const taxLabel=x.tax?"IVA incluido":"SIN IVA";
+   return '<div class="line-item"><span><strong>'+esc(x.name)+'</strong><small class="muted" style="display:block;margin-top:3px">'+esc(x.category||"Adicional")+' · '+qty+' × '+masterMoney(unit)+' · '+taxLabel+(x.detail?" · "+esc(x.detail):"")+'</small></span><b>'+masterMoney(total)+'</b></div>';
+ }).join("");
+ return rows||'<div class="empty">Sin adicionales registrados.</div>';
+}
 async function viewService(id){
  if(demoMode){
   const x=DEMO_SERVICES.find(s=>s.id===id);if(!x){toast("Servicio demo no encontrado");return}
@@ -547,7 +570,7 @@ async function viewService(id){
  openModal("Ficha del servicio",
   '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
   '<div class="field"><label>Observaciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+clientAdvanceButton+
-  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><pre style="white-space:pre-wrap">'+esc(JSON.stringify(x.requested_items||[],null,2))+'</pre></div>'+
+  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])])+'</div></div>''+
   (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(&#39;'+x.id+'&#39;,&#39;'+s+'&#39;)">'+esc(statusNames[s])+'</button>').join("")+'</div>':"")+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div><input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)">'+((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(&#39;'+m.storage_path+'&#39;)">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+'</div>');
 }
@@ -983,21 +1006,45 @@ async function requestServiceAdvance(serviceId){
    if(pr.error){toast(pr.error.message);return}p=pr.data;
    const cr=await sb.from("clients").select("name").eq("id",s.client_id).maybeSingle();clientName=cr.data?.name||clientName;
  }
- const advanceDefaults=romanoAdvanceDefault(s.scheduled_at,s.service_type);
- const defaultTime=advanceDefaults.scheduled,desiredTime=advanceDefaults.desired;
- const localValue=new Date(desiredTime.getTime()-desiredTime.getTimezoneOffset()*60000).toISOString().slice(0,16);
- const minLocal=new Date(Date.now()+60000);
- const maxLocal=new Date(defaultTime.getTime()-60000);
- const minValue=new Date(minLocal.getTime()-minLocal.getTimezoneOffset()*60000).toISOString().slice(0,16);
- const maxValue=new Date(maxLocal.getTime()-maxLocal.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ const now=new Date(),scheduled=s?.scheduled_at?new Date(s.scheduled_at):null;
+ if(!scheduled||Number.isNaN(scheduled.getTime())){toast("Este servicio no tiene una hora de llegada válida.");return}
+ if(scheduled.getTime()<=now.getTime()){toast("La hora de llegada del huésped ya pasó. Para solicitar un adelanto, el servicio debe tener una hora futura.");return}
+ const desired=new Date(Math.max(now.getTime()+60000,scheduled.getTime()-60*60000));
+ if(desired.getTime()>=scheduled.getTime()){toast("No existe margen suficiente para adelantar este servicio.");return}
+ if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
+ const updateClock=()=>{const el=$("advSpainClock");if(el)el.textContent=romanoMadridLabel(new Date())+" · España (Europe/Madrid)"};
+ window.__advanceArrivalInstant=scheduled;\n const localValue=romanoMadridInputValue(desired);
  openModal("Pedir adelantar check-in",
-  '<form onsubmit="saveServiceAdvance(event,\''+serviceId+'\')">'+
-  '<div class="notice"><strong>Cliente:</strong> '+esc(clientName)+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'<br><strong>Horario actual:</strong> '+esc(s?.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"—")+'</div>'+
-  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" min="'+minValue+'" max="'+maxValue+'" required></div>'+
+  '<form onsubmit="saveServiceAdvance(event,\\''+serviceId+'\\')">'+
+  '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>El sistema usa siempre la zona horaria Europe/Madrid y se adapta automáticamente al horario de verano/invierno.</small></div>'+
+  '<div class="notice" style="margin-top:12px"><strong>Hora de llegada del huésped:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
+  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" required><small class="muted">Puede elegir cualquier horario anterior a la llegada del huésped. El valor se interpreta siempre como hora de España.</small></div>'+
+  '<div class="field"><label>Ajuste rápido respecto a la llegada</label><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px">'+
+  '<button type="button" class="btn" onclick="setAdvanceOffset(-120)">−2 h</button>'+
+  '<button type="button" class="btn gold" onclick="setAdvanceOffset(-60)">−1 h</button>'+
+  '<button type="button" class="btn" onclick="setAdvanceOffset(-30)">−30 min</button>'+
+  '<button type="button" class="btn" onclick="setAdvanceOffset(-15)">−15 min</button></div></div>'+
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
   '<div class="field"><label>Motivo / emergencia</label><textarea id="advReason" required placeholder="Explique por qué necesita adelantar el check-in..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
   '<button class="primary">Enviar solicitud</button></form>');
+ updateClock();
+ window.__advanceClockTimer=setInterval(updateClock,1000);
+}
+function setAdvanceOffset(minutes){
+ const serviceTime=$("advSpainClock")?null:null;
+ const input=$("advRequestedFor");if(!input)return;
+ const value=Number(minutes||0);
+ const text=input.value;
+ const base=window.__advanceArrivalInstant;
+ if(base){
+   const d=new Date(base.getTime()+value*60000);
+   input.value=romanoMadridInputValue(d);
+   return;
+ }
+ const parsed=romanoMadridInputToDate(text);if(!parsed)return;
+ const d=new Date(parsed.getTime()+value*60000);
+ input.value=romanoMadridInputValue(d);
 }
 async function uploadChangeRequestMedia(serviceId,requestId,files){
  const attachments=[];
@@ -1018,8 +1065,8 @@ async function saveServiceAdvance(e,serviceId){
  e.preventDefault();
  const requestedForValue=$("advRequestedFor")?.value,reason=$("advReason")?.value.trim(),priority=$("advPriority")?.value||"normal",files=$("advFiles")?.files||[];
  if(!requestedForValue||!reason){toast("Informe el nuevo horario y el motivo.");return}
- const requestedFor=new Date(requestedForValue);
- if(Number.isNaN(requestedFor.getTime())){toast("Informe un horario válido.");return}
+ const requestedFor=romanoMadridInputToDate(requestedForValue);
+ if(!requestedFor||Number.isNaN(requestedFor.getTime())){toast("Informe un horario válido de España.");return}
  let service=null;
  if(demoMode){
    service=DEMO_SERVICES.find(x=>x.id===serviceId);
@@ -1029,28 +1076,28 @@ async function saveServiceAdvance(e,serviceId){
    if(sr.error){toast(sr.error.message);return}
    service=sr.data;
  }
- const scheduledFor=service?.scheduled_at?new Date(service.scheduled_at):null;
- if(scheduledFor&&!demoMode&&scheduledFor.getTime()<=Date.now()){toast("Este servicio ya pasó y no admite adelanto.");return}
- if(scheduledFor&&requestedFor.getTime()>=scheduledFor.getTime()){toast("El nuevo horario debe ser anterior al horario actual del servicio.");return}
- if(requestedFor.getTime()<=Date.now()){toast("El nuevo horario debe ser futuro.");return}
+ const scheduledFor=service?.scheduled_at?new Date(service.scheduled_at):null,now=new Date();
+ if(!scheduledFor||Number.isNaN(scheduledFor.getTime())){toast("Este servicio no tiene una hora válida.");return}
+ if(["completed","cancelled"].includes(service.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
+ if(scheduledFor.getTime()<=now.getTime()){toast("La hora de llegada del huésped ya pasó y no admite adelanto.");return}
+ if(requestedFor.getTime()>=scheduledFor.getTime()){toast("El nuevo horario debe ser anterior al horario de llegada del huésped.");return}
+ if(requestedFor.getTime()<=now.getTime()){toast("El nuevo horario debe ser futuro según la hora de España.");return}
  if(files.length>5){toast("Puede adjuntar hasta 5 archivos.");return}
  if(demoMode){
    const s=service,p=DEMO_PROPERTIES.find(x=>x.id===s.property_id);
-   if(new Date(requestedFor).getTime()>=new Date(s.scheduled_at).getTime()){toast("El nuevo horario debe ser anterior al horario actual del servicio.");return}
-   if(new Date(requestedFor).getTime()<=Date.now()){toast("El nuevo horario debe ser futuro.");return}
    DEMO_CHANGE_REQUESTS.unshift({id:crypto.randomUUID(),service_id:serviceId,property_id:s.property_id,requested_by:currentUser?.id||"demo-client",request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments:Array.from(files).map(f=>({file_name:f.name,media_type:(f.type||"").split("/")[0]})),created_at:new Date().toISOString(),service_code:s.code,property_name:p?.name});
+   if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
    closeModal();toast("Solicitud demo enviada · queda en análisis");renderServiceChangeRequests();return;
  }
- if(["completed","cancelled"].includes(service.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
  const existing=await sb.from("service_change_requests").select("id").eq("service_id",serviceId).eq("request_type","checkin_advance").eq("status","requested").limit(1);
  if(existing.data?.length){toast("Ya existe una solicitud de adelanto pendiente para este servicio.");return}
- const requestId=crypto.randomUUID();
- let attachments=[];
+ const requestId=crypto.randomUUID();let attachments=[];
  try{
    if(files.length)attachments=await uploadChangeRequestMedia(serviceId,requestId,files);
    const r=await sb.from("service_change_requests").insert({id:requestId,company_id:currentProfile.company_id,service_id:serviceId,property_id:service.property_id,requested_by:currentUser.id,request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments});
    if(r.error)throw r.error;
  }catch(err){toast(err.message||"No fue possible enviar la solicitud.");return}
+ if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
  closeModal();toast("Solicitud enviada · supervisor y administrador fueron notificados");openPage("change_requests");
 }
 function serviceChangeStatusLabel(status){return {requested:"Solicitado · En análisis",approved:"Aprobado",rejected:"Rechazado",cancelled:"Cancelado"}[status]||status}
