@@ -124,6 +124,35 @@ async function renderDashboardMaster(){
  if(window.L){const m=L.map("masterMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);if(demoMode){[[40.4168,-3.7038,"👩🏻‍🧹 Limpeza · DEMO"],[40.421,-3.69,"👨🏻‍🔧 Manutenção · DEMO"],[40.405,-3.72,"👩🏻‍💼 Supervisão · DEMO"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]))}else{const r=await sb.from("employee_locations").select("profile_id,latitude,longitude,recorded_at").order("recorded_at",{ascending:false}).limit(30);const seen={};(r.data||[]).forEach(x=>{if(seen[x.profile_id])return;seen[x.profile_id]=1;L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Última atualização: "+new Date(x.recorded_at).toLocaleString("es-ES"))})}}
 }
 async function renderDashboardReference(){
+ if(role()==="client"){
+  const name=currentProfile?.full_name||currentUser?.email||"Rita";
+  let services=[],properties=[],alerts=[];
+  if(demoMode){
+   services=DEMO_SERVICES.filter(s=>s.client_id===currentProfile?.id||s.client_id==="demo-client"||!s.client_id).slice(0,5);
+   properties=DEMO_PROPERTIES.slice(0,12);
+   alerts=[];
+  }else{
+   const [sr,pr,nr]=await Promise.all([
+    sb.from("services").select("id,code,service_type,typology,status,scheduled_at,priority").order("scheduled_at",{ascending:true}).limit(5),
+    sb.from("properties").select("id,name,address,city").order("created_at",{ascending:false}).limit(12),
+    sb.from("notifications").select("id").order("created_at",{ascending:false}).limit(20)
+   ]);
+   services=sr.data||[];properties=pr.data||[];alerts=nr.data||[];
+  }
+  const statusLabel={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisionado",completed:"Finalizado"};
+  const avatar=(s)=>{
+   const t=String(s?.service_type||"").toLowerCase();
+   const cls=t.includes("pint")?"male-paint":(t.includes("manten")||t.includes("electric")||t.includes("plumb")?"male-maint":"female-clean");
+   const face=cls==="female-clean"?"👩🏻‍🧹":"👨🏻‍🔧";
+   return '<div class="client-avatar staff3d '+cls+'">'+face+'</div>';
+  };
+  const rows=services.map((s,i)=>'<div class="dash-service"><div class="dash-avatar">'+avatar(s)+'</div><div><b>'+esc(s.service_type||"Servicio")+'</b><small>⌖ '+esc(s.typology||"—")+'</small><small>⌂ '+esc(s.code||"")+'</small></div><div><div class="dash-time">'+(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</div><span class="dash-pill dp-work">'+esc(statusLabel[s.status]||s.status||"Pendiente")+'</span></div></div>').join("");
+  $("content").innerHTML='<div class="dashboard-shell"><div class="dashboard-header"><div class="dashboard-welcome"><h1>☼&nbsp; '+esc(greeting())+', '+esc(name.split("@")[0])+'</h1><p>Que hoy sea más un día de conquistas.</p><div class="verse">“Todo lo que fizer, faça de coração, como para el Señor y no para los hombres.”<br><span>Colossenses 3:23</span></div></div><div class="dashboard-actions"><input id="dashSearch" class="dash-search" placeholder="⌕  Buscar..."><button id="dashBell" class="dash-bell">♟<i>'+alerts.length+'</i></button><div class="dash-brand-badge"><strong>♛ R</strong><small>ROMANO PARTNERS</small></div></div></div><div class="dash-hero"><div class="dash-hero-copy"><div class="eyebrow">ROMANO PROPERTY CARE · MANAGEMENT</div><h2>PROPIEDADES IMPECABLES<br>CLIENTE SATISFECHO</h2><p>Excelencia en cada detalle · seguimiento de sus servicios</p></div><div class="room-art"><div class="room-window"></div><div class="room-sofa"></div><div class="room-table"></div><div class="room-plant">🌿</div></div></div><div class="dash-kpis"><div class="dash-kpi"><div class="ki">▣</div><div><small>Mis servicios</small><strong>'+services.length+'</strong><em>Programados</em></div></div><div class="dash-kpi"><div class="ki">⌂</div><div><small>Mis propiedades</small><strong>'+properties.length+'</strong><em>Registradas</em></div></div><div class="dash-kpi"><div class="ki">◷</div><div><small>En seguimiento</small><strong>'+services.filter(s=>["on_the_way","in_progress","paused","supervised"].includes(s.status)).length+'</strong><em>En operación</em></div></div><div class="dash-kpi"><div class="ki">!</div><div><small>Alertas</small><strong>'+alerts.length+'</strong><em>Actualizadas</em></div></div><div class="dash-kpi"><div class="ki">＋</div><div><small>Nueva solicitud</small><strong>+</strong><em>Solicitar servicio</em></div></div><div class="dash-kpi"><div class="ki">✓</div><div><small>Estado</small><strong>OK</strong><em>Cuenta activa</em></div></div></div><div class="dash-grid"><div class="dash-card"><div class="dash-card-head"><h3>♧ Mis servicios</h3><span id="dashAll">Ver todos</span></div><div class="dash-list">'+(rows||'<div class="empty">No hay servicios.</div>')+'</div><div class="dash-quick"><button class="primary-q" data-go="newservice">＋<br>Nuevo servicio</button><button data-go="properties">⌂<br>Mis propiedades</button><button data-go="notifications">!<br>Alertas</button><button data-go="documents">▤<br>Documentos</button></div></div><div class="dash-card"><div class="dash-card-head"><h3>⌂ Mis propiedades</h3><span>Privado</span></div><div class="dash-next">'+(properties.slice(0,4).map((p,i)=>'<div class="next-row"><div class="next-time">⌂</div><div><b>'+esc(p.name||"Propiedad")+'</b><small>'+esc(p.city||p.address||"")+'</small></div><div class="next-arrow">›</div></div>').join("")||'<div class="empty">No hay propiedades.</div>')+'</div></div><div><div class="dash-card"><div class="dash-card-head"><h3>▣ Próximos servicios</h3><span id="dashAgenda">Ver agenda</span></div><div class="dash-next">'+services.slice(0,4).map(s=>'<div class="next-row"><div class="next-time">'+(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</div><div><b>'+esc(s.service_type||"Servicio")+' '+esc(s.typology||"")+'</b><small>'+esc(statusLabel[s.status]||s.status||"Pendiente")+'</small></div><div class="next-arrow">›</div></div>').join("")+'</div></div><div class="dash-support"><div class="wa">◉</div><b>Soporte rápido</b><small>Hable con el equipo</small><button id="dashChat">Abrir comunicación →</button></div></div></div>';
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>openPage(b.dataset.go));
+  $("dashSearch").onkeydown=e=>{if(e.key==="Enter")openPage("search")};
+  $("dashBell").onclick=()=>openPage("notifications");$("dashAll").onclick=()=>openPage("services");$("dashAgenda").onclick=()=>openPage("calendar");$("dashChat").onclick=()=>openPage("chat");
+  return;
+ }
  if(!demoMode){return renderDashboardMaster();}
  const name=currentProfile?.full_name||currentUser?.email||"Rita";
  const services=DEMO_SERVICES.slice(0,5);
