@@ -204,7 +204,7 @@ async function aiDispatch(){const r=await sb.from("service_dispatch_attempts").s
 const SUPABASE_URL="https://ztjfvqcutwlfbqmtclyv.supabase.co";
 const SUPABASE_KEY="sb_publishable_OwekejMFUr_3hdujnJzxOw_SI-5vEJj";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const $=id=>document.getElementById(id); let currentUser=null,currentProfile=null,demoMode=true;
+const $=id=>document.getElementById(id); let currentUser=null,currentProfile=null,demoMode=false;
 const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"};
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 const DEMO_CLIENTS=[{id:"demo-c1",name:"Alehost",email:"operaciones@alehost.demo",phone:"+34 600 100 201",created_at:"2026-09-20T09:00:00Z"},{id:"demo-c2",name:"Booking Premium Madrid",email:"madrid@booking.demo",phone:"+34 600 100 202",created_at:"2026-09-19T10:00:00Z"},{id:"demo-c3",name:"Málaga Luxury Stays",email:"malaga@luxury.demo",phone:"+34 600 100 203",created_at:"2026-09-18T11:00:00Z"},{id:"demo-c4",name:"Clínica Retiro",email:"contacto@clinica.demo",phone:"+34 600 100 204",created_at:"2026-09-17T12:00:00Z"},{id:"demo-c5",name:"Hotel Boutique Salamanca",email:"hotel@boutique.demo",phone:"+34 600 100 205",created_at:"2026-09-16T13:00:00Z"}];
