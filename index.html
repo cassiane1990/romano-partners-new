@@ -1224,10 +1224,7 @@ async function sendChatPremium(e){
      const r=await sb.rpc("send_chat_message",{p_thread_id:__activeChatId,p_body:body});
      if(r.error)throw r.error;
    }
-   for(const file of files){
-     const media=await uploadChatMediaFile(file);
-     await uploadChatMediaFile(file);
-   }
+   for(const file of files) await uploadChatMediaFile(file);
    input.value="";if(mediaInput)mediaInput.value="";await refreshChatMessages();
  }catch(err){toast(err.message||String(err))}
 }</script></body></html>
