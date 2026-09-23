@@ -23,7 +23,7 @@
 .dispatch-timer{font:700 19px Georgia;color:#76531f}
 .dispatch-track{height:7px;border-radius:99px;background:#eee5d7;overflow:hidden;margin:8px 0}.dispatch-track i{display:block;height:100%;width:100%;background:#c89a4b;transform-origin:left;animation:dispatch5 5s linear forwards}@keyframes dispatch5{to{transform:scaleX(0)}}
 .demo-money{font:700 17px Georgia;color:#76531f}.demo-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.demo-kpi{padding:13px;border:1px solid #e5dac8;border-radius:14px;background:#fffdf9}.demo-kpi small{display:block;color:#857a6e;font-size:8px}.demo-kpi strong{display:block;font:20px Georgia;margin-top:5px}
-@media(max-width:900px){.demo-board{grid-template-columns:1fr}.demo-kpi-row{grid-template-columns:repeat(2,1fr)}}</style>
+@media(max-width:900px){.demo-board{grid-template-columns:1fr}.demo-kpi-row{grid-template-columns:repeat(2,1fr)}}.romano-chat-shell{display:grid;grid-template-columns:300px minmax(0,1fr);height:calc(100vh - 150px);min-height:520px;border:1px solid #e5dac8;border-radius:20px;overflow:hidden;background:#fffdf9}.romano-chat-list{border-right:1px solid #e5dac8;background:#faf6ef;overflow:auto}.romano-chat-list-head{padding:18px;border-bottom:1px solid #e5dac8}.romano-chat-list-head h3{margin:0}.romano-chat-contact{display:flex;align-items:center;gap:12px;width:100%;border:0;border-bottom:1px solid #eee6da;background:transparent;padding:14px 16px;text-align:left;cursor:pointer}.romano-chat-contact.active{background:#f0e1c5}.romano-chat-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#e8c87c,#b7893f);color:#fff;font-weight:800;flex:none}.romano-chat-contact b{font-size:12px}.romano-chat-contact small{display:block;color:#84796d;margin-top:4px}.romano-chat-main{display:flex;flex-direction:column;min-width:0;background:#fffdf9}.romano-chat-head{padding:14px 18px;border-bottom:1px solid #e5dac8;display:flex;align-items:center;gap:12px}.romano-chat-head h3{margin:0}.romano-chat-head small{display:block;color:#84796d;margin-top:3px}.romano-chat-messages{flex:1;overflow:auto;padding:18px;background:linear-gradient(180deg,#fbf7ef,#fffdf9)}.romano-msg{max-width:72%;margin:7px 0;padding:10px 13px;border-radius:15px;box-shadow:0 1px 2px #0000000a}.romano-msg.mine{margin-left:auto;background:#ead7ad;border-bottom-right-radius:4px}.romano-msg.theirs{margin-right:auto;background:#fff;border:1px solid #eee4d6;border-bottom-left-radius:4px}.romano-msg small{display:block;font-size:8px;color:#81776c;margin-top:5px;text-align:right}.romano-chat-compose{display:flex;gap:8px;padding:12px;border-top:1px solid #e5dac8;background:#fff}.romano-chat-compose input{flex:1;border:1px solid #e5dac8;border-radius:999px;padding:12px 15px;outline:none}.romano-chat-empty{height:100%;display:grid;place-items:center;text-align:center;color:#8c8277;padding:30px}.romano-unread{min-width:18px;height:18px;border-radius:99px;background:#b7893f;color:#fff;font-size:9px;display:grid;place-items:center;margin-left:auto}@media(max-width:760px){.romano-chat-shell{grid-template-columns:1fr;height:calc(100vh - 125px);min-height:0}.romano-chat-list{display:none}.romano-chat-shell.mobile-chat-open .romano-chat-list{display:none}.romano-chat-shell.mobile-chat-open .romano-chat-main{display:flex}.romano-chat-main{min-height:0}.romano-chat-contact{padding:12px}.romano-msg{max-width:86%}}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
@@ -529,14 +529,14 @@ async function startRealtime(){
  if(window.__romanoChannel)sb.removeChannel(window.__romanoChannel);
  window.__romanoChannel=sb.channel("romano-live-"+(currentProfile?.company_id||currentUser?.id))
  .on("postgres_changes",{event:"*",schema:"public",table:"services"},()=>{if(document.querySelector("#content")){const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page;if(["dashboard","services","calendar","locations"].includes(active))openPage(active)}})
- .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},(payload)=>{
-   const active=document.querySelector("#masterNav button.active")?.dataset.page||"";
+ .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},async(payload)=>{
+   if(!payload.new||payload.new.recipient_id!==currentUser?.id)return;
+   const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page||"";
+   toast("🔔 "+(payload.new.title||"Nueva alerta")+(payload.new.body?" · "+payload.new.body:""));
+   try{const C=window.AudioContext||window.webkitAudioContext;if(C){const ac=new C(),o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.25);}}catch(e){}
    if(active==="notifications")openPage("notifications");
-   if(["admin","supervisor"].includes(role())&&payload.new){
-    toast("🔔 "+(payload.new.title||"Nueva alerta"));
-    try{const C=window.AudioContext||window.webkitAudioContext;if(C){const ac=new C(),o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.25);}}catch(e){}
-   }
  })
+ .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshActiveChat();})
  .subscribe();
 }
 function doLogout(){sb.auth.signOut()}
@@ -733,43 +733,79 @@ function masterUpdateMaintenance(){const type=$("mpMaintenance")?.value||"none",
 function masterLoadPropertyBeds(){const id=$("mpProperty")?.value,p=(demoMode?DEMO_PROPERTIES:((window.__mpProps||[]))).find(x=>x.id===id);if(!p)return;const s=document.querySelector("[data-qty='LINEN_SINGLE']"),d=document.querySelector("[data-qty='LINEN_KING']");if(s)s.value=String(Math.max(0,Number(p.beds_single||0)));if(d)d.value=String(Math.max(0,Number(p.beds_double||0)));masterRecalc()}
 async function newServicePremium(){const clients=demoMode?DEMO_CLIENTS:((await sb.from("clients").select("id,name").order("name")).data||[]),props=demoMode?DEMO_PROPERTIES:((await sb.from("properties").select("id,name,code,client_id,property_type").order("name")).data||[]);window.__mpProps=props;const clientOptions=clients.map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join(""),typeOptions=MAINTENANCE_TYPES.map(x=>"<option value='"+x[0]+"'>"+x[1]+"</option>").join(""),rateOptions=Object.entries(MAINTENANCE_RATES).map(([k,v])=>"<option value='"+k+"'>"+esc(v.label)+"</option>").join("");openModal("Nuevo servicio · pedido completo","<div class='wizard-grid'><div><div class='step'><b>1</b><strong>Cliente → apartamento</strong></div><div class='two'><div class='field'><label>Cliente</label><select id='mpClient' onchange='masterFilterProperties()'>"+clientOptions+"</select></div><div class='field'><label>Apartamento / propiedad</label><select id='mpProperty' onchange='masterLoadPropertyBeds()'></select></div></div><div class='step' style='margin-top:15px'><b>2</b><strong>Limpieza</strong></div><div class='two'><div class='field'><label>Limpieza</label><select id='mpCleaningType' onchange='masterUpdateCleaningMode()'><option value='airbnb'>Limpieza Airbnb</option><option value='hotel'>Limpieza hotel</option><option value='office'>Limpieza de oficina</option><option value='postobra'>Limpieza post-obra</option><option value='clinic'>Limpieza de clínica</option></select></div><div class='field'><label>Tipología</label><select id='mpCleaning' onchange='masterCleaningOptionChanged()'></select></div></div><div class='two'><div class='field'><label id='mpCleaningQtyLabel'>Cantidad</label><select id='mpCleaningQty' onchange='masterRecalc()'>"+qtyOptions(1,50)+"</select></div><div class='field'><label>Valor original</label><input id='mpCleaningPrice' type='number' min='0' step='0.01' oninput='masterRecalc()'><small id='mpCleaningPriceNote' class='muted'>Valor original · SIN IVA</small></div></div><div class='two'><div class='field'><label>Fecha y hora</label><input id='mpDate' type='datetime-local'></div><div class='field'><label>Prioridad</label><select id='mpPriority'><option value='normal'>Normal</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div><div class='step' style='margin-top:15px'><b>3</b><strong>Alquiler de ropa</strong></div><div class='two'><div class='field'><label>Cama individual · cantidad</label><select data-qty='LINEN_SINGLE' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select></div><div class='field'><label>Cama doble / King · cantidad</label><select data-qty='LINEN_KING' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select></div></div><div class='two'><div class='field'><label>Sofá-cama</label><select id='mpSofaType' onchange='masterRecalc()'><option value='none'>No</option><option value='single'>Sofá-cama individual · 15,57 € SIN IVA</option><option value='double'>Sofá-cama doble / casal · 16,87 € SIN IVA</option></select></div><div class='field'><label>Sofá-cama · cantidad</label><select data-qty='SOFA_BED' onchange='masterRecalc()'>"+qtyOptions(0,10)+"</select></div></div><div class='notice'>Las cantidades de ropa se cargan automáticamente desde la composición de camas guardada en la propiedad. Los packs de sofá se añaden aparte.</div><div class='step' style='margin-top:15px'><b>4</b><strong>Lavandería</strong></div><div class='field'><label>¿Lavandería?</label><select id='mpLaundry' onchange='masterRecalc()'><option value='no'>No</option><option value='yes'>Sí</option></select></div><div class='step' style='margin-top:15px'><b>5</b><strong>Amenities</strong></div><div class='two'><div class='field'><label>Kit bienvenida · cantidad</label><select data-qty='KITCHEN' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select><small class='muted'>2,50 € · IVA incluido</small></div><div class='field'><label>Kit shampoo + jabón · cantidad</label><select data-qty='SHAMPOO' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select><small class='muted'>1,50 € · IVA incluido</small></div></div><div class='step' style='margin-top:15px'><b>6</b><strong>Adicionales</strong></div><div id='mpAdditionalList'></div><button type='button' class='btn' onclick='addServiceAdditionalRow()'>＋ Adicionar adicional</button><div class='step' style='margin-top:15px'><b>7</b><strong>Mantenimiento dentro del mismo pedido</strong></div><div class='two'><div class='field'><label>Tipo de mantenimiento</label><select id='mpMaintenance' onchange='masterUpdateMaintenance()'>"+typeOptions+"</select></div><div class='field'><label>Tarifa de mantenimiento</label><select id='mpMaintenanceRate' onchange='masterUpdateMaintenance()'>"+rateOptions+"</select></div></div><div class='two'><div class='field' id='mpMaintenanceHoursWrap'><label>Horas</label><select id='mpMaintenanceHours' onchange='masterRecalc()'>"+qtyOptions(1,7)+"</select></div><div class='field' id='mpMaintenanceOtherWrap' style='display:none'><label>Valor otros (€)</label><input id='mpMaintenanceOtherValue' type='number' min='0' step='0.01' value='0' oninput='masterRecalc()'></div></div><div class='field'><label>Observación de mantenimiento</label><textarea id='mpMaintenanceNote' placeholder='Detalle de la reparación, instalación, silicone, pintura, etc.'></textarea></div><div class='field'><label>Observaciones del servicio</label><textarea id='mpNotes' placeholder='Instrucciones, detalles del apartamento, entrada, salida, limpieza especial...'></textarea></div></div><div><div class='panel'><div class='panel-head'><h3>Resumen del servicio</h3><span class='pill'>Pedido</span></div><div class='field'><label>País fiscal</label><select id='mpVat' onchange='masterRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='mpLines'></div><div class='line-item'><span>Subtotal SIN IVA</span><b id='mpSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='mpTax'>0,00 €</b></div><div class='line-item'><span>TOTAL CON IVA</span><b id='mpTotal' class='big-total'>0,00 €</b></div><div class='notice'>Cada elección aparece en el resumen con cantidad y valor. Amenities y mantenimiento de la tabla están expresados CON IVA; ropa y limpieza se calculan según su tratamiento fiscal.</div><button type='button' class='primary' onclick='savePremiumService()'>Crear servicio</button></div></div></div>");$("mpDate").value=new Date(Date.now()+3600000).toISOString().slice(0,16);masterFilterProperties();masterUpdateCleaningMode();masterUpdateMaintenance();masterRecalc()}
 function masterFilterProperties(){const cid=$("mpClient")?.value,sel=$("mpProperty");if(!sel)return;const props=demoMode?DEMO_PROPERTIES:((window.__mpProps||[])),own=props.filter(x=>!cid||x.client_id===cid);sel.innerHTML=own.length?own.map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option value=''>Sin propiedades para este cliente</option>";masterLoadPropertyBeds()}
-function masterRecalc(){const vat=Number($("mpVat")?.value||21)/100,clean=masterSelectedCleaning(),lines=[];if(clean.price!=null)lines.push({name:(clean.opt?.name||"Limpieza")+" · "+masterMoney(clean.price)+" SIN IVA",price:clean.price*clean.qty,qty:clean.qty,tax:clean.cat.tax});masterItemRows().forEach(x=>{if(x.invalid)lines.push({name:x.name+" · "+x.detail,price:0,qty:x.quantity,tax:true,invalid:true});else if(x.unit_price>0)lines.push({name:x.name,price:x.unit_price*x.quantity,qty:x.quantity,tax:x.tax,detail:x.detail||""})});let sub=0,tax=0,total=0;lines.forEach(x=>{if(x.invalid)return;const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;tax+=gross*vat;total+=gross*(1+vat)}});$("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+(x.qty>1?" × "+x.qty:"")+(x.detail?"<small class='muted' style='display:block'>"+esc(x.detail)+"</small>":"")+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Seleccione una tarifa o añada elementos.</div>";if(clean.price==null)$("mpLines").innerHTML="<div class='notice'>"+esc(clean.opt?.name||"Tarifa a confirmar")+" · no se suma hasta confirmar el precio.</div>"+$("mpLines").innerHTML;$("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);$("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total}
-async function savePremiumService(){const prop=$("mpProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}const clean=masterSelectedCleaning(),items=masterItemRows(),maintenance=$("mpMaintenance")?.value||"none",maintenanceRate=$("mpMaintenanceRate")?.value||"normal",maintenanceHours=Math.max(1,Number($("mpMaintenanceHours")?.value||1)),additional=items.filter(x=>x.category==="additional"),code="SRV-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),clientId=$("mpClient").value;const payload={id:demoMode?"demo-"+code.toLowerCase():undefined,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,priority:$("mpPriority").value,scheduled_at:new Date($("mpDate").value).toISOString(),status:"requested",requested_items:items,instructions:$("mpNotes").value.trim()||null,notes:JSON.stringify({maintenance,maintenance_rate:maintenanceRate,maintenance_hours:maintenanceHours,maintenance_note:$("mpMaintenanceNote")?.value.trim()||null}),tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",additional_items:additional,pricing:{cleaning_original:clean.price,cleaning_quantity:clean.qty,cleaning_basis:clean.cat.basis,maintenance_rate:maintenanceRate,maintenance_hours:maintenanceHours,sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:payload.id,...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio ficticio creado · "+code);renderServicesMaster();return}const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}payload.company_id=currentProfile.company_id;payload.client_id=pr.data.client_id;delete payload.id;const s=await sb.from("services").insert(payload).select("id").single();if(s.error){toast(s.error.message);return}const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5,pricing_source:"service_catalog"}});if(ev.error){toast(ev.error.message);return}closeModal();toast("Servicio "+code+" creado · dispatch activo");renderServicesMaster()}
-async function renderChatPremium(){
- const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
- const contact=role()==="client"?'<div class="panel"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Comuníquese directamente con la empresa.</div></div></div><div class="actions"><button class="btn gold" onclick="startRoleChat(\'supervisor\')">💬 Hablar con Supervisor</button><button class="btn" onclick="startRoleChat(\'admin\')">💬 Hablar con Administrador</button><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
- $("content").innerHTML=contact+'<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
-}
-async function startRoleChat(targetRole){
- const q=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).order("full_name");
- const target=(q.data||[])[0];
- if(q.error){toast(q.error.message);return}
- if(!target){toast("No hay "+(targetRole==="supervisor"?"supervisor":"administrador")+" disponible.");return}
- const title="Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador");
- const t=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:title});
- if(t.error){toast(t.error.message);return}
- toast("Chat con "+(targetRole==="supervisor"?"Supervisor":"Administrador")+" creado");
- openChatPremium(t.data,title);
-}
-async function newChatPremium(){
- const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
- openModal("Nuevo chat","<form onsubmit='saveChatPremium(event)'><div class='field'><label>Título</label><input id='ctTitle' required></div><div class='field'><label>Participante</label><select id='ctPerson'>"+(r.data||[]).filter(x=>x.id!==currentUser.id).map(x=>"<option value='"+x.id+"'>"+esc(x.full_name||x.email)+" · "+esc(roleNames[x.role]||x.role)+"</option>").join("")+"</select></div><button class='primary'>Criar conversa</button></form>");
-}
-async function saveChatPremium(e){
- e.preventDefault();
- const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title:$("ctTitle").value.trim(),thread_type:"direct",created_by:currentUser.id}).select("id").single();
- if(t.error){toast(t.error.message);return}
- const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:$("ctPerson").value}]);
- if(m.error)toast(m.error.message);else{closeModal();toast("Chat creado");renderChatPremium()}
-}
-async function openChatPremium(id,title){
- const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
- openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\''+id+'\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
-}
-async function sendChatPremium(e,id){
- e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
- const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:id,sender_id:currentUser.id,body});
- if(r.error)toast(r.error.message);else{toast("Mensaje enviado");openChatPremium(id,$("modalTitle").textContent)}
+function masterRecalc(){const vat=Number($("mpVat")?.value||21)/100,clean=masterSelectedCleaning(),lines=[];if(clean.price!=null)lines.push({name:(clean.opt?.name||"Limpieza")+" · "+masterMoney(clean.price)+" SIN IVA",price:clean.price*clean.qty,qty:clean.qty,tax:clean.cat.tax});masterItemRows().forEach(x=>{if(x.invalid)lines.push({name:x.name+" · "+x.detail,price:0,qty:x.quantity,tax:true,invalid:true});else if(x.unit_price>0)lines.push({name:x.name,price:x.unit_price*x.quantity,qty:x.quantity,tax:x.tax,detail:x.detail||""})});let sub=0,tax=0,total=0;lines.forEach(x=>{if(x.invalid)return;const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;tax+=gross*vat;total+=gross*(1+vat)}});$("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+(x.qty>1?" × "+x.qty:"")+(x.detail?"<small class='muted' style='display:block'>"+esc(x.detail)+"</small>":"")+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Seleccione una tarifa o añada elementos.</div>";if(clean.price==null)let __activeChatId=null;
+let __activeChatTitle="";
+let __chatThreads=[];
+
+async function getOrCreateRoleThread(targetRole){
+ const targetQ=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name");
+ if(targetQ.error){toast(targetQ.error.message);return null}
+ const target=(targetQ.data||[])[0];
+ if(!target){toast("No hay "+(targetRole==="supervisor"?"supervisor":"administrador")+" disponible.");return null}
+ const existing=await sb.from("chat_threads").select("id,title,updated_at").eq("company_id",currentProfile.company_id).eq("created_by",currentUser.id).eq("title","Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador")).order("created_at",{ascending:true}).limit(1);
+ if(existing.error){toast(existing.error.message);return null}
+ if(existing.data?.[0])return existing.data[0];
+ const created=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:"Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador")});
+ if(created.error){toast(created.error.message);return null}
+ return {id:created.data,title:"Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador")};
 }
 
-</script></body></html>
+async function renderChatPremium(){
+ const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at,created_by").order("updated_at",{ascending:false});
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ __chatThreads=r.data||[];
+ const isClient=role()==="client";
+ const contact=isClient?'<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Chat interno · WhatsApp · E-mail</div></div></div><div class="actions"><button class="btn gold" onclick="selectRoleChat(\'supervisor\')">💬 Supervisor</button><button class="btn" onclick="selectRoleChat(\'admin\')">💬 Administrador</button><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail</a></div></div>':"";
+ $("content").innerHTML=contact+'<div class="romano-chat-shell"><aside class="romano-chat-list"><div class="romano-chat-list-head"><h3>Chat ROMANO</h3><div class="muted">Conversas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-avatar">R</div><div><h3>Seleccione una conversación</h3><small>Sus mensajes aparecerán aquí</small></div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Elija Supervisor o Administrador para comenzar.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event,window.__activeChatId)" style="display:none"><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><button class="btn gold">Enviar</button></form></section></div>';
+ await renderChatContacts();
+}
+
+async function renderChatContacts(){
+ const el=$("romanoChatContacts");if(!el)return;
+ const isClient=role()==="client";
+ if(isClient){
+   const sup=__chatThreads.find(x=>(x.title||"").includes("Supervisor"));
+   const adm=__chatThreads.find(x=>(x.title||"").includes("Administrador"));
+   el.innerHTML='<button class="romano-chat-contact '+(sup?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\'supervisor\')"><span class="romano-chat-avatar">S</span><span><b>Supervisor</b><small>Conversación privada</small></span></button><button class="romano-chat-contact '+(adm?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\'admin\')"><span class="romano-chat-avatar">A</span><span><b>Administrador</b><small>Conversación privada</small></span></button>';
+ }else{
+   el.innerHTML=__chatThreads.map(x=>'<button class="romano-chat-contact '+(x.id===__activeChatId?"active":"")+'" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')"><span class="romano-chat-avatar">R</span><span><b>'+esc(x.title||"Conversación")+'</b><small>'+esc(x.thread_type||"direct")+'</small></span></button>').join("")||'<div class="romano-chat-empty">Sem conversas.</div>';
+ }
+}
+
+async function selectRoleChat(targetRole){
+ let thread=__chatThreads.find(x=>(x.title||"")===("Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador")));
+ if(!thread)thread=await getOrCreateRoleThread(targetRole);
+ if(!thread)return;
+ await openChatPremium(thread.id,thread.title);
+}
+
+async function startRoleChat(targetRole){return selectRoleChat(targetRole)}
+
+async function newChatPremium(){selectRoleChat("admin")}
+
+async function saveChatPremium(e){e?.preventDefault();}
+
+async function refreshActiveChat(){
+ if(__activeChatId)await openChatPremium(__activeChatId,__activeChatTitle,true);
+}
+
+async function openChatPremium(id,title,silent=false){
+ __activeChatId=id;__activeChatTitle=title||"Conversación";
+ const head=$("romanoChatHead"),messages=$("romanoChatMessages"),compose=$("romanoChatCompose");
+ if(!head||!messages||!compose){if(!silent)openModal(__activeChatTitle,"");return}
+ head.innerHTML='<div class="romano-chat-avatar">'+esc((__activeChatTitle||"R").replace(/[^A-Za-zÁÉÍÓÚáéíóú]/g,"").charAt(0)||"R")+'</div><div><h3>'+esc(__activeChatTitle)+'</h3><small>Chat privado ROMANO · mensajes en tiempo real</small></div>';
+ const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
+ if(r.error){messages.innerHTML='<div class="romano-chat-empty">'+esc(r.error.message)+'</div>';return}
+ messages.innerHTML=(r.data||[]).map(x=>'<div class="romano-msg '+(x.sender_id===currentUser.id?"mine":"theirs")+'"><div>'+esc(x.body)+'</div><small>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small></div>').join("")||'<div class="romano-chat-empty">Aún no hay mensajes. Escriba el primero.</div>';
+ compose.style.display="flex";
+ messages.scrollTop=messages.scrollHeight;
+ await renderChatContacts();
+}
+
+async function sendChatPremium(e,id){
+ e.preventDefault();if(!id)return;
+ const input=$("romanoChatBody"),body=input?.value.trim();if(!body)return;
+ const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:id,sender_id:currentUser.id,body});
+ if(r.error){toast(r.error.message);return}
+ input.value="";await openChatPremium(id,__activeChatTitle,true);
+}</script></body></html>
