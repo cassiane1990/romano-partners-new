@@ -23,7 +23,7 @@
 .dispatch-timer{font:700 19px Georgia;color:#76531f}
 .dispatch-track{height:7px;border-radius:99px;background:#eee5d7;overflow:hidden;margin:8px 0}.dispatch-track i{display:block;height:100%;width:100%;background:#c89a4b;transform-origin:left;animation:dispatch5 5s linear forwards}@keyframes dispatch5{to{transform:scaleX(0)}}
 .demo-money{font:700 17px Georgia;color:#76531f}.demo-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.demo-kpi{padding:13px;border:1px solid #e5dac8;border-radius:14px;background:#fffdf9}.demo-kpi small{display:block;color:#857a6e;font-size:8px}.demo-kpi strong{display:block;font:20px Georgia;margin-top:5px}
-@media(max-width:900px){.demo-board{grid-template-columns:1fr}.demo-kpi-row{grid-template-columns:repeat(2,1fr)}}</style>
+@media(max-width:900px){.demo-board{grid-template-columns:1fr}.demo-kpi-row{grid-template-columns:repeat(2,1fr)}}.romano-chat-page{display:grid;grid-template-columns:300px minmax(0,1fr);height:calc(100vh - 135px);min-height:560px;background:#fffdf9;border:1px solid #e5dac8;border-radius:22px;overflow:hidden;box-shadow:0 12px 30px #523b1d0a}.romano-chat-sidebar{background:#faf6ef;border-right:1px solid #e5dac8;overflow:auto}.romano-chat-sidebar-head{padding:20px;border-bottom:1px solid #e5dac8}.romano-chat-sidebar-head h3{margin:0 0 5px;font-size:16px}.romano-chat-contact{width:100%;display:flex;align-items:center;gap:11px;padding:14px 16px;border:0;border-bottom:1px solid #eee7dc;background:transparent;text-align:left}.romano-chat-contact:hover,.romano-chat-contact.active{background:#f0e2c8}.romano-chat-contact .rc-avatar{width:43px;height:43px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#efd59c,#b7893f);color:#fff;font-weight:800;flex:none}.romano-chat-contact .rc-info{min-width:0;flex:1}.romano-chat-contact .rc-info b{display:block;font-size:12px}.romano-chat-contact .rc-info small{display:block;margin-top:3px;color:#8b8176;font-size:9px}.romano-unread{min-width:19px;height:19px;border-radius:50%;display:grid;place-items:center;background:#b7893f;color:#fff;font-size:9px;font-weight:700}.romano-chat-main{min-width:0;display:flex;flex-direction:column;background:#fffdf9}.romano-chat-head{height:72px;display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #e5dac8;background:#fffdf9}.romano-chat-head .rc-avatar{width:45px;height:45px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#efd59c,#b7893f);color:#fff;font-weight:800}.romano-chat-head b{font-size:14px}.romano-chat-head small{display:block;color:#8b8176;font-size:9px;margin-top:3px}.romano-chat-messages{flex:1;overflow:auto;padding:22px 20px;background:linear-gradient(180deg,#fbf7ef,#fffdf9)}.romano-chat-day{text-align:center;color:#91877c;font-size:8px;margin:8px 0 14px}.romano-bubble-row{display:flex;margin:7px 0}.romano-bubble-row.mine{justify-content:flex-end}.romano-bubble{max-width:min(72%,520px);padding:9px 12px;border-radius:16px;background:#fff;border:1px solid #eee4d6;box-shadow:0 2px 7px #523b1d08}.romano-bubble.mine{background:#ead5a9;border-color:#dfc58f;border-bottom-right-radius:5px}.romano-bubble.theirs{border-bottom-left-radius:5px}.romano-bubble-text{font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word}.romano-bubble-time{text-align:right;color:#8b8176;font-size:8px;margin-top:4px}.romano-chat-compose{display:flex;gap:8px;padding:12px 15px;border-top:1px solid #e5dac8;background:#fff}.romano-chat-compose input{flex:1;min-width:0;border:1px solid #dfd2bf;border-radius:999px;padding:12px 15px;outline:none;background:#fff}.romano-chat-compose input:focus{border-color:#b7893f;box-shadow:0 0 0 3px #b7893f18}.romano-chat-compose button{border:0;border-radius:999px;background:#b7893f;color:#fff;padding:0 20px;font-weight:700}.romano-chat-empty{height:100%;display:grid;place-items:center;text-align:center;color:#8b8176;padding:30px}.romano-chat-mobile-back{display:none}@media(max-width:760px){.romano-chat-page{height:calc(100vh - 105px);min-height:0;display:block}.romano-chat-sidebar{height:100%}.romano-chat-main{display:none;height:100%}.romano-chat-page.mobile-open .romano-chat-sidebar{display:none}.romano-chat-page.mobile-open .romano-chat-main{display:flex}.romano-chat-mobile-back{display:block;border:0;background:transparent;font-size:20px}.romano-bubble{max-width:84%}}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
@@ -515,28 +515,18 @@ async function renderDocuments(){const r=await sb.from("documents").select("id,t
 
 async function renderFinance(){const r=demoMode?{data:DEMO_INVOICES,error:null}:{data:null,error:null};const p=demoMode?{data:DEMO_PAYMENTS,error:null}:{data:null,error:null};if(!demoMode){const q=await sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100);const pp=await sb.from("payments").select("amount,method,paid_at").order("paid_at",{ascending:false}).limit(20);r.data=q.data;r.error=q.error;p.data=pp.data;p.error=pp.error}$("content").innerHTML='<div class="grid"><div class="stat"><small>Facturas</small><strong>'+((r.data||[]).length)+'</strong></div><div class="stat"><small>Total facturado</small><strong>'+((r.data||[]).reduce((a,x)=>a+Number(x.total||0),0)).toFixed(2)+' €</strong></div><div class="stat"><small>Pagos registrados</small><strong>'+((p.data||[]).length)+'</strong></div><div class="stat"><small>Pagado</small><strong>'+((p.data||[]).reduce((a,x)=>a+Number(x.amount||0),0)).toFixed(2)+' €</strong></div></div><div class="panel"><div class="panel-head"><h3>Facturación</h3><span class="pill">Servicio → factura → pago → costes → margen</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.status)+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas. Los valores reales de ROMANO PROPERTY CARE se introducirán cuando sean incorporados al sistema.</div>')+'</div>'}
 
-async function renderStock(){const r=await sb.from("stock_items").select("name,sku,unit,quantity,min_quantity").order("name");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Materiales y stock</h3><span class="pill">Control operativo</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Cantidad</th><th>Mínimo</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+((Number(x.quantity)<=Number(x.min_quantity))?'<span class="status urgent">Reponer</span>':'<span class="status approved">OK</span>')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>'}
-
-async function renderRecurring(){const r=await sb.from("recurring_services").select("id,frequency,typology,priority,active,next_run_at,instructions").order("next_run_at",{ascending:true});$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Servicios recurrentes</h3><span class="pill">Programación automática</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Frecuencia</th><th>Tipología</th><th>Prioridad</th><th>Próxima ejecución</th><th>Activo</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.frequency)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(x.priority)+'</td><td>'+esc(x.next_run_at?new Date(x.next_run_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.active?"Sí":"No")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios recurrentes.</div>')+'</div>'}
-
-async function renderNotifications(){const r=await sb.from("notifications").select("title,body,severity,read_at,created_at").order("created_at",{ascending:false}).limit(50);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Centro de alertas</h3><span class="pill">Incidencias · vencimientos · supervisión</span></div>'+(r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><strong>'+esc(x.title)+'</strong><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity)+' · '+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small></div>').join(""):'<div class="empty">No hay alertas.</div>')+'</div>'}
-
-async function renderSecurity(){const f=await sb.auth.mfa.listFactors();const enabled=f.data?.totp?.some(x=>x.status==="verified");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Seguridad y MFA</h3><span class="pill">'+(enabled?"MFA activo":"MFA no configurado")+'</span></div><p class="muted">El sistema utiliza Supabase Auth, sesiones reales y políticas RLS server-side. MFA TOTP se puede configurar para cuentas administrativas.</p><div class="actions"><button class="btn gold" onclick="enrollMFA()">Configurar MFA</button></div><div id="mfaSetup"></div></div>'}
-async function enrollMFA(){const e=await sb.auth.mfa.enroll({factorType:"totp",friendlyName:"ROMANO PARTNERS"});if(e.error){toast(e.error.message);return}$("mfaSetup").innerHTML='<div class="panel"><h3>Escanea el QR</h3><img style="width:220px;margin:15px 0" src="data:image/svg+xml;utf8,'+encodeURIComponent(e.data.totp.qr_code)+'"><div class="muted">Si no puedes escanearlo, usa el secreto: <strong>'+esc(e.data.totp.secret)+'</strong></div><div class="field"><label>Código del autenticador</label><input id="enrollCode" inputmode="numeric" maxlength="6"></div><button class="primary" onclick="verifyEnrollment(\''+e.data.id+'\')">Activar MFA</button></div>'}
-async function verifyEnrollment(id){const c=await sb.auth.mfa.challenge({factorId:id});if(c.error){toast(c.error.message);return}const v=await sb.auth.mfa.verify({factorId:id,challengeId:c.data.id,code:$("enrollCode").value.trim()});if(v.error){toast(v.error.message);return}toast("MFA activado");renderSecurity()}
-
-async function startRealtime(){
+async function renderStock(){const r=await sb.from("stock_items").select("name,sku,unit,quantity,min_quantity").order("name");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Materiales y stock</h3><span class="pill">Control operativo</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Cantidad</th><th>Mínimo</th><function startRealtime(){
  if(window.__romanoChannel)sb.removeChannel(window.__romanoChannel);
  window.__romanoChannel=sb.channel("romano-live-"+(currentProfile?.company_id||currentUser?.id))
  .on("postgres_changes",{event:"*",schema:"public",table:"services"},()=>{if(document.querySelector("#content")){const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page;if(["dashboard","services","calendar","locations"].includes(active))openPage(active)}})
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},(payload)=>{
-   const active=document.querySelector("#masterNav button.active")?.dataset.page||"";
+   if(!payload.new||payload.new.recipient_id!==currentUser?.id)return;
+   const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page||"";
+   toast("🔔 "+(payload.new.title||"Nueva alerta")+(payload.new.body?" · "+payload.new.body:""));
+   try{const C=window.AudioContext||window.webkitAudioContext;if(C){const ac=new C(),o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.25);}}catch(e){}
    if(active==="notifications")openPage("notifications");
-   if(["admin","supervisor"].includes(role())&&payload.new){
-    toast("🔔 "+(payload.new.title||"Nueva alerta"));
-    try{const C=window.AudioContext||window.webkitAudioContext;if(C){const ac=new C(),o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.25);}}catch(e){}
-   }
  })
+ .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshChatMessages();})
  .subscribe();
 }
 function doLogout(){sb.auth.signOut()}
@@ -735,41 +725,76 @@ async function newServicePremium(){const clients=demoMode?DEMO_CLIENTS:((await s
 function masterFilterProperties(){const cid=$("mpClient")?.value,sel=$("mpProperty");if(!sel)return;const props=demoMode?DEMO_PROPERTIES:((window.__mpProps||[])),own=props.filter(x=>!cid||x.client_id===cid);sel.innerHTML=own.length?own.map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option value=''>Sin propiedades para este cliente</option>";masterLoadPropertyBeds()}
 function masterRecalc(){const vat=Number($("mpVat")?.value||21)/100,clean=masterSelectedCleaning(),lines=[];if(clean.price!=null)lines.push({name:(clean.opt?.name||"Limpieza")+" · "+masterMoney(clean.price)+" SIN IVA",price:clean.price*clean.qty,qty:clean.qty,tax:clean.cat.tax});masterItemRows().forEach(x=>{if(x.invalid)lines.push({name:x.name+" · "+x.detail,price:0,qty:x.quantity,tax:true,invalid:true});else if(x.unit_price>0)lines.push({name:x.name,price:x.unit_price*x.quantity,qty:x.quantity,tax:x.tax,detail:x.detail||""})});let sub=0,tax=0,total=0;lines.forEach(x=>{if(x.invalid)return;const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;tax+=gross*vat;total+=gross*(1+vat)}});$("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+(x.qty>1?" × "+x.qty:"")+(x.detail?"<small class='muted' style='display:block'>"+esc(x.detail)+"</small>":"")+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Seleccione una tarifa o añada elementos.</div>";if(clean.price==null)$("mpLines").innerHTML="<div class='notice'>"+esc(clean.opt?.name||"Tarifa a confirmar")+" · no se suma hasta confirmar el precio.</div>"+$("mpLines").innerHTML;$("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);$("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total}
 async function savePremiumService(){const prop=$("mpProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}const clean=masterSelectedCleaning(),items=masterItemRows(),maintenance=$("mpMaintenance")?.value||"none",maintenanceRate=$("mpMaintenanceRate")?.value||"normal",maintenanceHours=Math.max(1,Number($("mpMaintenanceHours")?.value||1)),additional=items.filter(x=>x.category==="additional"),code="SRV-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),clientId=$("mpClient").value;const payload={id:demoMode?"demo-"+code.toLowerCase():undefined,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,priority:$("mpPriority").value,scheduled_at:new Date($("mpDate").value).toISOString(),status:"requested",requested_items:items,instructions:$("mpNotes").value.trim()||null,notes:JSON.stringify({maintenance,maintenance_rate:maintenanceRate,maintenance_hours:maintenanceHours,maintenance_note:$("mpMaintenanceNote")?.value.trim()||null}),tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",additional_items:additional,pricing:{cleaning_original:clean.price,cleaning_quantity:clean.qty,cleaning_basis:clean.cat.basis,maintenance_rate:maintenanceRate,maintenance_hours:maintenanceHours,sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:payload.id,...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio ficticio creado · "+code);renderServicesMaster();return}const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}payload.company_id=currentProfile.company_id;payload.client_id=pr.data.client_id;delete payload.id;const s=await sb.from("services").insert(payload).select("id").single();if(s.error){toast(s.error.message);return}const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5,pricing_source:"service_catalog"}});if(ev.error){toast(ev.error.message);return}closeModal();toast("Servicio "+code+" creado · dispatch activo");renderServicesMaster()}
+let __activeChatId=null,__activeChatTitle="",__chatRoleThreads={};
+
+function chatTitleFor(roleName){return "Cliente ↔ "+(roleName==="supervisor"?"Supervisor":"Administrador")}
+async function findOrCreateRoleThread(targetRole){
+ const title=chatTitleFor(targetRole);
+ const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").eq("company_id",currentProfile.company_id).eq("created_by",currentUser.id).eq("title",title).order("created_at",{ascending:true}).limit(1);
+ if(q.error){toast(q.error.message);return null}
+ if(q.data?.[0])return q.data[0];
+ const p=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name").limit(1);
+ if(p.error){toast(p.error.message);return null}
+ const target=p.data?.[0];if(!target){toast("No hay "+(targetRole==="supervisor"?"supervisor":"administrador")+" disponible.");return null}
+ const c=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:title});
+ if(c.error){toast(c.error.message);return null}
+ return {id:c.data,title,thread_type:"direct",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+}
+function stopChatPolling(){if(window.__chatPoll){clearInterval(window.__chatPoll);window.__chatPoll=null}}
+function startChatPolling(){stopChatPolling();window.__chatPoll=setInterval(()=>{if(__activeChatId)refreshChatMessages()},3000)}
 async function renderChatPremium(){
- const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
- const contact=role()==="client"?'<div class="panel"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Comuníquese directamente con la empresa.</div></div></div><div class="actions"><button class="btn gold" onclick="startRoleChat(\'supervisor\')">💬 Hablar con Supervisor</button><button class="btn" onclick="startRoleChat(\'admin\')">💬 Hablar con Administrador</button><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
- $("content").innerHTML=contact+'<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Chat ROMANO</h3><div class="muted">Comunicação privada por participantes e escopo.</div></div><button class="btn gold" onclick="newChatPremium()">＋ Nuevo chat</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line"><span><b>'+esc(x.title||"Conversación")+'</b><br><small>'+esc(x.thread_type)+'</small></span><button class="btn" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')">Abrir</button></div>').join(""):'<div class="empty">Sem conversas.</div>')+'</div>';
+ stopChatPolling();__activeChatId=null;__activeChatTitle="";
+ const isClient=role()==="client";
+ const contact=isClient?'<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Supervisor y Administrador · chat interno</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
+ $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><button type="submit">Enviar</button></form></section></div>';
+ await renderChatContacts();
 }
-async function startRoleChat(targetRole){
- const q=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).order("full_name");
- const target=(q.data||[])[0];
- if(q.error){toast(q.error.message);return}
- if(!target){toast("No hay "+(targetRole==="supervisor"?"supervisor":"administrador")+" disponible.");return}
- const title="Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador");
- const t=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:title});
- if(t.error){toast(t.error.message);return}
- toast("Chat con "+(targetRole==="supervisor"?"Supervisor":"Administrador")+" creado");
- openChatPremium(t.data,title);
+async function renderChatContacts(){
+ const el=$("romanoChatContacts");if(!el)return;
+ if(role()==="client"){
+   const sup=await findOrCreateRoleThread("supervisor");
+   const adm=await findOrCreateRoleThread("admin");
+   __chatRoleThreads={supervisor:sup,admin:adm};
+   const contacts=[["supervisor",sup,"Supervisor"],["admin",adm,"Administrador"]];
+   el.innerHTML=contacts.map(([key,t,label])=>'<button class="romano-chat-contact '+(t?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+label+'</b><small>Conversación privada</small></span></button>').join("");
+ }else{
+   const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
+   const rows=q.data||[];
+   el.innerHTML=rows.map(x=>'<button class="romano-chat-contact '+(x.id===__activeChatId?"active":"")+'" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')"><span class="rc-avatar">R</span><span class="rc-info"><b>'+esc(x.title||"Conversación")+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">Sem conversas.</div>';
+ }
 }
-async function newChatPremium(){
- const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
- openModal("Nuevo chat","<form onsubmit='saveChatPremium(event)'><div class='field'><label>Título</label><input id='ctTitle' required></div><div class='field'><label>Participante</label><select id='ctPerson'>"+(r.data||[]).filter(x=>x.id!==currentUser.id).map(x=>"<option value='"+x.id+"'>"+esc(x.full_name||x.email)+" · "+esc(roleNames[x.role]||x.role)+"</option>").join("")+"</select></div><button class='primary'>Criar conversa</button></form>");
+async function selectRoleChat(targetRole){
+ let thread=__chatRoleThreads[targetRole]||await findOrCreateRoleThread(targetRole);
+ if(!thread)return;
+ __chatRoleThreads[targetRole]=thread;
+ await openChatPremium(thread.id,targetRole==="supervisor"?"Supervisor":"Administrador");
 }
-async function saveChatPremium(e){
- e.preventDefault();
- const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title:$("ctTitle").value.trim(),thread_type:"direct",created_by:currentUser.id}).select("id").single();
- if(t.error){toast(t.error.message);return}
- const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:$("ctPerson").value}]);
- if(m.error)toast(m.error.message);else{closeModal();toast("Chat creado");renderChatPremium()}
+async function startRoleChat(targetRole){return selectRoleChat(targetRole)}
+async function newChatPremium(){return selectRoleChat("admin")}
+async function refreshChatMessages(){
+ if(!__activeChatId)return;
+ const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",__activeChatId).order("created_at",{ascending:true});
+ const box=$("romanoChatMessages");if(!box||r.error)return;
+ box.innerHTML=(r.data||[]).map(x=>'<div class="romano-bubble-row '+(x.sender_id===currentUser.id?"mine":"")+'"><div class="romano-bubble '+(x.sender_id===currentUser.id?"mine":"theirs")+'"><div class="romano-bubble-text">'+esc(x.body)+'</div><div class="romano-bubble-time">'+esc(new Date(x.created_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</div></div></div>').join("")||'<div class="romano-chat-empty"><div>Aún no hay mensajes.<br>Escriba el primero.</div></div>';
+ box.scrollTop=box.scrollHeight;
 }
 async function openChatPremium(id,title){
- const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
- openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\''+id+'\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
+ __activeChatId=id;__activeChatTitle=title||"Conversación";
+ const page=$("romanoChatPage"),head=$("romanoChatHead"),compose=$("romanoChatCompose");
+ if(!head||!compose)return;
+ if(page&&window.innerWidth<=760)page.classList.add("mobile-open");
+ const letter=(title||"R").replace(/[^A-Za-zÁÉÍÓÚáéíóú]/g,"").charAt(0)||"R";
+ head.innerHTML='<button class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><div class="rc-avatar">'+esc(letter)+'</div><div><b>'+esc(title)+'</b><small>● Chat privado · ROMANO PROPERTY CARE</small></div>';
+ compose.style.display="flex";
+ await refreshChatMessages();
+ await renderChatContacts();
+ startChatPolling();
 }
-async function sendChatPremium(e,id){
- e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
- const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:id,sender_id:currentUser.id,body});
- if(r.error)toast(r.error.message);else{toast("Mensaje enviado");openChatPremium(id,$("modalTitle").textContent)}
-}
-
-</script></body></html>
+function closeMobileChat(){const p=$("romanoChatPage");if(p)p.classList.remove("mobile-open");__activeChatId=null;__activeChatTitle=""}
+async function sendChatPremium(e){
+ e.preventDefault();if(!__activeChatId)return;
+ const input=$("romanoChatBody"),body=input?.value.trim();if(!body)return;
+ const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:__activeChatId,sender_id:currentUser.id,body});
+ if(r.error){toast(r.error.message);return}
+ input.value="";await refreshChatMessages();
+}</script></body></html>
