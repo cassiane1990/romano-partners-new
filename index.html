@@ -93,14 +93,14 @@ const SERVICE_CLEANING_CATALOG={
 
 function buildMasterNav(){
  const allowed={
-  admin:["dashboard","operations","services","newservice","calendar","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
-  supervisor:["dashboard","operations","services","newservice","calendar","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
+  admin:["dashboard","operations","services","newservice","calendar","change_requests","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
+  supervisor:["dashboard","operations","services","newservice","calendar","change_requests","emergency","maintenance","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
   employee:["dashboard","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
-  client:["dashboard","services","newservice","calendar","properties","documents","chat","notifications","emergency","sync","profile"]
+  client:["dashboard","services","newservice","calendar","change_requests","properties","documents","chat","notifications","emergency","sync","profile"]
  };
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
-  ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["emergency","⚠","Emergencia 24H"],["maintenance","⌁","Mantenimiento / Proyectos"],["quality","✓","Checklists / Calidad"]]],
+  ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de check-in"],["emergency","⚠","Emergencia 24H"],["maintenance","⌁","Mantenimiento / Proyectos"],["quality","✓","Checklists / Calidad"]]],
   ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"]]],
   ["EQUIPO · JORNADAS",[["employees","♧","Funcionarios"],["teams","♙","Equipos / Plan mensual"],["journey","◷","Mi Jornada"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"]]],
   ["RECURSOS",[["stock","▥","Materiales / Stock"],["linen","▤","Ropa / Linen"],["laundry","◌","Lavandería"],["amenities","▥","Amenities opcionales"]]],
@@ -218,9 +218,10 @@ function photoPreview(inputId,previewId,name){const f=$(inputId)?.files?.[0];if(
 function readDemoPhoto(inputId){return new Promise(resolve=>{const f=$(inputId)?.files?.[0];if(!f)return resolve("");const rd=new FileReader();rd.onload=()=>{const img=new Image();img.onload=()=>{const size=320,scale=Math.min(1,size/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale)),cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);resolve(cv.toDataURL("image/jpeg",.82))};img.src=rd.result};rd.readAsDataURL(f)})}
 function demoFindClient(id){return DEMO_CLIENTS.find(x=>x.id===id)}
 function demoFindProperty(id){return DEMO_PROPERTIES.find(x=>x.id===id)}
+const DEMO_CHANGE_REQUESTS=[];
 const DEMO_SERVICES=[{id:"demo-s1",code:"DEMO-SRV-001",service_type:"Limpieza 5★",typology:"T2",status:"on_the_way",priority:"normal",scheduled_at:"2026-09-23T08:15:00+02:00",assigned_employee_id:"demo-e1",property_id:"demo-p1",employee_name:"Ana Silva"},{id:"demo-s2",code:"DEMO-SRV-002",service_type:"Limpieza Airbnb",typology:"T4",status:"in_progress",priority:"high",scheduled_at:"2026-09-23T08:30:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p3",employee_name:"Carla Santos"},{id:"demo-s3",code:"DEMO-SRV-003",service_type:"Supervisión",typology:"T1",status:"supervised",priority:"normal",scheduled_at:"2026-09-23T10:20:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p2",employee_name:"Laura Mendes"},{id:"demo-s4",code:"DEMO-SRV-004",service_type:"Pintura",typology:"T3",status:"in_progress",priority:"normal",scheduled_at:"2026-09-23T09:00:00+02:00",assigned_employee_id:"demo-e3",property_id:"demo-p4",employee_name:"Pedro Costa"},{id:"demo-s5",code:"DEMO-SRV-005",service_type:"Mantenimiento",typology:"T2",status:"completed",priority:"normal",scheduled_at:"2026-09-23T11:45:00+02:00",assigned_employee_id:"demo-e4",property_id:"demo-p5",employee_name:"João Martins"}];
 
-const pages={dashboard:["Dashboard 360",renderDashboardReference],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
+const pages={dashboard:["Dashboard 360",renderDashboardReference],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de check-in",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
@@ -416,8 +417,8 @@ async function viewService(id){
  const media=await sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false});
  const dispatch=await sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10);
  const canUpdate=["admin","supervisor","employee"].includes(role());
- const canClientAdvance=role()==="client" && x.scheduled_at && new Date(x.scheduled_at).toLocaleDateString("es-ES")===new Date().toLocaleDateString("es-ES") && !["completed","cancelled"].includes(x.status);
- const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visual y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Pedir adelantar servicio</button></div>':"";
+ const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
+ const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visual y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Pedir adelantar check-in</button></div>':"";
  openModal("Ficha del servicio",
   '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
   '<div class="field"><label>Observaciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+clientAdvanceButton+
@@ -680,21 +681,115 @@ async function resolveEmergency(id){
  toast("Incidencia resuelta");emergency();updateOfflineIndicator()
 }
 async function requestServiceAdvance(serviceId){
- const s=await sb.from("services").select("id,code,property_id,service_type,scheduled_at").eq("id",serviceId).single();
- if(s.error){toast(s.error.message);return}
- const p=await sb.from("properties").select("id,name,code").eq("id",s.data.property_id).single();
- const prop=p.data?.name||p.data?.code||"apartamento";
- openModal("Pedir adelantar servicio",'<div class="notice"><strong>Cliente:</strong> '+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'<br><strong>Inmueble:</strong> '+esc(prop)+'</div><form onsubmit="saveServiceAdvance(event,\''+serviceId+'\')"><div class="field"><label>Urgencia</label><select id="advPriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>¿Por qué necesita adelantar el servicio?</label><textarea id="advReason" required placeholder="Explique la emergencia o motivo..."></textarea></div><button class="primary">Enviar solicitud</button></form>');
+ const isDemo=demoMode;
+ let s,p,clientName=currentProfile?.full_name||currentUser?.email||"Cliente";
+ if(isDemo){
+   s=DEMO_SERVICES.find(x=>x.id===serviceId);if(!s){toast("Servicio demo no encontrado");return}
+   p=DEMO_PROPERTIES.find(x=>x.id===s.property_id);
+ }else{
+   const sr=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,status,client_id").eq("id",serviceId).single();
+   if(sr.error){toast(sr.error.message);return}s=sr.data;
+   if(["completed","cancelled"].includes(s.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
+   const pr=await sb.from("properties").select("id,name,code").eq("id",s.property_id).single();
+   if(pr.error){toast(pr.error.message);return}p=pr.data;
+   const cr=await sb.from("clients").select("name").eq("id",s.client_id).maybeSingle();clientName=cr.data?.name||clientName;
+ }
+ const defaultTime=s.scheduled_at?new Date(s.scheduled_at):new Date(Date.now()+3600000);
+ const localValue=new Date(defaultTime.getTime()-defaultTime.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ openModal("Pedir adelantar check-in",
+  '<form onsubmit="saveServiceAdvance(event,\''+serviceId+'\')">'+
+  '<div class="notice"><strong>Cliente:</strong> '+esc(clientName)+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'<br><strong>Horario actual:</strong> '+esc(s?.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"—")+'</div>'+
+  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" required></div>'+
+  '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
+  '<div class="field"><label>Motivo / emergencia</label><textarea id="advReason" required placeholder="Explique por qué necesita adelantar el check-in..."></textarea></div>'+
+  '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
+  '<button class="primary">Enviar solicitud</button></form>');
+}
+async function uploadChangeRequestMedia(serviceId,requestId,files){
+ const attachments=[];
+ for(const file of Array.from(files||[]).slice(0,5)){
+   if(file.size>50*1024*1024)throw new Error("El archivo "+file.name+" supera el límite de 50 MB.");
+   const safe=file.name.replace(/[^a-zA-Z0-9._-]+/g,"_");
+   const path=currentProfile.company_id+"/"+serviceId+"/"+requestId+"/"+crypto.randomUUID()+"-"+safe;
+   const up=await sb.storage.from("service-media").upload(path,file,{contentType:file.type||undefined,cacheControl:"3600",upsert:false});
+   if(up.error)throw up.error;
+   const mediaType=(file.type||"").startsWith("video/")?"video":(file.type||"").startsWith("audio/")?"audio":"image";
+   const mr=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:mediaType,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size}).select("id").single();
+   if(mr.error)throw mr.error;
+   attachments.push({media_id:mr.data.id,file_name:file.name,media_type:mediaType,storage_path:path,mime_type:file.type||null,size_bytes:file.size});
+ }
+ return attachments;
 }
 async function saveServiceAdvance(e,serviceId){
  e.preventDefault();
- const reason=$("advReason").value.trim(),priority=$("advPriority").value;if(!reason)return;
- const s=await sb.from("services").select("property_id").eq("id",serviceId).single();if(s.error){toast(s.error.message);return}
- const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:s.data.property_id,category:"expedite_request",priority,description:reason,status:"open"};
- if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · solicitud guardada para sincronizar");return}
- const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
- if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · solicitud puesta en cola")}else toast(r.error.message);return}
- closeModal();toast("Solicitud enviada al supervisor y al administrador");updateOfflineIndicator();
+ const requestedForValue=$("advRequestedFor")?.value,reason=$("advReason")?.value.trim(),priority=$("advPriority")?.value||"normal",files=$("advFiles")?.files||[];
+ if(!requestedForValue||!reason){toast("Informe el nuevo horario y el motivo.");return}
+ const requestedFor=new Date(requestedForValue);
+ if(Number.isNaN(requestedFor.getTime())||requestedFor.getTime()<=Date.now()){toast("El nuevo horario debe ser futuro.");return}
+ if(files.length>5){toast("Puede adjuntar hasta 5 archivos.");return}
+ if(demoMode){
+   const s=DEMO_SERVICES.find(x=>x.id===serviceId),p=DEMO_PROPERTIES.find(x=>x.id===s?.property_id);
+   if(!s){toast("Servicio demo no encontrado");return}
+   DEMO_CHANGE_REQUESTS.unshift({id:crypto.randomUUID(),service_id:serviceId,property_id:s.property_id,requested_by:currentUser?.id||"demo-client",request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments:Array.from(files).map(f=>({file_name:f.name,media_type:(f.type||"").split("/")[0]})),created_at:new Date().toISOString(),service_code:s.code,property_name:p?.name});
+   closeModal();toast("Solicitud demo enviada · queda en análisis");renderServiceChangeRequests();return;
+ }
+ const s=await sb.from("services").select("id,property_id,status").eq("id",serviceId).single();
+ if(s.error){toast(s.error.message);return}
+ if(["completed","cancelled"].includes(s.data.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
+ const existing=await sb.from("service_change_requests").select("id").eq("service_id",serviceId).eq("request_type","checkin_advance").eq("status","requested").limit(1);
+ if(existing.data?.length){toast("Ya existe una solicitud de adelanto pendiente para este servicio.");return}
+ const requestId=crypto.randomUUID();
+ let attachments=[];
+ try{
+   if(files.length)attachments=await uploadChangeRequestMedia(serviceId,requestId,files);
+   const r=await sb.from("service_change_requests").insert({id:requestId,company_id:currentProfile.company_id,service_id:serviceId,property_id:s.data.property_id,requested_by:currentUser.id,request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments});
+   if(r.error)throw r.error;
+ }catch(err){toast(err.message||"No fue possible enviar la solicitud.");return}
+ closeModal();toast("Solicitud enviada · supervisor y administrador fueron notificados");openPage("change_requests");
+}
+function serviceChangeStatusLabel(status){return {requested:"Solicitado · En análisis",approved:"Aprobado",rejected:"Rechazado",cancelled:"Cancelado"}[status]||status}
+function serviceChangePriorityLabel(priority){return {normal:"Normal",high:"Alta",urgent:"Urgente"}[priority]||priority}
+async function renderServiceChangeRequests(){
+ if(demoMode){
+   const rows=DEMO_CHANGE_REQUESTS;
+   $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de check-in</h3><div class="muted">Flujo de demostración · sin escritura en producción</div></div></div>'+
+   (rows.length?rows.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.service_code||"Servicio")+'</strong><div class="muted">'+esc(x.property_name||"Apartamento")+'</div></div><span class="status urgent">'+esc(serviceChangeStatusLabel(x.status))+'</span></div><div class="two"><div><small class="muted">Nuevo horario</small><p>'+esc(new Date(x.requested_for).toLocaleString("es-ES"))+'</p></div><div><small class="muted">Urgencia</small><p>'+esc(serviceChangePriorityLabel(x.priority))+'</p></div></div><p>'+esc(x.notes||"—")+'</p></div>').join(""):'<div class="empty">No hay solicitudes.</div>')+'</div>';
+   return;
+ }
+ const q=await sb.from("service_change_requests").select("id,service_id,property_id,requested_by,request_type,requested_for,notes,status,priority,attachments,reviewed_by,reviewed_at,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
+ if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
+ const rows=q.data||[],serviceIds=[...new Set(rows.map(x=>x.service_id).filter(Boolean))],propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],profileIds=[...new Set(rows.map(x=>x.requested_by).filter(Boolean))];
+ const [sr,pr,cr]=await Promise.all([
+   serviceIds.length?sb.from("services").select("id,code,service_type,scheduled_at,status").in("id",serviceIds):Promise.resolve({data:[]}),
+   propertyIds.length?sb.from("properties").select("id,name,code").in("id",propertyIds):Promise.resolve({data:[]}),
+   profileIds.length?sb.from("profiles").select("id,full_name,email").in("id",profileIds):Promise.resolve({data:[]})
+ ]);
+ const services=Object.fromEntries((sr.data||[]).map(x=>[x.id,x])),props=Object.fromEntries((pr.data||[]).map(x=>[x.id,x])),profiles=Object.fromEntries((cr.data||[]).map(x=>[x.id,x]));
+ const canManageChange=["admin","supervisor"].includes(role());
+ let h='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de check-in</h3><div class="muted">'+(role()==="client"?"Acompanhe suas solicitações de adelanto.":"Solicitudes recibidas para análisis y decisión.")+'</div></div></div>';
+ h+=rows.length?rows.map(x=>{
+   const s=services[x.service_id],p=props[x.property_id],u=profiles[x.requested_by],att=Array.isArray(x.attachments)?x.attachments:[];
+   const actions=canManageChange&&x.status==="requested"?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideServiceChangeRequest(\''+x.id+'\',true)">✓ Aceptar adelanto</button><button class="btn" onclick="decideServiceChangeRequest(\''+x.id+'\',false)">✕ Rechazar</button></div>':"";
+   return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(s?.code||"Servicio")+'</strong><div class="muted">'+esc(p?.name||p?.code||"Apartamento")+' · '+esc(u?.full_name||u?.email||"Cliente")+'</div></div><span class="status '+(x.status==="requested"?"urgent":x.status==="approved"?"approved":x.status==="rejected"?"rejected":"")+'">'+esc(serviceChangeStatusLabel(x.status))+'</span></div>'+
+   '<div class="two"><div><small class="muted">Horario actual</small><p>'+esc(s?.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Nuevo horario solicitado</small><p><strong>'+esc(new Date(x.requested_for).toLocaleString("es-ES"))+'</strong></p></div><div><small class="muted">Urgencia</small><p>'+esc(serviceChangePriorityLabel(x.priority))+'</p></div><div><small class="muted">Servicio</small><p>'+esc(s?.service_type||"—")+'</p></div></div>'+
+   '<div class="field"><label>Motivo / emergencia</label><div class="notice">'+esc(x.notes||"—")+'</div></div>'+
+   '<div class="muted">Adjuntos: '+att.length+(att.length?" · "+att.map(a=>esc(a.file_name)).join(", "):" · ninguno")+'</div>'+actions+'</div>';
+ }).join(""):'<div class="empty">No hay solicitudes de check-in.</div>';
+ h+='</div>';$("content").innerHTML=h;
+}
+async function decideServiceChangeRequest(id,approved){
+ if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede decidir.");return}
+ const q=await sb.from("service_change_requests").select("id,service_id,requested_for,status").eq("id",id).single();
+ if(q.error){toast(q.error.message);return}
+ if(q.data.status!=="requested"){toast("Esta solicitud ya fue decidida.");return}
+ const status=approved?"approved":"rejected",now=new Date().toISOString();
+ const r=await sb.from("service_change_requests").update({status,reviewed_by:currentUser.id,reviewed_at:now,updated_at:now}).eq("id",id).eq("status","requested");
+ if(r.error){toast(r.error.message);return}
+ if(approved){
+   const s=await sb.from("services").update({scheduled_at:q.data.requested_for,updated_at:now}).eq("id",q.data.service_id);
+   if(s.error){await sb.from("service_change_requests").update({status:"requested",reviewed_by:null,reviewed_at:null,updated_at:new Date().toISOString()}).eq("id",id);toast("No fue posible cambiar el horario del servicio: "+s.error.message);return}
+ }
+ toast(approved?"Adelanto aprobado · horario del servicio actualizado":"Solicitud rechazada");renderServiceChangeRequests();
 }
 async function startServiceGPS(serviceId){
  if(!navigator.geolocation){toast("El navegador no permite geolocalización.");return}
