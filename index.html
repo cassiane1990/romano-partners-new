@@ -401,32 +401,18 @@ function doLogout(){sb.auth.signOut()}
 function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();buildMasterNav();startRealtime();initOfflineSync();openPage("dashboard")}
 function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
-let __authBusy=false;
-let __authReadyId=null;
+let __authBusy=false,__authReadyId=null;
 async function enterAppFromSession(session){
- if(!session?.user){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return false}
- if(__authBusy||__authReadyId===session.user.id)return false;
+ if(!session?.user){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}
+ if(__authBusy||__authReadyId===session.user.id)return;
  __authBusy=true;currentUser=session.user;
- try{
-  await profileLoad();
-  const mfaOk=await ensureMFA();
-  if(!mfaOk)return false;
-  __authReadyId=currentUser.id;
-  showApp();
-  return true;
- }catch(err){
-  currentProfile=null;__authReadyId=null;
-  showLogin("No se pudo completar el acceso: "+(err?.message||err));
-  return false;
- }finally{__authBusy=false}
+ try{await profileLoad();if(!(await ensureMFA()))return;__authReadyId=currentUser.id;showApp()}
+ catch(err){currentProfile=null;__authReadyId=null;showLogin("No se pudo completar el acceso: "+(err?.message||err))}
+ finally{__authBusy=false}
 }
-$("loginForm").addEventListener("submit",async e=>{
- e.preventDefault();$("loginMsg").classList.add("hidden");
- const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
- if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}
- await enterAppFromSession(r.data.session);
-});
-if($("logout"))$("logout").onclick=async()=>{await sb.auth.signOut({scope:"local"});currentUser=null;currentProfile=null;__authReadyId=null;showLogin()};
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}await enterAppFromSession(r.data.session)});
+
+if($("logout"))$("logout").onclick=async()=>{await sb.auth.signOut();currentUser=null;currentProfile=null;showLogin()};
 $("signupBtn").onclick=async()=>{
  const email=$("email").value.trim(),password=$("password").value;
  if(!email||password.length<8){toast("Informe email e uma contraseña de mínimo 8 caracteres.");return}
@@ -437,17 +423,13 @@ $("signupBtn").onclick=async()=>{
 };
 $("resetBtn").onclick=async()=>{
  const email=$("email").value.trim();if(!email){toast("Informe o email.");return}
- const r=await sb.auth.onAuthStateChange(async(event,session)=>{
- if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}
- if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session);
-});
-(async()=>{
- const s=await sb.auth.getSession();
- if(s.error){showLogin(s.error.message);return}
- if(s.data.session)await enterAppFromSession(s.data.session);else showLogin();
-})();>b.onclick=()=>openPage(b.dataset.page));
-sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
-(async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
+ const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+ if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
+};
+$("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
+document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
+sb.auth.onAuthStateChange(async(event,session)=>{if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
+(async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
 
 async function renderClientsPremium(){return renderClients()}
 async function renderPropertiesPremium(){return renderProperties()}
