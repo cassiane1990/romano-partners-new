@@ -441,7 +441,7 @@ async function profileLoad(){
  currentProfile=data;
  currentProfile.avatar_display_url="";
  if(data.avatar_url){
-  if(/^https?:\\/\\//i.test(data.avatar_url)) currentProfile.avatar_display_url=data.avatar_url;
+  if(/^https?:\/\//i.test(data.avatar_url)) currentProfile.avatar_display_url=data.avatar_url;
   else {const signed=await sb.storage.from("profile-media").createSignedUrl(data.avatar_url,3600);if(!signed.error)currentProfile.avatar_display_url=signed.data?.signedUrl||"";}
  }
 }
