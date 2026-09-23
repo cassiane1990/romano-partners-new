@@ -360,23 +360,31 @@ async function viewProperty(id){
  openModal("Ficha de propiedad",'<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Nombre</small><p>'+esc(x.name)+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.property_type||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(x.status||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Dirección</small><p>'+esc([x.address,x.city,x.country].filter(Boolean).join(", ")||"—")+'</p></div></div>')
 }
 async function viewService(id){
- const r=await sb.from("services").select("*").eq("id",id).single();
- if(r.error){toast(r.error.message);return}
- const x=r.data;
- window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
+ if(demoMode){
+  const x=DEMO_SERVICES.find(s=>s.id===id);if(!x){toast("Servicio demo no encontrado");return}
+  const prop=DEMO_PROPERTIES.find(p=>p.id===x.property_id),client=DEMO_CLIENTS.find(cl=>cl.id===x.client_id);
+  let note={};try{note=JSON.parse(x.notes||"{}")}catch(e){}
+  const items=x.requested_items||[];
+  const itemHtml=items.length?items.map(i=>"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span><b>"+masterMoney((i.unit_price||0)*(i.quantity||1))+"</b></div>").join(""):"<div class='empty'>Sem adicionais.</div>";
+  openModal("Ficha del servicio · DEMOSTRACIÓN",
+   "<div class='demo-flag'>DATOS FICTICIOS · NO PRODUCCIÓN</div><div class='master-hero'><h1>"+esc(x.code)+"</h1><p>"+esc(client?.name||"")+" · "+esc(prop?.name||"")+"</p><div class='master-sign'>"+esc(x.service_type)+" · "+esc(x.typology)+" · "+esc(statusNames[x.status]||x.status)+"</div></div>"+
+   "<div class='two'><div><small class='muted'>Cliente</small><p><strong>"+esc(client?.name||"—")+"</strong></p></div><div><small class='muted'>Apartamento</small><p>"+esc(prop?.name||"—")+"</p></div><div><small class='muted'>Limpieza</small><p>"+esc(x.service_type||"—")+"</p></div><div><small class='muted'>Tipología</small><p>"+esc(x.typology||"—")+"</p></div></div>"+
+   "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Ropa · lavandería · amenities</h3></div>"+itemHtml+"<div class='line-item'><span>Lavandería</span><b>"+(x.laundry?"Sí":"No")+"</b></div><div class='line-item'><span>Kit de bienvenida</span><b>"+(x.welcome_kit?"Sí · "+x.welcome_kit_quantity+" · "+masterMoney(x.welcome_kit_value):"No")+"</b></div></div>"+
+   "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Mantenimiento</h3></div><div class='line-item'><span>"+esc(note.maintenance==="none"?"No":note.maintenance||"No")+"</span><b>"+(note.maintenance==="other"?masterMoney(items.find(i=>i.category==="maintenance")?.unit_price||0):"—")+"</b></div><p class='muted'>"+esc(note.maintenance_note||"Sem observações de manutenção.")+"</p></div>"+
+   "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sem observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"
+  );return;
+ }
+ const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
+ const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  const media=await sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false});
  const dispatch=await sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10);
  const canUpdate=["admin","supervisor","employee"].includes(role());
  openModal("Ficha del servicio",
  '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
- '<div class="field"><label>Instrucciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
- (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(\''+x.id+'\',\''+s+'\')">'+esc(statusNames[s])+'</button>').join("")+((role()==="employee"||role()==="supervisor")?'<button class="btn" onclick="startServiceGPS(\''+x.id+'\')">◎ Activar GPS</button><button class="btn" onclick="stopServiceGPS()">Detener GPS</button>':'')+'<button class="btn" onclick="openPage(\'quality\')">✓ Checklist</button><button class="btn" onclick="openPage(\'emergency\')">⚠ Incidencia</button></div>':"")+
- '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+
- ((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+
- '</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div>'+
- '<input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(\''+x.id+'\')">'+
- ((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(\''+m.storage_path+'\')">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+
- '</div>');
+ '<div class="field"><label>Observaciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
+ '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><pre style="white-space:pre-wrap">'+esc(JSON.stringify(x.requested_items||[],null,2))+'</pre></div>'+
+ (canUpdate?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","completed","approved"].map(s=>'<button class="btn '+(s==="completed"||s==="approved"?"gold":"")+'" onclick="setServiceStatusPremium(''+x.id+'',''+s+'')">'+esc(statusNames[s])+'</button>').join("")+'</div>':"")+
+ '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div><input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(''+x.id+'')">'+((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(''+m.storage_path+'')">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+'</div>');
 }
 async function setServiceStatusPremium(id,status){
  const now=new Date().toISOString();
@@ -609,53 +617,109 @@ async function startServiceGPS(serviceId){
 function stopServiceGPS(){if(window.__romanoWatchId!=null){navigator.geolocation.clearWatch(window.__romanoWatchId);window.__romanoWatchId=null;toast("GPS del servicio detenido")}}
 async function renderQualityPremium(){return quality()}
 async function renderEmergencyPremium(){return emergency()}
-async function newServicePremium(){
- const p=await sb.from("properties").select("id,name,code,client_id,property_type").order("name");
- const c=await sb.from("clients").select("id,name").order("name");
- const clientOptions=(c.data||[]).map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
- openModal("Nuevo servicio · pedido completo","<div class='wizard-grid'><div><div class='step'><b>1</b><strong>Cliente → apartamento</strong></div><div class='two'><div class='field'><label>Cliente</label><select id='mpClient' onchange='masterFilterProperties()'>"+clientOptions+"</select></div><div class='field'><label>Propiedad</label><select id='mpProperty' onchange='masterRecalc()'>"+(p.data||[]).map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+"</option>").join("")+"</select></div></div><div class='step' style='margin-top:15px'><b>2</b><strong>Limpieza</strong></div><div class='two'><div class='field'><label>Tipo de servicio</label><select id='mpType'><option value='limpieza_alojamiento'>Limpieza</option><option value='check_in'>Check-in</option><option value='check_out'>Check-out</option><option value='airbnb_alojamiento_local'>Airbnb / Alojamiento Local</option><option value='hotel_5_estrellas'>Hotel 5 estrellas</option></select></div><div class='field'><label>Tipología</label><select id='mpCleaning' onchange='masterRecalc()'>"+MASTER_PRICES.cleaning.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+(x.price==null?" · Consultar":" · "+masterMoney(x.price))+"</option>").join("")+"</select></div></div><div class='two'><div class='field'><label>Fecha y hora</label><input id='mpDate' type='datetime-local'></div><div class='field'><label>Prioridad</label><select id='mpPriority'><option value='normal'>Normal</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div><div class='step' style='margin-top:15px'><b>3</b><strong>Ropa de cama / baño</strong></div><div class='choice-grid'>"+MASTER_PRICES.linen.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-code='"+x.code+"' data-name='"+esc(x.name)+"' data-price='"+x.price+"' data-tax='1' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+masterMoney(x.price)+" · IVA incluido</small></label>").join("")+"</div><div class='step' style='margin-top:15px'><b>4</b><strong>Lavandería / Amenities</strong></div><div class='choice-grid'>"+MASTER_PRICES.laundry.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-code='"+x.code+"' data-name='"+esc(x.name)+"' data-price='"+x.price+"' data-tax='0' onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+masterMoney(x.price)+" · sin IVA</small></label>").join("")+MASTER_PRICES.amenities.map(x=>"<label class='choice-card'><input class='mpItem' type='checkbox' data-code='"+x.code+"' data-name='"+esc(x.name)+"' data-price='"+(x.price||0)+"' data-tax='1' "+(x.price==null?"disabled":"")+" onchange='masterRecalc()'> "+esc(x.name)+"<br><small>"+(x.price?masterMoney(x.price):"Consultar")+"</small></label>").join("")+"</div><div class='step' style='margin-top:15px'><b>5</b><strong>Mantenimiento adicional</strong></div><div class='two'><div class='field'><label>Tipo</label><select id='mpMaint' onchange='masterRecalc()'><option value=''>Sem manutenção</option>"+MASTER_PRICES.maintenance.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+" · "+masterMoney(x.price)+"</option>").join("")+"</select></div><div class='field'><label>Observación</label><input id='mpMaintNote' placeholder='Pintura, reparación, silicone, instalación...'></div></div><div class='field'><label>Observaciones generales</label><textarea id='mpNotes'></textarea></div></div><div><div class='panel'><div class='panel-head'><h3>Nota del servicio</h3><span class='pill'>Admin / Cliente</span></div><div class='field'><label>País fiscal</label><select id='mpVat' onchange='masterRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='mpLines'></div><div class='line-item'><span>Sin IVA</span><b id='mpSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='mpTax'>0,00 €</b></div><div class='line-item'><span class='big-total'>Total</span><b id='mpTotal' class='big-total'>0,00 €</b></div><div class='notice'>Limpieza y lavandería: sin IVA. Mantenimiento, ropa y amenities: IVA incluido conforme à proposta. T5 e Premium: consultar.</div><button class='primary' onclick='savePremiumService()'>Crear pedido y activar dispatch</button></div></div></div>");
- $("mpDate").value=new Date(Date.now()+3600000).toISOString().slice(0,16);masterRecalc();
+let __mpAdditionalSeq=0;
+function masterAdditionalRow(id){
+ return "<div class='mpAdditionalRow two' data-additional-id='"+id+"' style='margin-top:8px'><div class='field'><label>Adicional</label><input class='mpAdditionalName' placeholder='Escreva o adicional'></div><div class='field'><label>Valor (€)</label><div style='display:flex;gap:6px'><input class='mpAdditionalValue' type='number' min='0' step='0.01' value='0' oninput='masterRecalc()'><button type='button' class='btn' onclick='this.closest(\".mpAdditionalRow\").remove();masterRecalc()'>×</button></div></div></div>";
 }
-function masterFilterProperties(){const cid=$("mpClient").value;document.querySelectorAll("#mpProperty option").forEach(o=>o.hidden=false);masterRecalc()}
+function addServiceAdditionalRow(){__mpAdditionalSeq++;$("mpAdditionalList").insertAdjacentHTML("beforeend",masterAdditionalRow(__mpAdditionalSeq));masterRecalc()}
+function masterSelectedQty(code){const el=$("[data-qty='"+code+"']");return Math.max(0,Number(el?.value||0))}
+function masterItemRows(){
+ const rows=[];
+ const single=masterSelectedQty("LINEN_SINGLE"),king=masterSelectedQty("LINEN_KING");
+ if(single)rows.push({category:"ropa",code:"SINGLE",name:"Pack cama solteiro",quantity:single,unit_price:18,tax:true});
+ if(king)rows.push({category:"ropa",code:"KING",name:"Pack cama casal / king",quantity:king,unit_price:19.42,tax:true});
+ const laundry=$("mpLaundry")?.value==="yes";
+ if(laundry)rows.push({category:"lavanderia",code:"LAUNDRY",name:"Lavandería",quantity:1,unit_price:0,tax:false});
+ const amenDefs=[["KITCHEN","Kit bienvenida cocina",2.5],["SHAMPOO","Kit shampoo + jabón",1.5]];
+ amenDefs.forEach(d=>{const q=masterSelectedQty(d[0]);if(q)rows.push({category:"amenities",code:d[0],name:d[1],quantity:q,unit_price:d[2],tax:true})});
+ const welcome=$("mpWelcome")?.value==="yes",wq=Math.max(0,Number($("mpWelcomeQty")?.value||0)),wv=Math.max(0,Number($("mpWelcomeValue")?.value||0));
+ if(welcome&&wq)rows.push({category:"kit_bienvenida",code:"WELCOME",name:"Kit de bienvenida",quantity:wq,unit_price:wv,custom_value:true,tax:true});
+ const maint=$("mpMaintenance")?.value||"";
+ if(maint&&maint!=="none"){
+  const name=$("mpMaintenance").selectedOptions[0]?.textContent||maint;
+  const value=maint==="other"?Math.max(0,Number($("mpMaintenanceOtherValue")?.value||0)):0;
+  rows.push({category:"maintenance",code:maint,name,quantity:1,unit_price:value,tax:true,custom_value:maint==="other",observation:$("mpMaintenanceNote")?.value.trim()||null});
+ }
+ document.querySelectorAll(".mpAdditionalRow").forEach(row=>{
+  const name=row.querySelector(".mpAdditionalName")?.value.trim(),value=Math.max(0,Number(row.querySelector(".mpAdditionalValue")?.value||0));
+  if(name)rows.push({category:"additional",code:"ADDITIONAL",name,quantity:1,unit_price:value,tax:true,custom_value:true});
+ });
+ return rows;
+}
+async function newServicePremium(){
+ const clients=demoMode?DEMO_CLIENTS:((await sb.from("clients").select("id,name").order("name")).data||[]);
+ const props=demoMode?DEMO_PROPERTIES:((await sb.from("properties").select("id,name,code,client_id,property_type").order("name")).data||[]);
+ const clientOptions=clients.map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
+ const typOptions=MASTER_PRICES.cleaning.map(x=>"<option value='"+x.code+"'>"+esc(x.name)+(x.price==null?" · Consultar":" · "+masterMoney(x.price))+"</option>").join("");
+ openModal("Nuevo servicio · pedido completo",
+ "<div class='wizard-grid'><div>"+
+ "<div class='step'><b>1</b><strong>Cliente → apartamento</strong></div>"+
+ "<div class='two'><div class='field'><label>Cliente</label><select id='mpClient' onchange='masterFilterProperties()'>"+clientOptions+"</select></div><div class='field'><label>Apartamento / propiedad</label><select id='mpProperty' onchange='masterRecalc()'></select></div></div>"+
+ "<div class='step' style='margin-top:15px'><b>2</b><strong>Limpieza</strong></div>"+
+ "<div class='two'><div class='field'><label>Tipo de limpieza</label><select id='mpCleaningType' onchange='masterRecalc()'><option value='limpieza_alojamiento'>Limpieza</option><option value='check_in'>Check-in</option><option value='check_out'>Check-out</option><option value='airbnb_alojamiento_local'>Airbnb / Alojamiento Local</option><option value='hotel_5_estrellas'>Hotel 5 estrellas</option></select></div><div class='field'><label>Tipología</label><select id='mpCleaning' onchange='masterRecalc()'>"+typOptions+"</select></div></div>"+
+ "<div class='two'><div class='field'><label>Fecha y hora</label><input id='mpDate' type='datetime-local'></div><div class='field'><label>Prioridad</label><select id='mpPriority'><option value='normal'>Normal</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div>"+
+ "<div class='step' style='margin-top:15px'><b>3</b><strong>Alquiler de ropa</strong></div>"+
+ "<div class='two'><div class='field'><label>Pack cama solteiro · cantidad</label><input data-qty='LINEN_SINGLE' type='number' min='0' step='1' value='0' oninput='masterRecalc()'></div><div class='field'><label>Pack cama casal / king · cantidad</label><input data-qty='LINEN_KING' type='number' min='0' step='1' value='0' oninput='masterRecalc()'></div></div>"+
+ "<div class='step' style='margin-top:15px'><b>4</b><strong>Lavandería</strong></div>"+
+ "<div class='field'><label>¿Lavandería?</label><select id='mpLaundry' onchange='masterRecalc()'><option value='no'>No</option><option value='yes'>Sí</option></select></div>"+
+ "<div class='step' style='margin-top:15px'><b>5</b><strong>Amenities</strong></div>"+
+ "<div class='two'><div class='field'><label>Kit bienvenida cocina · cantidad</label><input data-qty='KITCHEN' type='number' min='0' step='1' value='0' oninput='masterRecalc()'></div><div class='field'><label>Kit shampoo + jabón · cantidad</label><input data-qty='SHAMPOO' type='number' min='0' step='1' value='0' oninput='masterRecalc()'></div></div>"+
+ "<div class='step' style='margin-top:15px'><b>6</b><strong>Kit de bienvenida</strong></div>"+
+ "<div class='two'><div class='field'><label>¿Kit de bienvenida?</label><select id='mpWelcome' onchange='masterRecalc()'><option value='no'>No</option><option value='yes'>Sí</option></select></div><div class='field'><label>Cantidad</label><input id='mpWelcomeQty' type='number' min='0' step='1' value='1' oninput='masterRecalc()'></div></div>"+
+ "<div class='field'><label>Valor por kit (€)</label><input id='mpWelcomeValue' type='number' min='0' step='0.01' value='0' oninput='masterRecalc()'></div>"+
+ "<div class='step' style='margin-top:15px'><b>7</b><strong>Adicionales</strong></div>"+
+ "<div id='mpAdditionalList'></div><button type='button' class='btn' onclick='addServiceAdditionalRow()'>＋ Adicionar adicional</button>"+
+ "<div class='step' style='margin-top:15px'><b>8</b><strong>Mantenimiento dentro del mismo pedido</strong></div>"+
+ "<div class='two'><div class='field'><label>Tipo de mantenimiento</label><select id='mpMaintenance' onchange='masterRecalc()'><option value='none'>No</option><option value='preventive'>Mantenimiento preventivo</option><option value='corrective'>Mantenimiento correctivo</option><option value='silicone'>Silicone</option><option value='assembly'>Montaje</option><option value='installation'>Instalación</option><option value='hydraulic'>Hidráulica</option><option value='electric'>Eléctrica</option><option value='other'>Otros</option></select></div><div class='field' id='mpMaintenanceOtherWrap' style='display:none'><label>Valor otros (€)</label><input id='mpMaintenanceOtherValue' type='number' min='0' step='0.01' value='0' oninput='masterRecalc()'></div></div>"+
+ "<div class='field'><label>Observación de mantenimiento</label><textarea id='mpMaintenanceNote' placeholder='Detalle de la reparación, instalación, silicone, etc.' oninput='masterRecalc()'></textarea></div>"+
+ "<div class='step' style='margin-top:15px'><b>9</b><strong>Observaciones del servicio</strong></div><div class='field'><label>Observaciones</label><textarea id='mpNotes' placeholder='Instrucciones, detalles del apartamento, entrada, salida, limpieza especial...'></textarea></div>"+
+ "<div class='step' style='margin-top:15px'><b>10</b><strong>Observaciones finales</strong></div><div class='field'><label>Observaciones finales</label><textarea id='mpFinalNotes' placeholder='Notas finales del pedido'></textarea></div>"+
+ "</div><div><div class='panel'><div class='panel-head'><h3>Resumen del servicio</h3><span class='pill'>Pedido</span></div><div class='field'><label>País fiscal</label><select id='mpVat' onchange='masterRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='mpLines'></div><div class='line-item'><span>Sin IVA</span><b id='mpSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='mpTax'>0,00 €</b></div><div class='line-item'><span class='big-total'>Total</span><b id='mpTotal' class='big-total'>0,00 €</b></div><div class='notice'>El servicio se crea con cliente, apartamento, limpieza, ropa, lavandería, amenities, kit de bienvenida, adicionales, mantenimiento y observaciones en el mismo pedido.</div><button type='button' class='primary' onclick='savePremiumService()'>Crear servicio</button></div></div></div>");
+ $("mpDate").value=new Date(Date.now()+3600000).toISOString().slice(0,16);
+ masterFilterProperties();masterRecalc();
+}
+function masterFilterProperties(){
+ const cid=$("mpClient")?.value,sel=$("mpProperty");if(!sel)return;
+ const props=demoMode?DEMO_PROPERTIES:((window.__mpProps||[]));
+ const own=props.filter(x=>!cid||x.client_id===cid);
+ sel.innerHTML=own.length?own.map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option value=''>Sin propiedades para este cliente</option>";
+ masterRecalc();
+}
 function masterRecalc(){
- const vat=Number($("mpVat")?.value||21)/100,lines=[];const cl=MASTER_PRICES.cleaning.find(x=>x.code===$("mpCleaning")?.value);if(cl&&cl.price!=null)lines.push({name:cl.name,price:cl.price,tax:cl.tax});
- document.querySelectorAll(".mpItem:checked").forEach(x=>{const p=Number(x.dataset.price||0);if(p>0)lines.push({name:x.dataset.name,price:p,tax:x.dataset.tax==="1"})});
- const mt=MASTER_PRICES.maintenance.find(x=>x.code===$("mpMaint")?.value);if(mt)lines.push({name:mt.name,price:mt.price,tax:true});
- let sub=0,tax=0,total=0;lines.forEach(x=>{const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;total+=gross}});
- $("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Añada elementos.</div>";
- $("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);$("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total;
+ const vat=Number($("mpVat")?.value||21)/100,lines=[];
+ const cl=MASTER_PRICES.cleaning.find(x=>x.code===$("mpCleaning")?.value);
+ if(cl&&cl.price!=null)lines.push({name:cl.name,price:cl.price,qty:1,tax:cl.tax});
+ masterItemRows().forEach(x=>{if(x.unit_price>0)lines.push({name:x.name,price:x.unit_price*x.quantity,qty:x.quantity,tax:x.tax})});
+ const mt=$("mpMaintenance")?.value;if($("mpMaintenanceOtherWrap"))$("mpMaintenanceOtherWrap").style.display=mt==="other"?"block":"none";
+ let sub=0,tax=0,total=0;
+ lines.forEach(x=>{const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;total+=gross}});
+ $("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+(x.qty>1?" × "+x.qty:"")+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Añada elementos.</div>";
+ $("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);
+ $("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total;
 }
 async function savePremiumService(){
- if(demoMode){toast("Modo demostración: no se escribe en producción.");return}
- const prop=$("mpProperty").value;if(!prop){toast("Seleccione una propiedad.");return}
- const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}
- const selected=[...document.querySelectorAll(".mpItem:checked")].map(x=>({code:x.dataset.code,quantity:1})).filter(x=>x.code);
- const mt=$("mpMaint").value;if(mt)selected.push({code:mt,quantity:1});
- const pricingCode=$("mpCleaning").value||null;
- const taxCountry=$("mpVat").value==="23"?"PT":"ES";
+ const prop=$("mpProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
+ const cl=MASTER_PRICES.cleaning.find(x=>x.code===$("mpCleaning")?.value);
+ const items=masterItemRows();
+ const maintenance=$("mpMaintenance")?.value||"none";
+ const additional=items.filter(x=>x.category==="additional");
  const code="SRV-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6);
- const s=await sb.from("services").insert({
-   company_id:currentProfile.company_id,
-   client_id:pr.data.client_id,
-   property_id:prop,
-   code,
-   service_type:$("mpType").value,
-   typology:(pricingCode||"T1").split("-")[0],
-   pricing_code:pricingCode,
-   tax_country:taxCountry,
-   requested_items:selected,
-   priority:$("mpPriority").value,
-   scheduled_at:new Date($("mpDate").value).toISOString(),
-   instructions:$("mpNotes").value.trim()||null,
-   notes:$("mpMaintNote").value.trim()||null,
-   status:"requested",
-   client_requested_at:new Date().toISOString()
- }).select("id").single();
+ const clientId=$("mpClient").value;
+ const payload={
+  id:demoMode?"demo-"+code.toLowerCase():undefined,client_id:clientId,property_id:prop,code,service_type:$("mpCleaningType").value,typology:cl?.code?.split("-")[0]||"T1",pricing_code:cl?.code||null,priority:$("mpPriority").value,scheduled_at:new Date($("mpDate").value).toISOString(),status:"requested",requested_items:items,instructions:$("mpNotes").value.trim()||null,notes:JSON.stringify({maintenance,maintenance_note:$("mpMaintenanceNote").value.trim()||null,final_observations:$("mpFinalNotes").value.trim()||null}),tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",welcome_kit:$("mpWelcome").value==="yes",welcome_kit_quantity:Number($("mpWelcomeQty").value||0),welcome_kit_value:Number($("mpWelcomeValue").value||0),additional_items:additional};
+ if(demoMode){
+  const next=Object.assign({},payload);delete next.id;DEMO_SERVICES.unshift({id:payload.id,...next,employee_name:null});
+  closeModal();toast("Servicio ficticio creado · "+code);renderServicesMaster();return;
+ }
+ const pr=await sb.from("properties").select("client_id").eq("id",prop).single();if(pr.error){toast(pr.error.message);return}
+ payload.company_id=currentProfile.company_id;payload.client_id=pr.data.client_id;delete payload.id;
+ const s=await sb.from("services").insert(payload).select("id").single();
  if(s.error){toast(s.error.message);return}
  const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:s.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{dispatch_window_minutes:5,pricing_source:"service_catalog"}});
  if(ev.error){toast(ev.error.message);return}
- closeModal();toast("Pedido "+code+" creado · valores calculados por el catálogo oficial · dispatch activo");renderServicesMaster();
+ closeModal();toast("Servicio "+code+" creado · dispatch activo");renderServicesMaster();
 }
+
 
 async function renderChatPremium(){
  const r=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").order("updated_at",{ascending:false});
