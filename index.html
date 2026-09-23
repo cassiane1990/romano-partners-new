@@ -621,7 +621,7 @@ async function emergency(){
  const r=await sb.from("occurrences").select("id,service_id,property_id,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100);
  const canWrite=["admin","supervisor","employee","client"].includes(role());
  let h='<div class="panel"><div class="panel-head"><div><h3>Emergencia 24H · Incidencias</h3><div class="muted">Ocurrencia urgente vinculada al servicio o propiedad</div></div>'+(canWrite?'<button class="btn gold" onclick="newEmergency()">＋ Registrar incidencia</button>':'')+'</div>';
- h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':'approved')+'">'+esc(x.status)+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="resolveEmergency(\''+x.id+'\')">Marcar resuelta</button></div>':'')+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
+ h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':'approved')+'">'+esc(x.status)+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'&&x.category==='expedite_request'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="decideServiceAdvance(\''+x.id+'\',true)">✓ Aceptar adelanto</button><button class="btn" onclick="decideServiceAdvance(\''+x.id+'\',false)">✕ Rechazar</button></div>':(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="resolveEmergency(\''+x.id+'\')">Marcar resuelta</button></div>':''))+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
  h+='</div>';$("content").innerHTML=h;
 }
 async function newEmergency(){
@@ -660,6 +660,16 @@ async function saveEmergency(e){
  const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · incidencia puesta en cola")}else toast(r.error.message);return}
  closeModal();toast("Incidencia registrada y enviada a supervisión");emergency();updateOfflineIndicator();
+}
+async function decideServiceAdvance(id,approved){
+ const resolution=approved?"Adelanto aprobado por supervisión/admin":"Adelanto rechazado por supervisión/admin";
+ const r=await sb.from("occurrences").update({status:approved?"approved":"rejected",resolution,resolved_at:new Date().toISOString()}).eq("id",id);
+ if(r.error){toast(r.error.message);return}
+ const occ=await sb.from("occurrences").select("created_by").eq("id",id).single();
+ if(occ.data?.created_by){
+  await sb.from("notifications").insert({company_id:currentProfile.company_id,recipient_id:occ.data.created_by,title:approved?"Adelanto aprobado":"Adelanto rechazado",body:resolution,severity:approved?"normal":"high"});
+ }
+ toast(approved?"Adelanto aprobado":"Adelanto rechazado");emergency();
 }
 async function resolveEmergency(id){
  const resolution=prompt("Resolución / acción realizada:");if(!resolution)return;
