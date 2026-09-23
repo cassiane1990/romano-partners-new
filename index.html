@@ -480,7 +480,23 @@ function doLogout(){sb.auth.signOut()}
 function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();buildMasterNav();renderProfileVisual();startRealtime();initOfflineSync();openPage("dashboard")}
 function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}currentUser=r.data.user;try{await profileLoad();if(!(await ensureMFA()))return;showApp()}catch(err){await sb.auth.signOut();showLogin(err.message)}});
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const btn=e.submitter||$("loginForm").querySelector("button.primary");
+ if(btn)btn.disabled=true;
+ $("loginMsg").classList.add("hidden");
+ try{
+   const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+   if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}
+   currentUser=r.data.user;
+   await profileLoad();
+   if(!(await ensureMFA()))return;
+   showApp();
+ }catch(err){
+   $("loginMsg").textContent=err?.message||"No fue posible iniciar sesión.";
+   $("loginMsg").classList.remove("hidden");
+ }finally{if(btn)btn.disabled=false}
+});
 if($("logout"))$("logout").onclick=async()=>{await sb.auth.signOut();currentUser=null;currentProfile=null;showLogin()};
 $("signupBtn").onclick=async()=>{
  const email=$("email").value.trim(),password=$("password").value;
@@ -497,7 +513,7 @@ $("resetBtn").onclick=async()=>{
 };
 $("demoLoginBtn").onclick=()=>{demoMode=!demoMode;$("demoLoginBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoLoginBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
-sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
+sb.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;currentProfile=null;showLogin()}});
 (async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
 
 async function renderClientsPremium(){return renderClients()}
