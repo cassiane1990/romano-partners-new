@@ -204,7 +204,7 @@ async function renderJourneyMaster(){
 async function masterClockIn(){const pos=await masterGeo();const r=await sb.from("work_journal_entries").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,check_in_at:new Date().toISOString(),check_in_lat:pos?.lat||null,check_in_lng:pos?.lng||null,status:"open"});if(r.error)toast(r.error.message);else{toast("Entrada registrada");renderJourneyMaster()}}
 async function masterClockOut(){const pos=await masterGeo();const r=await sb.from("work_journal_entries").update({check_out_at:new Date().toISOString(),check_out_lat:pos?.lat||null,check_out_lng:pos?.lng||null,status:"closed"}).eq("profile_id",currentUser.id).eq("status","open");if(r.error)toast(r.error.message);else{toast("Salida registrada");renderJourneyMaster()}}
 function masterGeo(){return new Promise(resolve=>{if(!navigator.geolocation)return resolve(null);navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),()=>resolve(null),{enableHighAccuracy:true,timeout:7000})})}
-async async function renderLocationsMaster(){
+async function renderLocationsMaster(){
  const demoRows=[
   {name:"Ana Silva",service:"Limpieza 5★",typology:"T2",place:"Apartamento T2 · Málaga",time:"08:15",status:"on_the_way",type:"cleaner",lat:40.425,lon:-3.695},
   {name:"Carlos Mendes",service:"Mantenimiento · Silicona",typology:"T3",place:"Apartamento T3 · Madrid",time:"09:00",status:"in_progress",type:"maintenance",lat:40.415,lon:-3.690},
