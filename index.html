@@ -794,7 +794,7 @@ function resetLiveSimulation(){
 function renderLiveSimulator(){
  const z=window.ROMANO_LIVE_SIM;
  const events=z.events.length?z.events.map(e=>'<div class="sim-event"><b>'+esc(e.title)+'</b><span>'+esc(e.detail)+' · '+esc(e.time)+'</span></div>').join(""):'<div class="sim-event"><b>Pronto para iniciar</b><span>Simula uma operação diária completa sem tocar no banco real.</span></div>';
- return '<div class="live-sim"><div class="live-sim-head"><div><div class="live-sim-title"><i class="live-dot"></i><b>Operação ao vivo · DEMONSTRAÇÃO</b></div><small>Serviços, dispatch, funcionários e estados evoluem automaticamente.</small></div><div id="simClock" class="sim-clock">Dia demo · 07:00</div></div><div class="sim-controls"><button class="btn gold" onclick="toggleLiveSimulation()">'+(z.running?"Ⅱ Pausar":"▶ Iniciar operação")+'</button><button class="btn" onclick="resetLiveSimulation()">↺ Restaurar</button><button class="btn" onclick="openPage('services')">Abrir operação 360</button></div><div id="simFeed" class="sim-feed">'+events+'</div></div>';
+ return '<div class="live-sim"><div class="live-sim-head"><div><div class="live-sim-title"><i class="live-dot"></i><b>Operação ao vivo · DEMONSTRAÇÃO</b></div><small>Serviços, dispatch, funcionários e estados evoluem automaticamente.</small></div><div id="simClock" class="sim-clock">Dia demo · 07:00</div></div><div class="sim-controls"><button class="btn gold" onclick="toggleLiveSimulation()">'+(z.running?"Ⅱ Pausar":"▶ Iniciar operação")+'</button><button class="btn" onclick="resetLiveSimulation()">↺ Restaurar</button><button class="btn" onclick="openPage(\'services\')">Abrir operação 360</button></div><div id="simFeed" class="sim-feed">'+events+'</div></div>';
 }
 </script></body></html>
 
