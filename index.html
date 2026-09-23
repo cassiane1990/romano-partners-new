@@ -332,8 +332,6 @@ function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toL
 
 async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
 async function ensureMFA(){
- const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
- if(a.error)throw a.error;
  const factors=await sb.auth.mfa.listFactors();
  if(factors.error)throw factors.error;
  const verifiedTotp=(factors.data?.totp||[]).filter(x=>x.status==="verified");
@@ -341,6 +339,8 @@ async function ensureMFA(){
    $("mfa").classList.add("hidden");
    return true;
  }
+ const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+ if(a.error)throw a.error;
  if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){
    $("mfa").classList.remove("hidden");
    $("login").classList.add("hidden");
