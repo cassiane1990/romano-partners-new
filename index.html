@@ -746,12 +746,10 @@ async function startRoleChat(targetRole){
  if(q.error){toast(q.error.message);return}
  if(!target){toast("No hay "+(targetRole==="supervisor"?"supervisor":"administrador")+" disponible.");return}
  const title="Cliente ↔ "+(targetRole==="supervisor"?"Supervisor":"Administrador");
- const t=await sb.from("chat_threads").insert({company_id:currentProfile.company_id,title,thread_type:"direct",created_by:currentUser.id}).select("id").single();
+ const t=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:title});
  if(t.error){toast(t.error.message);return}
- const m=await sb.from("chat_members").insert([{thread_id:t.data.id,profile_id:currentUser.id},{thread_id:t.data.id,profile_id:target.id}]);
- if(m.error){toast(m.error.message);return}
  toast("Chat con "+(targetRole==="supervisor"?"Supervisor":"Administrador")+" creado");
- openChatPremium(t.data.id,title);
+ openChatPremium(t.data,title);
 }
 async function newChatPremium(){
  const r=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).order("full_name");
