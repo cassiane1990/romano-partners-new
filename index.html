@@ -30,7 +30,7 @@
 <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
 <form id="loginForm"><div class="field"><label>Correo electrónico</label><input id="email" type="email" autocomplete="username" required></div>
 <div class="field"><label>Contraseña</label><input id="password" type="password" autocomplete="current-password" required></div>
-<button class="primary">Entrar al sistema</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
+<button class="primary">Entrar al sistema</button><button type="button" class="btn gold" id="demoLoginBtn" style="width:100%;margin-top:8px">✦ Ver experiencia completa · DEMOSTRACIÓN</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
 </div></div>
 
 <div id="mfa" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>VERIFICACIÓN</h1><p>SEGURIDAD ROMANO PARTNERS</p></div>
@@ -716,6 +716,17 @@ setTimeout(()=>{
  const sf=document.querySelector(".side-footer");
  if(sf&&!document.getElementById("profileQuick")){const q=document.createElement("div");q.id="profileQuick";q.className="sf-logout";q.textContent="◉ Mi perfil";q.onclick=()=>openMyProfile();sf.insertBefore(q,sf.lastElementChild);}
 },0);
+
+/* Demo entry point: isolated fictitious operation, no auth and no database writes. */
+function enterDemoExperience(){
+ demoMode=true;window.__romanoDemoRole="admin";
+ $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");
+ $("userEmail").textContent="modo demostración · datos ficticios";
+ $("demoBtn").textContent="DEMO ACTIVO";$("demoBtn").classList.add("gold");
+ buildMasterNav();renderProfileVisual();openPage("dashboard");
+ toast("Experiência DEMONSTRAÇÃO iniciada · nenhum dado real será alterado.");
+}
+setTimeout(()=>{const b=$("demoLoginBtn");if(b)b.onclick=enterDemoExperience},0);
 </script></body></html>
 
 // ===== DEMONSTRACIÓN 360: dados fictícios + fluxo de dispatch =====
