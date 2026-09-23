@@ -97,7 +97,11 @@
   .modal-card select,.modal-card input,.modal-card textarea{max-width:100%;min-width:0}
 }
 </style>
-</head>
+<style id="romano-menu-restore">
+@media (min-width:901px){.side{width:250px}.main{margin-left:250px}}
+@media (max-width:900px){.side{width:268px;padding:18px 14px;box-shadow:10px 0 30px #0003}.side-brand strong{font-size:24px}.side-brand span,.side .role{display:block}.nav button span{display:inline}.nav button{text-align:left;padding:12px 13px}.nav .section{display:block}.main{margin-left:268px}}
+@media (max-width:560px){.grid,.two{grid-template-columns:1fr}.top{padding:0 16px}.content{padding:14px}.login-card{padding:28px}.table{display:block;overflow:auto}}
+</style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
 <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
@@ -173,7 +177,7 @@ function buildMasterNav(){
  };
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
-  ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de check-in"],["emergency","⚠","Emergencia 24H"],["maintenance","⌁","Mantenimiento / Proyectos"],["quality","✓","Checklists / Calidad"]]],
+  ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de cambio de horario"],["emergency","⚠","Emergencia 24H"],["maintenance","⌁","Mantenimiento / Proyectos"],["quality","✓","Checklists / Calidad"]]],
   ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"]]],
   ["EQUIPO · JORNADAS",[["employees","♧","Funcionarios"],["teams","♙","Equipos / Plan mensual"],["journey","◷","Mi Jornada"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"]]],
   ["RECURSOS",[["stock","▥","Materiales / Stock"],["linen","▤","Ropa / Linen"],["laundry","◌","Lavandería"],["amenities","▥","Amenities opcionales"]]],
@@ -402,7 +406,7 @@ async function uploadProfilePhoto(input){
  currentProfile.avatar_url=path;currentProfile.avatar_display_url=signed.data?.signedUrl||"";
  showApp();toast("Foto de perfil actualizada");
 }
-const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de check-in",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
+const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
@@ -621,7 +625,7 @@ async function viewService(id){
   let note={};try{note=JSON.parse(x.notes||"{}")}catch(e){}
   const items=x.requested_items||[];
   const itemHtml=items.length?items.map(i=>"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span><b>"+masterMoney((i.unit_price||0)*(i.quantity||1))+"</b></div>").join(""):"<div class='empty'>Sem adicionais.</div>";
-  const demoAdvanceButton=x.status!=="completed"&&x.status!=="cancelled"?("<div class=\"notice\" style=\"margin-top:12px\"><strong>⚡ Solicitud de adelanto</strong><br>Puede probar aquí el flujo de check-in adelantado.</div><div class=\"actions\"><button class=\"btn gold\" onclick=\"requestServiceAdvance('"+x.id+"')\">⚡ Pedir adelantar check-in</button></div>"):"";
+  const demoAdvanceButton=x.status!=="completed"&&x.status!=="cancelled"?("<div class=\"notice\" style=\"margin-top:12px\"><strong>⚡ Solicitud de adelanto</strong><br>Puede probar aquí el flujo de check-in adelantado.</div><div class=\"actions\"><button class=\"btn gold\" onclick=\"requestServiceAdvance('"+x.id+"')\">⚡ Cambiar horario de check-in</button></div>"):"";
   openModal("Ficha del servicio · DEMOSTRACIÓN",
    "<div class='demo-flag'>DATOS FICTICIOS · NO PRODUCCIÓN</div><div class='master-hero'><h1>"+esc(x.code)+"</h1><p>"+esc(client?.name||"")+" · "+esc(prop?.name||"")+"</p><div class='master-sign'>"+esc(x.service_type)+" · "+esc(x.typology)+" · "+esc(statusNames[x.status]||x.status)+"</div></div>"+
    "<div class='two'><div><small class='muted'>Cliente</small><p><strong>"+esc(client?.name||"—")+"</strong></p></div><div><small class='muted'>Apartamento</small><p>"+esc(prop?.name||"—")+"</p></div><div><small class='muted'>Limpieza</small><p>"+esc(x.service_type||"—")+"</p></div><div><small class='muted'>Tipología</small><p>"+esc(x.typology||"—")+"</p></div></div>"+
@@ -636,7 +640,7 @@ async function viewService(id){
  const dispatch=await sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10);
  const canUpdate=["admin","supervisor","employee"].includes(role());
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
- const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visual y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Pedir adelantar check-in</button></div>':"";
+ const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visual y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
  openModal("Ficha del servicio",
   '<div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Programado</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div></div>'+
   '<div class="field"><label>Observaciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+clientAdvanceButton+
@@ -1004,7 +1008,7 @@ async function emergency(){
  const r=await sb.from("occurrences").select("id,service_id,property_id,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100);
  const canWrite=["admin","supervisor","employee","client"].includes(role());
  let h='<div class="panel"><div class="panel-head"><div><h3>Emergencia 24H · Incidencias</h3><div class="muted">Ocurrencia urgente vinculada al servicio o propiedad</div></div>'+(canWrite?'<button class="btn gold" onclick="newEmergency()">＋ Registrar incidencia</button>':'')+'</div>';
- h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':'approved')+'">'+esc(x.status)+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'&&x.category==='expedite_request'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="decideServiceAdvance(\''+x.id+'\',true)">✓ Aceptar adelanto</button><button class="btn" onclick="decideServiceAdvance(\''+x.id+'\',false)">✕ Rechazar</button></div>':(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="resolveEmergency(\''+x.id+'\')">Marcar resuelta</button></div>':''))+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
+ h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?r.data.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.category)+' · '+esc(x.priority)+'</strong><div class="muted">'+esc(x.description)+'</div></div><span class="status '+(x.status==='open'?'urgent':'approved')+'">'+esc(x.status)+'</span></div><div class="muted">Creada: '+esc(new Date(x.created_at).toLocaleString('es-ES'))+(x.resolution?' · Resolución: '+esc(x.resolution):'')+'</div>'+(canManage()&&x.status==='open'&&x.category==='expedite_request'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="decideServiceAdvance(\''+x.id+'\',true)">✓ Aceptar cambio</button><button class="btn" onclick="decideServiceAdvance(\''+x.id+'\',false)">✕ Rechazar</button></div>':(canManage()&&x.status==='open'?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="resolveEmergency(\''+x.id+'\')">Marcar resuelta</button></div>':''))+'</div>').join(''):'<div class="empty">No hay incidencias.</div>');
  h+='</div>';$("content").innerHTML=h;
 }
 async function newEmergency(){
@@ -1071,51 +1075,48 @@ async function requestServiceAdvance(serviceId){
  }else{
    const sr=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,status,client_id").eq("id",serviceId).single();
    if(sr.error){toast(sr.error.message);return}s=sr.data;
-   if(["completed","cancelled"].includes(s.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
+   if(["completed","cancelled"].includes(s.status)){toast("Este servicio ya no admite cambios de horario.");return}
    const pr=await sb.from("properties").select("id,name,code").eq("id",s.property_id).single();
    if(pr.error){toast(pr.error.message);return}p=pr.data;
    const cr=await sb.from("clients").select("name").eq("id",s.client_id).maybeSingle();clientName=cr.data?.name||clientName;
  }
  const now=new Date(),scheduled=s?.scheduled_at?new Date(s.scheduled_at):null;
- if(!scheduled||Number.isNaN(scheduled.getTime())){toast("Este servicio no tiene una hora de llegada válida.");return}
- if(scheduled.getTime()<=now.getTime()){toast("La hora de llegada del huésped ya pasó. Para solicitar un adelanto, el servicio debe tener una hora futura.");return}
- const desired=new Date(Math.max(now.getTime()+60000,scheduled.getTime()-60*60000));
- if(desired.getTime()>=scheduled.getTime()){toast("No existe margen suficiente para adelantar este servicio.");return}
+ if(!scheduled||Number.isNaN(scheduled.getTime())){toast("Este servicio no tiene una hora válida.");return}
  if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
- const updateClock=()=>{const el=$("advSpainClock");if(el)el.textContent=romanoMadridLabel(new Date())+" · España (Europe/Madrid)"};
  window.__advanceArrivalInstant=scheduled;
- const localValue=romanoMadridInputValue(desired);
- openModal("Pedir adelantar check-in",
-  '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)" >'+
-  '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>El sistema usa siempre la zona horaria Europe/Madrid y se adapta automáticamente al horario de verano/invierno.</small></div>'+
-  '<div class="notice" style="margin-top:12px"><strong>Hora de llegada del huésped:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
-  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" required><small class="muted">Puede elegir cualquier horario anterior a la llegada del huésped. El valor se interpreta siempre como hora de España.</small></div>'+
-  '<div class="field"><label>Ajuste rápido respecto a la llegada</label><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px">'+
+ const defaultDesired=scheduled.getTime()>now.getTime()?new Date(scheduled.getTime()-60*60000):new Date(now.getTime()+60*60000);
+ const updateClock=()=>{const el=$("advSpainClock");if(el)el.textContent=romanoMadridLabel(new Date())+" · España (Europe/Madrid)"};
+ openModal("Solicitar cambio de horario",
+  '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)">'+
+  '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>La hora se calcula siempre con Europe/Madrid, independientemente del reloj del iPad/iPhone.</small></div>'+
+  '<div class="notice" style="margin-top:12px"><strong>Horario actual del servicio:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
+  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" min="'+romanoMadridInputValue(new Date(now.getTime()+60000))+'" required><small class="muted">Puede adelantar o retrasar el servicio. El horario se interpreta siempre como hora de España.</small></div>'+
+  '<div class="field"><label>Ajuste rápido respecto al horario actual</label><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px">'+
   '<button type="button" class="btn" onclick="setAdvanceOffset(-120)">−2 h</button>'+
-  '<button type="button" class="btn gold" onclick="setAdvanceOffset(-60)">−1 h</button>'+
+  '<button type="button" class="btn" onclick="setAdvanceOffset(-60)">−1 h</button>'+
   '<button type="button" class="btn" onclick="setAdvanceOffset(-30)">−30 min</button>'+
-  '<button type="button" class="btn" onclick="setAdvanceOffset(-15)">−15 min</button></div></div>'+
+  '<button type="button" class="btn" onclick="setAdvanceOffset(30)">+30 min</button>'+
+  '<button type="button" class="btn" onclick="setAdvanceOffset(60)">+1 h</button>'+
+  '<button type="button" class="btn gold" onclick="setAdvanceOffset(120)">+2 h</button></div></div>'+
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
-  '<div class="field"><label>Motivo / emergencia</label><textarea id="advReason" required placeholder="Explique por qué necesita adelantar el check-in..."></textarea></div>'+
+  '<div class="field"><label>Motivo</label><textarea id="advReason" required placeholder="Explique por qué necesita cambiar el horario..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
   '<button class="primary">Enviar solicitud</button></form>');
  updateClock();
  window.__advanceClockTimer=setInterval(updateClock,1000);
 }
 function setAdvanceOffset(minutes){
- const serviceTime=$("advSpainClock")?null:null;
  const input=$("advRequestedFor");if(!input)return;
- const value=Number(minutes||0);
- const text=input.value;
  const base=window.__advanceArrivalInstant;
  if(base){
-   const d=new Date(base.getTime()+value*60000);
-   input.value=romanoMadridInputValue(d);
+   const d=new Date(base.getTime()+Number(minutes||0)*60000);
+   if(d.getTime()>Date.now())input.value=romanoMadridInputValue(d);
+   else input.value=romanoMadridInputValue(new Date(Date.now()+60000));
    return;
  }
- const parsed=romanoMadridInputToDate(text);if(!parsed)return;
- const d=new Date(parsed.getTime()+value*60000);
- input.value=romanoMadridInputValue(d);
+ const parsed=romanoMadridInputToDate(input.value);if(!parsed)return;
+ const d=new Date(parsed.getTime()+Number(minutes||0)*60000);
+ input.value=romanoMadridInputValue(d.getTime()>Date.now()?d:new Date(Date.now()+60000));
 }
 async function uploadChangeRequestMedia(serviceId,requestId,files){
  const attachments=[];
@@ -1149,34 +1150,33 @@ async function saveServiceAdvance(e,serviceId){
  }
  const scheduledFor=service?.scheduled_at?new Date(service.scheduled_at):null,now=new Date();
  if(!scheduledFor||Number.isNaN(scheduledFor.getTime())){toast("Este servicio no tiene una hora válida.");return}
- if(["completed","cancelled"].includes(service.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
- if(scheduledFor.getTime()<=now.getTime()){toast("La hora de llegada del huésped ya pasó y no admite adelanto.");return}
- if(requestedFor.getTime()>=scheduledFor.getTime()){toast("El nuevo horario debe ser anterior al horario de llegada del huésped.");return}
+ if(["completed","cancelled"].includes(service.status)){toast("Este servicio ya no admite cambios de horario.");return}
  if(requestedFor.getTime()<=now.getTime()){toast("El nuevo horario debe ser futuro según la hora de España.");return}
+ if(requestedFor.getTime()===scheduledFor.getTime()){toast("El nuevo horario debe ser diferente al horario actual.");return}
  if(files.length>5){toast("Puede adjuntar hasta 5 archivos.");return}
  if(demoMode){
    const s=service,p=DEMO_PROPERTIES.find(x=>x.id===s.property_id);
    DEMO_CHANGE_REQUESTS.unshift({id:crypto.randomUUID(),service_id:serviceId,property_id:s.property_id,requested_by:currentUser?.id||"demo-client",request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments:Array.from(files).map(f=>({file_name:f.name,media_type:(f.type||"").split("/")[0]})),created_at:new Date().toISOString(),service_code:s.code,property_name:p?.name});
    if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
-   closeModal();toast("Solicitud demo enviada · queda en análisis");renderServiceChangeRequests();return;
+   closeModal();toast("Solicitud de cambio enviada · queda en análisis");renderServiceChangeRequests();return;
  }
  const existing=await sb.from("service_change_requests").select("id").eq("service_id",serviceId).eq("request_type","checkin_advance").eq("status","requested").limit(1);
- if(existing.data?.length){toast("Ya existe una solicitud de adelanto pendiente para este servicio.");return}
+ if(existing.data?.length){toast("Ya existe una solicitud de cambio de horario pendiente para este servicio.");return}
  const requestId=crypto.randomUUID();let attachments=[];
  try{
    if(files.length)attachments=await uploadChangeRequestMedia(serviceId,requestId,files);
    const r=await sb.from("service_change_requests").insert({id:requestId,company_id:currentProfile.company_id,service_id:serviceId,property_id:service.property_id,requested_by:currentUser.id,request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments});
    if(r.error)throw r.error;
- }catch(err){toast(err.message||"No fue possible enviar la solicitud.");return}
+ }catch(err){toast(err.message||"No fue posible enviar la solicitud.");return}
  if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
- closeModal();toast("Solicitud enviada · supervisor y administrador fueron notificados");openPage("change_requests");
+ closeModal();toast("Solicitud de cambio enviada · supervisor y administrador fueron notificados");openPage("change_requests");
 }
 function serviceChangeStatusLabel(status){return {requested:"Solicitado · En análisis",approved:"Aprobado",rejected:"Rechazado",cancelled:"Cancelado"}[status]||status}
 function serviceChangePriorityLabel(priority){return {normal:"Normal",high:"Alta",urgent:"Urgente"}[priority]||priority}
 async function renderServiceChangeRequests(){
  if(demoMode){
    const rows=DEMO_CHANGE_REQUESTS;
-   $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de check-in</h3><div class="muted">Flujo de demostración · sin escritura en producción</div></div></div>'+
+   $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de cambio de horario</h3><div class="muted">Flujo de demostración · sin escritura en producción</div></div></div>'+
    (rows.length?rows.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(x.service_code||"Servicio")+'</strong><div class="muted">'+esc(x.property_name||"Apartamento")+'</div></div><span class="status urgent">'+esc(serviceChangeStatusLabel(x.status))+'</span></div><div class="two"><div><small class="muted">Nuevo horario</small><p>'+esc(new Date(x.requested_for).toLocaleString("es-ES"))+'</p></div><div><small class="muted">Urgencia</small><p>'+esc(serviceChangePriorityLabel(x.priority))+'</p></div></div><p>'+esc(x.notes||"—")+'</p></div>').join(""):'<div class="empty">No hay solicitudes.</div>')+'</div>';
    return;
  }
@@ -1190,15 +1190,15 @@ async function renderServiceChangeRequests(){
  ]);
  const services=Object.fromEntries((sr.data||[]).map(x=>[x.id,x])),props=Object.fromEntries((pr.data||[]).map(x=>[x.id,x])),profiles=Object.fromEntries((cr.data||[]).map(x=>[x.id,x]));
  const canManageChange=["admin","supervisor"].includes(role());
- let h='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de check-in</h3><div class="muted">'+(role()==="client"?"Acompanhe suas solicitações de adelanto.":"Solicitudes recibidas para análisis y decisión.")+'</div></div></div>';
+ let h='<div class="panel"><div class="panel-head"><div><h3>Solicitudes de cambio de horario</h3><div class="muted">'+(role()==="client"?"Acompanhe suas solicitações de cambio de horario.":"Solicitudes recibidas para análisis y decisión de horario.")+'</div></div></div>';
  h+=rows.length?rows.map(x=>{
    const s=services[x.service_id],p=props[x.property_id],u=profiles[x.requested_by],att=Array.isArray(x.attachments)?x.attachments:[];
-   const actions=canManageChange&&x.status==="requested"?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideServiceChangeRequest(\''+x.id+'\',true)">✓ Aceptar adelanto</button><button class="btn" onclick="decideServiceChangeRequest(\''+x.id+'\',false)">✕ Rechazar</button></div>':"";
+   const actions=canManageChange&&x.status==="requested"?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideServiceChangeRequest(\''+x.id+'\',true)">✓ Aceptar cambio</button><button class="btn" onclick="decideServiceChangeRequest(\''+x.id+'\',false)">✕ Rechazar</button></div>':"";
    return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(s?.code||"Servicio")+'</strong><div class="muted">'+esc(p?.name||p?.code||"Apartamento")+' · '+esc(u?.full_name||u?.email||"Cliente")+'</div></div><span class="status '+(x.status==="requested"?"urgent":x.status==="approved"?"approved":x.status==="rejected"?"rejected":"")+'">'+esc(serviceChangeStatusLabel(x.status))+'</span></div>'+
    '<div class="two"><div><small class="muted">Horario actual</small><p>'+esc(s?.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Nuevo horario solicitado</small><p><strong>'+esc(new Date(x.requested_for).toLocaleString("es-ES"))+'</strong></p></div><div><small class="muted">Urgencia</small><p>'+esc(serviceChangePriorityLabel(x.priority))+'</p></div><div><small class="muted">Servicio</small><p>'+esc(s?.service_type||"—")+'</p></div></div>'+
    '<div class="field"><label>Motivo / emergencia</label><div class="notice">'+esc(x.notes||"—")+'</div></div>'+
    '<div class="muted">Adjuntos: '+att.length+(att.length?" · "+att.map(a=>esc(a.file_name)).join(", "):" · ninguno")+'</div>'+actions+'</div>';
- }).join(""):'<div class="empty">No hay solicitudes de check-in.</div>';
+ }).join(""):'<div class="empty">No hay solicitudes de cambio de horario.</div>';
  h+='</div>';$("content").innerHTML=h;
 }
 async function decideServiceChangeRequest(id,approved){
@@ -1213,7 +1213,7 @@ async function decideServiceChangeRequest(id,approved){
    const s=await sb.from("services").update({scheduled_at:q.data.requested_for,updated_at:now}).eq("id",q.data.service_id);
    if(s.error){await sb.from("service_change_requests").update({status:"requested",reviewed_by:null,reviewed_at:null,updated_at:new Date().toISOString()}).eq("id",id);toast("No fue posible cambiar el horario del servicio: "+s.error.message);return}
  }
- toast(approved?"Adelanto aprobado · horario del servicio actualizado":"Solicitud rechazada");renderServiceChangeRequests();
+ toast(approved?"Cambio aprobado · horario del servicio actualizado":"Solicitud rechazada");renderServiceChangeRequests();
 }
 async function startServiceGPS(serviceId){
  if(!navigator.geolocation){toast("El navegador no permite geolocalización.");return}
