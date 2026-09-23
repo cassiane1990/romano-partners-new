@@ -1249,3 +1249,71 @@ async function sendChatPremium(e){
    input.value="";if(mediaInput)mediaInput.value="";await refreshChatMessages();
  }catch(err){toast(err.message||String(err))}
 }</script></body></html>
+/* ROMANO PREMIUM RESPONSIVE SYSTEM — client validation pass */
+@media (min-width:1400px){
+  .content{padding-left:32px;padding-right:32px}
+  .modal-card{width:min(920px,calc(100vw - 80px));padding:28px}
+}
+@media (min-width:901px) and (max-width:1399px){
+  .side{width:210px}
+  .main{margin-left:210px}
+  .content{padding:20px 22px 30px}
+  .modal{padding:18px}
+  .modal-card{width:min(900px,calc(100vw - 36px));max-height:calc(100vh - 36px);padding:24px}
+  .wizard-grid{grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:18px}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+}
+@media (max-width:900px){
+  .side{width:76px;padding:14px 8px}
+  .side-brand{padding:5px 2px}
+  .side-brand .crown-r{width:48px;height:48px;font-size:28px}
+  .side-brand .crown-r:before{font-size:19px;top:-8px}
+  .side-brand strong,.side-brand span,.nav .master-group,.nav button span:last-child,.side-footer .sf-name,.side-footer .sf-role,.side-footer .sf-logout{display:none}
+  .nav button{justify-content:center;padding:11px 4px}
+  .nav button span:first-child{width:28px!important;font-size:15px}
+  .side-footer{margin:10px 0;padding:7px}
+  .side-footer .sf-user{justify-content:center}
+  .main{margin-left:76px}
+  .content,.dashboard-page .content{padding:16px 14px 24px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .panel{padding:15px}
+  .dashboard-header{grid-template-columns:1fr auto;gap:10px}
+  .dashboard-actions{grid-column:1/-1;justify-content:flex-start}
+  .dashboard-date{display:none}
+  .rpc-home-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rpc-home-grid{grid-template-columns:1fr 1fr}
+  .rpc-home-grid>.rpc-home-card:first-child{grid-column:1/-1}
+  .wizard-grid{grid-template-columns:1fr;gap:14px}
+  .modal{padding:12px}
+  .modal-card{width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 24px);padding:20px;border-radius:20px}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+}
+@media (max-width:600px){
+  .side{width:62px}
+  .main{margin-left:62px}
+  .content,.dashboard-page .content{padding:12px 10px 20px}
+  .grid,.rpc-home-grid,.rpc-home-actions,.rpc-home-kpis{grid-template-columns:1fr}
+  .rpc-home-grid>.rpc-home-card:first-child{grid-column:auto}
+  .dashboard-header{grid-template-columns:1fr}
+  .dashboard-actions{width:100%;display:grid;grid-template-columns:1fr auto}
+  .dash-search{width:100%}
+  .panel{margin-top:12px;padding:12px;border-radius:16px}
+  .panel-head{align-items:flex-start}
+  .table{font-size:10px;display:block;overflow-x:auto;white-space:nowrap}
+  .modal{padding:8px}
+  .modal-card{width:calc(100vw - 16px);max-height:calc(100vh - 16px);padding:16px;border-radius:18px}
+  .modal-card .two,.two{grid-template-columns:1fr}
+  .wizard-grid{gap:10px}
+  .wizard-grid .step{padding:9px 10px!important}
+  .wizard-grid .field label{font-size:10px}
+  .wizard-grid select,.wizard-grid input,.wizard-grid textarea{min-width:0;max-width:100%;font-size:16px}
+  .choice-grid{grid-template-columns:1fr}
+  .line-item{gap:10px;align-items:flex-start}
+  .line-item span:last-child{white-space:nowrap}
+}
+@media (min-width:901px){
+  .modal-card{overflow-x:hidden}
+  .modal-card .wizard-grid>*{min-width:0}
+  .modal-card .field,.modal-card .two{min-width:0}
+  .modal-card select,.modal-card input,.modal-card textarea{max-width:100%;min-width:0}
+}
