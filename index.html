@@ -316,7 +316,7 @@ function romanoMadridOffsetMinutes(date=new Date()){
  return (m[1]==="-"?-1:1)*(Number(m[2])*60+Number(m[3]||0));
 }
 function romanoMadridInputToDate(value){
- const m=String(value||"").match(/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/);
+ const m=String(value||"").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
  if(!m)return null;
  const base=Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4]),Number(m[5]),0);
  let guess=new Date(base);
@@ -1090,8 +1090,7 @@ async function requestServiceAdvance(serviceId){
   '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)">'+
   '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>La hora se calcula siempre con Europe/Madrid, independientemente del reloj del iPad/iPhone.</small></div>'+
   '<div class="notice" style="margin-top:12px"><strong>Horario actual del servicio:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
-  '<div class="field"><label>Hora de entrada del huésped</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" min="'+romanoMadridInputValue(new Date(now.getTime()+60000))+'" required><small class="muted">Indique únicamente la hora en que el huésped desea entrar. El horario se interpreta siempre como hora de España.</small></div>'+
-  '
+  '<div class="field"><label>Hora de entrada del huésped</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" required><small class="muted">Indique únicamente la hora en que el huésped desea entrar. El horario se interpreta siempre como hora de España.</small></div>'+
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
   '<div class="field"><label>Motivo</label><textarea id="advReason" required placeholder="Explique por qué necesita cambiar el horario..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
