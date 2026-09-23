@@ -1013,9 +1013,10 @@ async function requestServiceAdvance(serviceId){
  if(desired.getTime()>=scheduled.getTime()){toast("No existe margen suficiente para adelantar este servicio.");return}
  if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
  const updateClock=()=>{const el=$("advSpainClock");if(el)el.textContent=romanoMadridLabel(new Date())+" · España (Europe/Madrid)"};
- window.__advanceArrivalInstant=scheduled;\n const localValue=romanoMadridInputValue(desired);
+ window.__advanceArrivalInstant=scheduled;
+ const localValue=romanoMadridInputValue(desired);
  openModal("Pedir adelantar check-in",
-  '<form onsubmit="saveServiceAdvance(event,\\''+serviceId+'\\')">'+
+  '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)" >'+
   '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>El sistema usa siempre la zona horaria Europe/Madrid y se adapta automáticamente al horario de verano/invierno.</small></div>'+
   '<div class="notice" style="margin-top:12px"><strong>Hora de llegada del huésped:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
   '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" required><small class="muted">Puede elegir cualquier horario anterior a la llegada del huésped. El valor se interpreta siempre como hora de España.</small></div>'+
