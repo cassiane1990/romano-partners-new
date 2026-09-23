@@ -1137,7 +1137,7 @@ async function renderChatPremium(){
  stopChatPolling();__activeChatId=null;__activeChatTitle="";
  const isClient=role()==="client";
  const contact=isClient?'<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Supervisor y Administrador · chat interno</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
- $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto ou vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
+ $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto ou vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
  await renderChatContacts();
 }
 async function renderChatContacts(){
@@ -1174,7 +1174,7 @@ async function refreshChatMessages(){
      if(s.data?.signedUrl){
        if(x.media_type==="video") media='<div class="romano-chat-media"><video controls playsinline preload="metadata" src="'+esc(s.data.signedUrl)+'"></video></div>';
        else if(x.media_type==="image") media='<div class="romano-chat-media"><img src="'+esc(s.data.signedUrl)+'" alt="'+esc(x.media_name||"Foto")+'"></div>';
-       else media='<a class="romano-chat-file" href="'+esc(s.data.signedUrl)+'" target="_blank" rel="noopener">📎 '+esc(x.media_name||"Archivo")+'</a>';
+       else media='<a class="romano-chat-file" href="'+esc(s.data.signedUrl)+'" target="_blank" rel="noopener">📎 '+esc(x.media_name||"Documento")+'</a>';
      }
    }
    const textBody=x.body?'<div class="romano-bubble-text">'+esc(x.body)+'</div>':"";
@@ -1189,13 +1189,15 @@ function chatMediaSelected(){
 }
 async function uploadChatMediaFile(file){
  if(!__activeChatId)throw new Error("Seleccione una conversación.");
- if(!["image/","video/"].some(x=>(file.type||"").startsWith(x)))throw new Error("Solo se permiten fotos y vídeos.");
+ const type=file.type||"";
+ const allowed=type.startsWith("image/")||type.startsWith("video/")||["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","text/plain"].includes(type);
+ if(!allowed)throw new Error("Formato no permitido. Puedes enviar foto, vídeo o documento PDF/Word/Excel.");
  if(file.size>50*1024*1024)throw new Error("Cada archivo no puede superar 50 MB.");
  const safe=(file.name||"archivo").replace(/[^a-zA-Z0-9._-]+/g,"_");
  const path=currentProfile.company_id+"/"+__activeChatId+"/"+crypto.randomUUID()+"-"+safe;
  const up=await sb.storage.from("chat-media").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream"});
  if(up.error)throw up.error;
- const mediaType=(file.type||"").startsWith("video/")?"video":"image";
+ const mediaType=(file.type||"").startsWith("video/")?"video":(file.type||"").startsWith("image/")?"image":"document";
  return {media_type:mediaType,media_path:path,media_name:file.name,media_mime:file.type||null,media_size:file.size};
 }
 async function openChatPremium(id,title){
