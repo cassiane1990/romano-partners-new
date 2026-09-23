@@ -671,7 +671,16 @@ async function saveChatPremium(e){
 }
 async function openChatPremium(id,title){
  const r=await sb.from("chat_messages").select("id,sender_id,body,created_at").eq("thread_id",id).order("created_at",{ascending:true});
- openModal(title,'<div style="max-height:48vh;overflow:auto">'+((r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</small><div style="font-size:11px">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>')+'</div><form onsubmit="sendChatPremium(event,\''+id+'\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
+ if(r.error){toast(r.error.message);return}
+ const ids=[...new Set((r.data||[]).map(x=>x.sender_id).filter(Boolean))];
+ let names={};
+ if(ids.length){
+   const p=await sb.from("profiles").select("id,full_name,email").in("id",ids);
+   if(p.error){toast(p.error.message);return}
+   names=Object.fromEntries((p.data||[]).map(x=>[x.id,x.full_name||x.email||"Usuario"]));
+ }
+ const messages=(r.data||[]).map(x=>'<div class="panel" style="padding:9px;margin:6px 0"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="font-size:11px">'+esc(names[x.sender_id]||"Usuario")+'</b><small class="muted">'+esc(new Date(x.created_at).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"}))+'</small></div><div style="font-size:11px;margin-top:5px;white-space:pre-wrap">'+esc(x.body)+'</div></div>').join("")||'<div class="empty">Sem mensagens.</div>';
+ openModal(title,'<div style="max-height:48vh;overflow:auto">'+messages+'</div><form onsubmit="sendChatPremium(event,\''+id+'\')" style="display:flex;gap:7px;margin-top:10px"><input id="ctBody" style="flex:1;border:1px solid #e5dac8;border-radius:999px;padding:10px" placeholder="Escreva..."><button class="btn gold">Enviar</button></form>');
 }
 async function sendChatPremium(e,id){
  e.preventDefault();const body=$("ctBody").value.trim();if(!body)return;
