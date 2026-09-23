@@ -97,10 +97,67 @@
   .modal-card select,.modal-card input,.modal-card textarea{max-width:100%;min-width:0}
 }
 </style>
-<style id="romano-menu-restore">
-@media (min-width:901px){.side{width:250px}.main{margin-left:250px}}
-@media (max-width:900px){.side{width:268px;padding:18px 14px;box-shadow:10px 0 30px #0003}.side-brand strong{font-size:24px}.side-brand span,.side .role{display:block}.nav button span{display:inline}.nav button{text-align:left;padding:12px 13px}.nav .section{display:block}.main{margin-left:268px}}
-@media (max-width:560px){.grid,.two{grid-template-columns:1fr}.top{padding:0 16px}.content{padding:14px}.login-card{padding:28px}.table{display:block;overflow:auto}}
+<style id="romano-menu-standard">
+/* ROMANO — standard menu across profiles */
+.side{width:250px!important;padding:18px 12px 14px!important}
+.main{margin-left:250px!important}
+.side-footer{display:block!important}
+.side-footer .sf-user{display:flex!important}
+.side-footer .sf-name,.side-footer .sf-role,.side-footer .sf-logout{display:block!important}
+.nav button{text-align:left!important;justify-content:flex-start!important}
+.nav button span:last-child{display:inline!important}
+.nav .master-group{display:block!important}
+
+/* ROMANO — clean form rhythm: one component per row, no visual collisions */
+.modal-card .wizard-grid{align-items:start;row-gap:18px}
+.modal-card .wizard-grid>div{min-width:0}
+.modal-card .wizard-grid .two{align-items:start;row-gap:16px}
+.modal-card .wizard-grid .field{min-width:0;margin:0}
+.modal-card .wizard-grid .field label{display:block;margin-bottom:7px;line-height:1.25}
+.modal-card .wizard-grid input,
+.modal-card .wizard-grid select,
+.modal-card .wizard-grid textarea{box-sizing:border-box;width:100%;min-height:48px}
+.modal-card .wizard-grid textarea{min-height:96px}
+.modal-card .wizard-grid .step{
+ display:flex;align-items:center;gap:10px;
+ min-height:42px;box-sizing:border-box;
+ margin-top:18px!important;
+ padding:10px 12px!important;
+ border:1px solid #eadfce;border-radius:14px;
+ background:linear-gradient(180deg,#fffdf9,#f8f0e3);
+}
+.modal-card .wizard-grid .step:first-child{margin-top:0!important}
+.modal-card .wizard-grid .step b{
+ flex:0 0 28px;width:28px;height:28px;border-radius:9px;
+ display:grid;place-items:center;background:#b7893f;color:#fff;font-size:12px;
+}
+.modal-card .wizard-grid .step strong{font-size:13px;line-height:1.2;color:#28231d}
+.modal-card .wizard-grid .notice{margin-top:12px;line-height:1.45}
+.modal-card .wizard-grid .line-item{min-height:38px;align-items:center}
+.modal-card .wizard-grid .actions{margin-top:12px}
+
+@media (max-width:900px){
+ .side{width:230px!important;padding:16px 12px 14px!important}
+ .main{margin-left:230px!important}
+ .side-brand strong{font-size:22px}
+ .side-brand .crown-r{width:56px;height:56px;font-size:32px}
+ .nav button{padding:10px 11px;font-size:12px}
+ .side-footer .sf-name{font-size:10px}
+ .side-footer .sf-role{font-size:8px}
+ .wizard-grid{grid-template-columns:1fr!important;gap:14px}
+ .modal-card{width:min(760px,calc(100vw - 24px));}
+}
+@media (max-width:600px){
+ .side{width:210px!important;padding:14px 10px!important}
+ .main{margin-left:210px!important}
+ .content,.dashboard-page .content{padding:12px 10px 20px}
+ .modal{padding:8px}
+ .modal-card{width:calc(100vw - 16px);padding:16px;border-radius:18px}
+ .modal-card .wizard-grid .two{grid-template-columns:1fr!important}
+ .modal-card .wizard-grid .step{margin-top:14px!important}
+ .modal-card .wizard-grid input,
+ .modal-card .wizard-grid select{min-height:50px}
+}
 </style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
