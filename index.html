@@ -695,12 +695,13 @@ async function requestServiceAdvance(serviceId){
    if(pr.error){toast(pr.error.message);return}p=pr.data;
    const cr=await sb.from("clients").select("name").eq("id",s.client_id).maybeSingle();clientName=cr.data?.name||clientName;
  }
- const defaultTime=s.scheduled_at?new Date(s.scheduled_at):new Date(Date.now()+3600000);
+ const scheduledTime=s.scheduled_at?new Date(s.scheduled_at):null;
+ const defaultTime=scheduledTime&&scheduledTime.getTime()>Date.now()+60000?scheduledTime:new Date(Date.now()+3600000);
  const localValue=new Date(defaultTime.getTime()-defaultTime.getTimezoneOffset()*60000).toISOString().slice(0,16);
  openModal("Pedir adelantar check-in",
   '<form onsubmit="saveServiceAdvance(event,\''+serviceId+'\')">'+
   '<div class="notice"><strong>Cliente:</strong> '+esc(clientName)+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'<br><strong>Horario actual:</strong> '+esc(s?.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"—")+'</div>'+
-  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" required></div>'+
+  '<div class="field"><label>Nuevo horario deseado</label><input id="advRequestedFor" type="datetime-local" value="'+localValue+'" min="'+new Date().toISOString().slice(0,16)+'" required></div>'+
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
   '<div class="field"><label>Motivo / emergencia</label><textarea id="advReason" required placeholder="Explique por qué necesita adelantar el check-in..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
