@@ -256,7 +256,7 @@ function romanoAdvanceDefault(scheduledAt){
  return {scheduled,desired};
 }
 const DEMO_CHANGE_REQUESTS=[];
-const DEMO_SERVICES=[{id:"demo-s1",code:"DEMO-SRV-001",service_type:"Check-in · Limpieza 5★",typology:"T2",status:"on_the_way",priority:"normal",scheduled_at:"2026-09-24T15:00:00+02:00",assigned_employee_id:"demo-e1",property_id:"demo-p1",employee_name:"Ana Silva"},{id:"demo-s2",code:"DEMO-SRV-002",service_type:"Limpieza Airbnb",typology:"T4",status:"in_progress",priority:"high",scheduled_at:"2026-09-23T08:30:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p3",employee_name:"Carla Santos"},{id:"demo-s3",code:"DEMO-SRV-003",service_type:"Supervisión",typology:"T1",status:"supervised",priority:"normal",scheduled_at:"2026-09-23T10:20:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p2",employee_name:"Laura Mendes"},{id:"demo-s4",code:"DEMO-SRV-004",service_type:"Pintura",typology:"T3",status:"in_progress",priority:"normal",scheduled_at:"2026-09-23T09:00:00+02:00",assigned_employee_id:"demo-e3",property_id:"demo-p4",employee_name:"Pedro Costa"},{id:"demo-s5",code:"DEMO-SRV-005",service_type:"Mantenimiento",typology:"T2",status:"completed",priority:"normal",scheduled_at:"2026-09-23T11:45:00+02:00",assigned_employee_id:"demo-e4",property_id:"demo-p5",employee_name:"João Martins"}];
+const DEMO_SERVICES=[{id:"demo-s1",code:"DEMO-SRV-001",service_type:"Check-in · Limpieza 5★",typology:"T2",status:"on_the_way",priority:"normal",scheduled_at:"2026-09-24T15:00:00+02:00",assigned_employee_id:"demo-e1",property_id:"demo-p1",employee_name:"Ana Silva"},{id:"demo-s2",code:"DEMO-SRV-002",service_type:"Check-in · Limpieza Airbnb",typology:"T4",status:"in_progress",priority:"high",scheduled_at:"2026-09-24T15:00:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p3",employee_name:"Carla Santos"},{id:"demo-s3",code:"DEMO-SRV-003",service_type:"Supervisión",typology:"T1",status:"supervised",priority:"normal",scheduled_at:"2026-09-23T10:20:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p2",employee_name:"Laura Mendes"},{id:"demo-s4",code:"DEMO-SRV-004",service_type:"Pintura",typology:"T3",status:"in_progress",priority:"normal",scheduled_at:"2026-09-23T09:00:00+02:00",assigned_employee_id:"demo-e3",property_id:"demo-p4",employee_name:"Pedro Costa"},{id:"demo-s5",code:"DEMO-SRV-005",service_type:"Mantenimiento",typology:"T2",status:"completed",priority:"normal",scheduled_at:"2026-09-23T11:45:00+02:00",assigned_employee_id:"demo-e4",property_id:"demo-p5",employee_name:"João Martins"}];
 
 const pages={dashboard:["Dashboard 360",renderDashboardReference],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de check-in",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
@@ -768,23 +768,29 @@ async function saveServiceAdvance(e,serviceId){
  const requestedForValue=$("advRequestedFor")?.value,reason=$("advReason")?.value.trim(),priority=$("advPriority")?.value||"normal",files=$("advFiles")?.files||[];
  if(!requestedForValue||!reason){toast("Informe el nuevo horario y el motivo.");return}
  const requestedFor=new Date(requestedForValue);
- const scheduledFor=s.scheduled_at?new Date(s.scheduled_at):null;
  if(Number.isNaN(requestedFor.getTime())){toast("Informe un horario válido.");return}
+ let service=null;
+ if(demoMode){
+   service=DEMO_SERVICES.find(x=>x.id===serviceId);
+   if(!service){toast("Servicio demo no encontrado");return}
+ }else{
+   const sr=await sb.from("services").select("id,property_id,scheduled_at,status,service_type").eq("id",serviceId).single();
+   if(sr.error){toast(sr.error.message);return}
+   service=sr.data;
+ }
+ const scheduledFor=service?.scheduled_at?new Date(service.scheduled_at):null;
  if(scheduledFor&&!demoMode&&scheduledFor.getTime()<=Date.now()){toast("Este servicio ya pasó y no admite adelanto.");return}
  if(scheduledFor&&requestedFor.getTime()>=scheduledFor.getTime()){toast("El nuevo horario debe ser anterior al horario actual del servicio.");return}
  if(requestedFor.getTime()<=Date.now()){toast("El nuevo horario debe ser futuro.");return}
  if(files.length>5){toast("Puede adjuntar hasta 5 archivos.");return}
  if(demoMode){
-   const s=DEMO_SERVICES.find(x=>x.id===serviceId),p=DEMO_PROPERTIES.find(x=>x.id===s?.property_id);
-   if(!s){toast("Servicio demo no encontrado");return}
+   const s=service,p=DEMO_PROPERTIES.find(x=>x.id===s.property_id);
    if(new Date(requestedFor).getTime()>=new Date(s.scheduled_at).getTime()){toast("El nuevo horario debe ser anterior al horario actual del servicio.");return}
    if(new Date(requestedFor).getTime()<=Date.now()){toast("El nuevo horario debe ser futuro.");return}
    DEMO_CHANGE_REQUESTS.unshift({id:crypto.randomUUID(),service_id:serviceId,property_id:s.property_id,requested_by:currentUser?.id||"demo-client",request_type:"checkin_advance",requested_for:requestedFor.toISOString(),notes:reason,status:"requested",priority,attachments:Array.from(files).map(f=>({file_name:f.name,media_type:(f.type||"").split("/")[0]})),created_at:new Date().toISOString(),service_code:s.code,property_name:p?.name});
    closeModal();toast("Solicitud demo enviada · queda en análisis");renderServiceChangeRequests();return;
  }
- const s=await sb.from("services").select("id,property_id,status").eq("id",serviceId).single();
- if(s.error){toast(s.error.message);return}
- if(["completed","cancelled"].includes(s.data.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
+ if(["completed","cancelled"].includes(service.status)){toast("Este servicio ya no admite solicitudes de adelanto.");return}
  const existing=await sb.from("service_change_requests").select("id").eq("service_id",serviceId).eq("request_type","checkin_advance").eq("status","requested").limit(1);
  if(existing.data?.length){toast("Ya existe una solicitud de adelanto pendiente para este servicio.");return}
  const requestId=crypto.randomUUID();
