@@ -331,7 +331,7 @@ function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<1
 function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
 async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
-async function ensureMFA(){const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(a.error)throw a.error;if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){$("mfa").classList.remove("hidden");return false}return true}
+async function ensureMFA(){$("mfa").classList.add("hidden");return true}
 async function mfaVerify(){const code=$("mfaCode").value.trim();if(!code)return;$("mfaMsg").classList.add("hidden");const f=await sb.auth.mfa.listFactors();if(f.error||!f.data.totp.length){$("mfaMsg").textContent="No se encontró un factor TOTP activo.";$("mfaMsg").classList.remove("hidden");return}const factorId=f.data.totp[0].id;const c=await sb.auth.mfa.challenge({factorId});if(c.error){$("mfaMsg").textContent=c.error.message;$("mfaMsg").classList.remove("hidden");return}const v=await sb.auth.mfa.verify({factorId,challengeId:c.data.id,code});if(v.error){$("mfaMsg").textContent=v.error.message;$("mfaMsg").classList.remove("hidden");return}$("mfa").classList.add("hidden");showApp()}
 $("mfaBtn").onclick=mfaVerify;
 
