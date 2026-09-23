@@ -23,7 +23,13 @@
 .dispatch-timer{font:700 19px Georgia;color:#76531f}
 .dispatch-track{height:7px;border-radius:99px;background:#eee5d7;overflow:hidden;margin:8px 0}.dispatch-track i{display:block;height:100%;width:100%;background:#c89a4b;transform-origin:left;animation:dispatch5 5s linear forwards}@keyframes dispatch5{to{transform:scaleX(0)}}
 .demo-money{font:700 17px Georgia;color:#76531f}.demo-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.demo-kpi{padding:13px;border:1px solid #e5dac8;border-radius:14px;background:#fffdf9}.demo-kpi small{display:block;color:#857a6e;font-size:8px}.demo-kpi strong{display:block;font:20px Georgia;margin-top:5px}
-@media(max-width:900px){.demo-board{grid-template-columns:1fr}.demo-kpi-row{grid-template-columns:repeat(2,1fr)}}</style>
+@media(max-width:900px){.demo-board{grid-template-columns:1fr}.demo-kpi-row{grid-template-columns:repeat(2,1fr)}}<style>
+/* ROMANO LIVE OPERATION SIMULATOR */
+.live-sim{border:1px solid #ddc79f;background:linear-gradient(135deg,#fffdf9,#f4e7d0);border-radius:18px;padding:14px;box-shadow:0 12px 28px #523b1d10;margin-top:13px}
+.live-sim-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.live-sim-title{display:flex;align-items:center;gap:8px}.live-dot{width:9px;height:9px;border-radius:50%;background:#2aaf73;box-shadow:0 0 0 5px #2aaf7320}
+.live-sim small{color:#81766a}.sim-clock{font:700 18px Georgia;color:#7a5420}.sim-feed{display:flex;gap:8px;overflow:auto;padding-top:10px}.sim-event{min-width:190px;background:#fff;border:1px solid #eee3d2;border-radius:12px;padding:9px}.sim-event b{display:block;font-size:9px}.sim-event span{font-size:8px;color:#8b8073}.sim-controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+</style></style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
@@ -123,7 +129,7 @@ async function renderDashboardReference(){
  const places=["Apartamento T2 · Málaga","Villa T4 · Marbella","Apartamento T1 · Madrid","Pintura · Madrid Centro","Clínica · Retiro"];
  const rows=services.map((s,i)=>'<div class="dash-service"><div class="dash-avatar">'+faces[i]+'</div><div><b>'+esc(s.employee_name||["Ana Silva","Carla Santos","Laura Mendes","Pedro Costa","João Martins"][i])+'</b><small>⌖ '+esc(s.service_type)+' · '+esc(s.typology)+'</small><small>⌂ '+places[i]+'</small></div><div><div class="dash-time">'+new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})+'</div><span class="dash-pill '+(s.status==="on_the_way"?"dp-way":s.status==="supervised"?"dp-super":s.status==="completed"?"dp-done":"dp-work")+'">'+esc(statusNames[s.status])+'</span></div></div>').join("");
  const next=services.slice(0,4).map((s,i)=>'<div class="next-row"><div class="next-time">'+new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})+'</div><div><b>'+esc(s.service_type)+' '+esc(s.typology)+'</b><small>'+["Madrid Centro","Salamanca","Chamberí","Clínica · Retiro"][i]+'</small></div><div class="next-arrow">›</div></div>').join("");
- $("content").innerHTML='<div class="dashboard-shell"><div class="dashboard-header"><div class="dashboard-welcome"><h1>☼&nbsp; '+esc(greeting())+', '+esc(name.split("@")[0])+'</h1><p>Que hoy sea más un día de conquistas.</p><div class="verse">“Todo lo que fizer, faça de coração, como para el Señor y no para los hombres.”<br><span>Colossenses 3:23</span></div></div><div class="dashboard-actions"><input id="dashSearch" class="dash-search" placeholder="⌕  Buscar..."><button id="dashBell" class="dash-bell">♟<i>3</i></button><div class="dash-brand-badge"><strong>♛ R</strong><small>ROMANO PARTNERS</small></div></div><div class="dashboard-date">miércoles, 23 de septiembre<strong>08:24</strong></div></div><div class="dash-hero"><div class="dash-hero-copy"><div class="eyebrow">ROMANO PROPERTY CARE · MANAGEMENT</div><h2>PROPIEDADES IMPECABLES<br>CLIENTES SATISFECHOS</h2><p>Excelencia en cada detalle · operación 5★ en tiempo real</p></div><div class="room-art"><div class="room-window"></div><div class="room-sofa"></div><div class="room-table"></div><div class="room-plant">🌿</div></div></div><div class="dash-kpis"><div class="dash-kpi"><div class="ki">▣</div><div><small>Servicios hoy</small><strong>8</strong><em>3 en andamento</em></div></div><div class="dash-kpi"><div class="ki">♟</div><div><small>Clientes</small><strong>5</strong><em>Activos</em></div></div><div class="dash-kpi"><div class="ki">⌂</div><div><small>Propiedades</small><strong>12</strong><em>En servicio</em></div></div><div class="dash-kpi"><div class="ki">♧</div><div><small>Funcionarios</small><strong>16</strong><em>Disponibles</em></div></div><div class="dash-kpi"><div class="ki">€</div><div><small>Facturado (mes)</small><strong>€ 4.250</strong><em>↑ 12%</em></div></div><div class="dash-kpi"><div class="ki">◷</div><div><small>Pendientes</small><strong>2</strong><em style="color:#b94c3d">Atención</em></div></div></div><div class="dash-grid"><div class="dash-card"><div class="dash-card-head"><h3>♧ Servicios en tiempo real</h3><span id="dashAll">Ver todos</span></div><div class="dash-list">'+rows+'</div><div class="dash-quick"><button class="primary-q" data-go="newservice">＋<br>Nuevo servicio</button><button data-go="properties">⌂<br>Nueva propiedad</button><button data-go="clients">♙<br>Nuevo cliente</button><button data-go="employees">♧<br>Nuevo funcionario</button></div></div><div class="dash-card"><div class="dash-card-head"><h3>⌖ Mapa de la equipe</h3><span>🟢 Tiempo real</span></div><div class="dash-map-wrap"><div id="dashMap" class="dash-map"></div></div></div><div><div class="dash-card"><div class="dash-card-head"><h3>▣ Próximos servicios</h3><span id="dashAgenda">Ver agenda</span></div><div class="dash-next">'+next+'</div></div><div class="dash-devotional"><h4>▣ Devocional del día</h4><p>“Confía en el Señor todo lo que haces, y tus planes serán bien-sucedidos.”</p><small>Proverbios 16:3</small></div></div></div><div class="dash-bottom"><div class="dash-brand-panel"><strong>Excelencia<br>en cada detalle</strong><span>♛ R</span><small>ROMANO PROPERTY CARE · MANAGEMENT</small><div class="dash-cleaner">👩🏻‍🧹</div></div><div class="dash-support"><div class="wa">◉</div><b>Soporte rápido</b><small>Hable con el equipo</small><button id="dashChat">Abrir comunicación →</button></div></div></div>';
+ $("content").innerHTML='<div class="dashboard-shell"><div class="dashboard-header"><div class="dashboard-welcome"><h1>☼&nbsp; '+esc(greeting())+', '+esc(name.split("@")[0])+'</h1><p>Que hoy sea más un día de conquistas.</p><div class="verse">“Todo lo que fizer, faça de coração, como para el Señor y no para los hombres.”<br><span>Colossenses 3:23</span></div></div><div class="dashboard-actions"><input id="dashSearch" class="dash-search" placeholder="⌕  Buscar..."><button id="dashBell" class="dash-bell">♟<i>3</i></button><div class="dash-brand-badge"><strong>♛ R</strong><small>ROMANO PARTNERS</small></div></div><div class="dashboard-date">miércoles, 23 de septiembre<strong>08:24</strong></div></div><div class="dash-hero"><div class="dash-hero-copy"><div class="eyebrow">ROMANO PROPERTY CARE · MANAGEMENT</div><h2>PROPIEDADES IMPECABLES<br>CLIENTES SATISFECHOS</h2><p>Excelencia en cada detalle · operación 5★ en tiempo real</p></div><div class="room-art"><div class="room-window"></div><div class="room-sofa"></div><div class="room-table"></div><div class="room-plant">🌿</div></div></div><div class="dash-kpis"><div class="dash-kpi"><div class="ki">▣</div><div><small>Servicios hoy</small><strong>8</strong><em>3 en andamento</em></div></div><div class="dash-kpi"><div class="ki">♟</div><div><small>Clientes</small><strong>5</strong><em>Activos</em></div></div><div class="dash-kpi"><div class="ki">⌂</div><div><small>Propiedades</small><strong>12</strong><em>En servicio</em></div></div><div class="dash-kpi"><div class="ki">♧</div><div><small>Funcionarios</small><strong>16</strong><em>Disponibles</em></div></div><div class="dash-kpi"><div class="ki">€</div><div><small>Facturado (mes)</small><strong>€ 4.250</strong><em>↑ 12%</em></div></div><div class="dash-kpi"><div class="ki">◷</div><div><small>Pendientes</small><strong>2</strong><em style="color:#b94c3d">Atención</em></div></div></div><div class="dash-grid"><div class="dash-card"><div class="dash-card-head"><h3>♧ Servicios en tiempo real</h3><span id="dashAll">Ver todos</span></div><div class="dash-list">'+rows+'</div><div class="dash-quick"><button class="primary-q" data-go="newservice">＋<br>Nuevo servicio</button><button data-go="properties">⌂<br>Nueva propiedad</button><button data-go="clients">♙<br>Nuevo cliente</button><button data-go="employees">♧<br>Nuevo funcionario</button></div></div><div class="dash-card"><div class="dash-card-head"><h3>⌖ Mapa de la equipe</h3><span>🟢 Tiempo real</span></div><div class="dash-map-wrap"><div id="dashMap" class="dash-map"></div></div></div><div><div class="dash-card"><div class="dash-card-head"><h3>▣ Próximos servicios</h3><span id="dashAgenda">Ver agenda</span></div><div class="dash-next">'+next+'</div></div><div class="dash-devotional"><h4>▣ Devocional del día</h4><p>“Confía en el Señor todo lo que haces, y tus planes serán bien-sucedidos.”</p><small>Proverbios 16:3</small></div></div></div><div id="liveSimulatorMount">'+renderLiveSimulator()+'</div><div class="dash-bottom"><div class="dash-brand-panel"><strong>Excelencia<br>en cada detalle</strong><span>♛ R</span><small>ROMANO PROPERTY CARE · MANAGEMENT</small><div class="dash-cleaner">👩🏻‍🧹</div></div><div class="dash-support"><div class="wa">◉</div><b>Soporte rápido</b><small>Hable con el equipo</small><button id="dashChat">Abrir comunicación →</button></div></div></div>';
  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>openPage(b.dataset.go));
  $("dashSearch").onkeydown=e=>{if(e.key==="Enter")openPage("search")};$("dashBell").onclick=()=>openPage("notifications");$("dashAll").onclick=()=>openPage("services");$("dashAgenda").onclick=()=>openPage("calendar");$("dashChat").onclick=()=>openPage("chat");
  if(window.L){const m=L.map("dashMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);[[40.425,-3.695,"Ana Silva · A camino"],[40.415,-3.69,"Pedro Costa · En servicio"],[40.405,-3.72,"Laura Mendes · Supervisado"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));}
@@ -727,6 +733,69 @@ function enterDemoExperience(){
  toast("Experiência DEMONSTRAÇÃO iniciada · nenhum dado real será alterado.");
 }
 setTimeout(()=>{const b=$("demoLoginBtn");if(b)b.onclick=enterDemoExperience},0);
+
+/* Continuous fictitious operation: isolated in browser memory. */
+window.ROMANO_LIVE_SIM={running:false,timer:null,minutes:0,events:[]};
+function simAddEvent(title,detail){
+ const z=window.ROMANO_LIVE_SIM;z.events.unshift({title,detail,time:new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit"})});z.events=z.events.slice(0,8);
+}
+function simStatusStep(s){
+ const flow=["requested","scheduled","on_the_way","in_progress","paused","supervised","completed"];
+ const current=flow.indexOf(s.status);
+ if(current<0)return false;
+ if(s.status==="requested"){demoEnsureDispatch(s);return false}
+ if(current<flow.length-1){
+   s.status=flow[current+1];
+   s.updated_demo_at=Date.now();
+   const emp=s.assigned_employee_id?demoFindEmployee(s.assigned_employee_id):null;
+   simAddEvent(s.code, (emp?.name||"Dispatch")+" → "+(statusNames[s.status]||s.status));
+   return true;
+ }
+ return false;
+}
+function simDispatchTick(){
+ DEMO_SERVICES.filter(s=>["requested","scheduled"].includes(s.status)).forEach(s=>{
+   const q=demoEnsureDispatch(s),c=demoCurrentCandidate(s.id);
+   if(c&&c.response==="pending"&&Date.now()>=c.expiresAt){
+     demoMoveNext(s.id,"expired");simAddEvent(s.code,"5 min sem resposta → próximo funcionário");
+   }
+ });
+}
+function simRender(){
+ if(!demoMode)return;
+ if(window.__romanoDemoRole==="admin"||window.__romanoDemoRole==="supervisor")openPage("dashboard");
+ else openPage("dashboard");
+}
+function simTick(){
+ const z=window.ROMANO_LIVE_SIM;if(!z.running)return;
+ z.minutes+=5;simDispatchTick();
+ const candidates=DEMO_SERVICES.filter(s=>s.status!=="completed");
+ if(candidates.length){
+   const s=candidates[Math.floor(z.minutes/5)%candidates.length];
+   if(s.status==="requested"){demoEnsureDispatch(s);simAddEvent(s.code,"Pedido recebido → dispatch iniciado");}
+   else if(s.status==="scheduled"||s.status==="on_the_way"||s.status==="in_progress"||s.status==="paused"||s.status==="supervised")simStatusStep(s);
+ }
+ if(document.getElementById("simClock"))document.getElementById("simClock").textContent="Dia demo · "+String(7+Math.floor(z.minutes/60)).padStart(2,"0")+":"+String(z.minutes%60).padStart(2,"0");
+ if(document.getElementById("simFeed"))document.getElementById("simFeed").innerHTML=z.events.map(e=>'<div class="sim-event"><b>'+esc(e.title)+'</b><span>'+esc(e.detail)+' · '+esc(e.time)+'</span></div>').join("");
+}
+function toggleLiveSimulation(){
+ const z=window.ROMANO_LIVE_SIM;z.running=!z.running;
+ if(z.running){
+   if(!z.events.length)simAddEvent("ROMANO PARTNERS","Operação diária iniciada · dados fictícios");
+   z.timer=setInterval(simTick,8000);toast("Simulação ao vivo iniciada");
+ }else{clearInterval(z.timer);z.timer=null;toast("Simulação pausada")}
+ openPage("dashboard");
+}
+function resetLiveSimulation(){
+ const z=window.ROMANO_LIVE_SIM;clearInterval(z.timer);z.timer=null;z.running=false;z.minutes=0;z.events=[];
+ DEMO_SERVICES.forEach((s,i)=>{if(i===0){s.status="on_the_way";s.assigned_employee_id="demo-e1";s.employee_name="Ana Silva"}if(i===1){s.status="in_progress";s.assigned_employee_id="demo-e2";s.employee_name="Carla Santos"}if(i===2){s.status="supervised";s.assigned_employee_id="demo-e9";s.employee_name="Marta Fernández"}if(i===3){s.status="in_progress";s.assigned_employee_id="demo-e3";s.employee_name="Pedro Costa"}if(i===4){s.status="completed";s.assigned_employee_id="demo-e4";s.employee_name="João Martins"}});
+ toast("Simulação restaurada");openPage("dashboard");
+}
+function renderLiveSimulator(){
+ const z=window.ROMANO_LIVE_SIM;
+ const events=z.events.length?z.events.map(e=>'<div class="sim-event"><b>'+esc(e.title)+'</b><span>'+esc(e.detail)+' · '+esc(e.time)+'</span></div>').join(""):'<div class="sim-event"><b>Pronto para iniciar</b><span>Simula uma operação diária completa sem tocar no banco real.</span></div>';
+ return '<div class="live-sim"><div class="live-sim-head"><div><div class="live-sim-title"><i class="live-dot"></i><b>Operação ao vivo · DEMONSTRAÇÃO</b></div><small>Serviços, dispatch, funcionários e estados evoluem automaticamente.</small></div><div id="simClock" class="sim-clock">Dia demo · 07:00</div></div><div class="sim-controls"><button class="btn gold" onclick="toggleLiveSimulation()">'+(z.running?"Ⅱ Pausar":"▶ Iniciar operação")+'</button><button class="btn" onclick="resetLiveSimulation()">↺ Restaurar</button><button class="btn" onclick="openPage('services')">Abrir operação 360</button></div><div id="simFeed" class="sim-feed">'+events+'</div></div>';
+}
 </script></body></html>
 
 // ===== DEMONSTRACIÓN 360: dados fictícios + fluxo de dispatch =====
