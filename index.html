@@ -408,7 +408,52 @@ function reloadCurrentPage(){const active=document.querySelector(".nav button.ac
 
 async function renderCalendar(){const r=await sb.from("services").select("code,service_type,typology,status,scheduled_at").not("scheduled_at","is",null).order("scheduled_at",{ascending:true}).limit(100);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario operativo</h3><span class="pill">Servicios programados</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(statusNames[x.status]||x.status)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios programados.</div>')+'</div>'}
 
-async function renderEmployees(){const r=demoMode?{data:DEMO_EMPLOYEES,error:null}:{data:null,error:null};if(!demoMode){const q=await sb.from("employee_profiles").select("id,employee_code,phone,email,nif_nie,hire_date,function_title,salary,active").order("created_at",{ascending:false});r.data=q.data;r.error=q.error}$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Funcionarios · Ficha profesional</h3><span class="pill">'+(r.data?.length||0)+' registros</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Código</th><th>Función</th><th>Email</th><th>NIF/NIE</th><th>Alta</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.employee_code)+'</td><td>'+esc(x.function_title||"—")+'</td><td>'+esc(x.email||"—")+'</td><td>'+esc(x.nif_nie||"—")+'</td><td>'+esc(x.hire_date||"—")+'</td><td>'+esc(x.active?"Activo":"Inactivo")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay funcionarios.</div>')+'</div>'}
+async function renderEmployees(){
+ const r=demoMode?{data:DEMO_EMPLOYEES,error:null}:{data:null,error:null};
+ if(!demoMode){const q=await sb.from("employee_profiles").select("id,employee_code,phone,email,nif_nie,hire_date,function_title,salary,active").order("created_at",{ascending:false});r.data=q.data;r.error=q.error}
+ const canWrite=demoMode||canManage();
+ let h='<div class="panel"><div class="panel-head"><div><h3>Funcionarios · Ficha profesional</h3><div class="muted">Alta, consulta, edición y prueba de datos de empleados.</div></div><div class="actions"><span class="pill">'+(r.data?.length||0)+' registros</span>'+(canWrite?'<button class="btn gold" onclick="newEmployee()">＋ Nuevo funcionario</button>':'')+'</div></div>';
+ if(r.error)h+='<div class="msg">'+esc(r.error.message)+'</div>';
+ else if(r.data?.length)h+='<table class="table"><thead><tr><th>Código</th><th>Función</th><th>Email</th><th>NIF/NIE</th><th>Alta</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td><b>'+esc(x.employee_code)+'</b></td><td>'+esc(x.function_title||"—")+'</td><td>'+esc(x.email||"—")+'</td><td>'+esc(x.nif_nie||"—")+'</td><td>'+esc(x.hire_date||"—")+'</td><td><span class="status '+(x.active?'approved':'urgent')+'">'+(x.active?"Activo":"Inactivo")+'</span></td><td><div class="actions"><button class="btn" onclick="viewEmployee(\''+x.id+'\')">Ver</button>'+(canWrite?'<button class="btn gold" onclick="editEmployee(\''+x.id+'\')">Editar</button>':'')+'</div></td></tr>').join("")+'</tbody></table>';
+ else h+='<div class="empty">No hay funcionarios.</div>';
+ h+='</div>';$("content").innerHTML=h;
+}
+async function newEmployee(){
+ const nextCode="RPC-"+String((DEMO_EMPLOYEES?.length||0)+1).padStart(3,"0");
+ openModal("Nuevo funcionario",'<form onsubmit="saveEmployee(event)"><div class="two"><div class="field"><label>Código</label><input id="eCode" value="'+esc(nextCode)+'" required></div><div class="field"><label>Función</label><input id="eFunction" placeholder="Limpieza · 5★" required></div></div><div class="two"><div class="field"><label>Email</label><input id="eEmail" type="email" placeholder="empleado@romano.test"></div><div class="field"><label>Teléfono</label><input id="ePhone" placeholder="+34 600 000 000"></div></div><div class="two"><div class="field"><label>NIF/NIE</label><input id="eNif" placeholder="NIE/NIF"></div><div class="field"><label>Fecha de alta</label><input id="eHire" type="date"></div></div><div class="two"><div class="field"><label>Salario</label><input id="eSalary" type="number" min="0" step="0.01" value="0"></div><div class="field"><label>Estado</label><select id="eActive"><option value="true">Activo</option><option value="false">Inactivo</option></select></div></div><button class="primary">Guardar funcionario</button></form>');
+ if($("eHire"))$("eHire").value=new Date().toISOString().slice(0,10);
+}
+async function saveEmployee(e){
+ e.preventDefault();
+ const data={employee_code:$("eCode").value.trim(),function_title:$("eFunction").value.trim(),email:$("eEmail").value.trim()||null,phone:$("ePhone").value.trim()||null,nif_nie:$("eNif").value.trim()||null,hire_date:$("eHire").value||null,salary:Number($("eSalary").value||0),active:$("eActive").value==="true"};
+ if(!data.employee_code||!data.function_title){toast("Código y función son obligatorios.");return}
+ if(demoMode){const id="demo-e"+(DEMO_EMPLOYEES.length+1);DEMO_EMPLOYEES.push({id,...data});closeModal();toast("Funcionario creado en modo demostración");renderEmployees();return}
+ const r=await sb.from("employee_profiles").insert({company_id:currentProfile.company_id,...data});
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Funcionario creado");renderEmployees();
+}
+async function viewEmployee(id){
+ const x=demoMode?DEMO_EMPLOYEES.find(z=>z.id===id):(await sb.from("employee_profiles").select("id,employee_code,phone,email,nif_nie,hire_date,function_title,salary,active").eq("id",id).single()).data;
+ if(!x){toast("Funcionario no encontrado.");return}
+ openModal("Ficha del funcionario"+(demoMode?" · DEMOSTRACIÓN":""),'<div class="panel" style="margin:0"><div class="line-item"><span>Código</span><b>'+esc(x.employee_code)+'</b></div><div class="line-item"><span>Función</span><b>'+esc(x.function_title||"—")+'</b></div><div class="line-item"><span>Email</span><b>'+esc(x.email||"—")+'</b></div><div class="line-item"><span>Teléfono</span><b>'+esc(x.phone||"—")+'</b></div><div class="line-item"><span>NIF/NIE</span><b>'+esc(x.nif_nie||"—")+'</b></div><div class="line-item"><span>Fecha de alta</span><b>'+esc(x.hire_date||"—")+'</b></div><div class="line-item"><span>Salario</span><b>'+Number(x.salary||0).toFixed(2)+' €</b></div><div class="line-item"><span>Estado</span><b>'+(x.active?"Activo":"Inactivo")+'</b></div></div>');
+}
+async function editEmployee(id){
+ const x=demoMode?DEMO_EMPLOYEES.find(z=>z.id===id):(await sb.from("employee_profiles").select("id,employee_code,phone,email,nif_nie,hire_date,function_title,salary,active").eq("id",id).single()).data;
+ if(!x){toast("Funcionario no encontrado.");return}
+ openEmployeeEditModal(x);
+}
+function openEmployeeEditModal(x){
+ openModal("Editar funcionario"+(demoMode?" · DEMOSTRACIÓN":""),'<form onsubmit="saveEmployeeEdit(event,\''+x.id+'\')"><div class="two"><div class="field"><label>Código</label><input id="eeCode" value="'+esc(x.employee_code||"")+'" required></div><div class="field"><label>Función</label><input id="eeFunction" value="'+esc(x.function_title||"")+'" required></div></div><div class="two"><div class="field"><label>Email</label><input id="eeEmail" type="email" value="'+esc(x.email||"")+'"></div><div class="field"><label>Teléfono</label><input id="eePhone" value="'+esc(x.phone||"")+'"></div></div><div class="two"><div class="field"><label>NIF/NIE</label><input id="eeNif" value="'+esc(x.nif_nie||"")+'"></div><div class="field"><label>Fecha de alta</label><input id="eeHire" type="date" value="'+esc(x.hire_date||"")+'"></div></div><div class="two"><div class="field"><label>Salario</label><input id="eeSalary" type="number" min="0" step="0.01" value="'+Number(x.salary||0)+'"></div><div class="field"><label>Estado</label><select id="eeActive"><option value="true" '+(x.active?'selected':'')+'>Activo</option><option value="false" '+(!x.active?'selected':'')+'>Inactivo</option></select></div></div><button class="primary">Guardar cambios</button></form>');
+}
+async function saveEmployeeEdit(e,id){
+ e.preventDefault();
+ const data={employee_code:$("eeCode").value.trim(),function_title:$("eeFunction").value.trim(),email:$("eeEmail").value.trim()||null,phone:$("eePhone").value.trim()||null,nif_nie:$("eeNif").value.trim()||null,hire_date:$("eeHire").value||null,salary:Number($("eeSalary").value||0),active:$("eeActive").value==="true"};
+ if(!data.employee_code||!data.function_title){toast("Código y función son obligatorios.");return}
+ if(demoMode){const x=DEMO_EMPLOYEES.find(z=>z.id===id);if(!x){toast("Funcionario no encontrado.");return}Object.assign(x,data);closeModal();toast("Funcionario actualizado en modo demostración");renderEmployees();return}
+ const r=await sb.from("employee_profiles").update(data).eq("id",id);
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Funcionario actualizado");renderEmployees();
+}
 
 async function renderDocuments(){const r=await sb.from("documents").select("id,title,document_type,file_name,created_at,client_id").order("created_at",{ascending:false}).limit(100);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Documentos seguros</h3><span class="pill">Storage + RLS</span></div><p class="muted">Contratos, recibos, facturas y documentos quedan vinculados al registro y sujetos a permisos del backend.</p>'+(r.data?.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.title)+'</td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos cargados.</div>')+'</div>'}
 
