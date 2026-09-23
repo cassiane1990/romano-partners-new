@@ -330,30 +330,14 @@ function canSeeFinance(){return ["admin","client"].includes(role())}
 function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
 function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
-async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");if(data.active===false)throw new Error("Perfil inativo.");currentProfile=data}
+async function profileLoad(){const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();if(error||!data)throw error||new Error("Perfil no encontrado.");currentProfile=data}
 async function ensureMFA(){
- const factors=await sb.auth.mfa.listFactors();
- if(factors.error)throw factors.error;
- const verifiedTotp=(factors.data?.totp||[]).filter(x=>x.status==="verified");
- if(verifiedTotp.length===0){
-   $("mfa").classList.add("hidden");
-   return true;
- }
- const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
- if(a.error)throw a.error;
- if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){
-   $("mfa").classList.remove("hidden");
-   $("login").classList.add("hidden");
-   $("mfaCode").value="";
-   setTimeout(()=>$("mfaCode")?.focus(),50);
-   return false;
- }
  $("mfa").classList.add("hidden");
  return true;
 }
 async function mfaVerify(){
  const code=$("mfaCode").value.trim();
- if(!/^\d{6}$/.test(code)){
+ if(!/^\\d{6}$/.test(code)){
    $("mfaMsg").textContent="Introduce un código MFA de 6 dígitos.";
    $("mfaMsg").classList.remove("hidden");
    return;
@@ -476,9 +460,24 @@ async function startRealtime(){
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},()=>{const active=document.querySelector("#masterNav button.active")?.dataset.page||"";if(active==="notifications")openPage("notifications")})
  .subscribe();
 }
-function doLogout(){sb.auth.signOut()}
-function showApp(){$("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";$("roleBadge").textContent=roleNames[role()]||role();$("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();buildMasterNav();renderProfileVisual();startRealtime();initOfflineSync();openPage("dashboard")}
-function showLogin(msg){$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
+function doLogout(){sb.auth.signOut({scope:"local"})}
+function showApp(){
+ $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");
+ $("userEmail").textContent=currentUser?.email||"";
+ $("roleBadge").textContent=roleNames[role()]||role();
+ $("avatar").textContent=(currentProfile?.full_name||"R").charAt(0).toUpperCase();
+ if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";
+ if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();
+ try{buildMasterNav()}catch(e){console.error("nav",e)}
+ Promise.resolve().then(()=>renderProfileVisual()).catch(e=>console.error("profile",e));
+ try{startRealtime()}catch(e){console.error("realtime",e)}
+ try{initOfflineSync()}catch(e){console.error("offline",e)}
+ Promise.resolve().then(()=>openPage("dashboard")).catch(e=>console.error("dashboard",e));
+}
+function showLogin(msg){
+ $("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");
+ if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}
+}
 async function openPage(key){const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();
@@ -497,7 +496,7 @@ $("loginForm").addEventListener("submit",async e=>{
    $("loginMsg").classList.remove("hidden");
  }finally{if(btn)btn.disabled=false}
 });
-if($("logout"))$("logout").onclick=async()=>{await sb.auth.signOut();currentUser=null;currentProfile=null;showLogin()};
+if($("logout"))$("logout").onclick=async()=>{await sb.auth.signOut({scope:"local"});currentUser=null;currentProfile=null;showLogin()};
 $("signupBtn").onclick=async()=>{
  const email=$("email").value.trim(),password=$("password").value;
  if(!email||password.length<8){toast("Informe email e uma contraseña de mínimo 8 caracteres.");return}
@@ -514,7 +513,7 @@ $("resetBtn").onclick=async()=>{
 $("demoLoginBtn").onclick=()=>{demoMode=!demoMode;$("demoLoginBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoLoginBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;currentProfile=null;showLogin()}});
-(async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
+(async()=>{try{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;await profileLoad();if(await ensureMFA())showApp()}}catch(e){console.error("session bootstrap",e);showLogin(e.message||"No fue posible iniciar sesión.")}})();
 
 async function renderClientsPremium(){return renderClients()}
 async function renderPropertiesPremium(){return renderProperties()}
