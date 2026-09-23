@@ -499,7 +499,60 @@ async function downloadServiceMedia(path){
 }
 function reloadCurrentPage(){const active=document.querySelector(".nav button.active");openPage(active?.dataset.page||"dashboard")}
 
-async function renderCalendar(){const r=await sb.from("services").select("code,service_type,typology,status,scheduled_at").not("scheduled_at","is",null).order("scheduled_at",{ascending:true}).limit(100);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario operativo</h3><span class="pill">Servicios programados</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(statusNames[x.status]||x.status)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios programados.</div>')+'</div>'}
+function demoCalendarDateTimeValue(iso){
+ const d=new Date(iso);if(Number.isNaN(d.getTime()))return "";
+ const pad=n=>String(n).padStart(2,"0");
+ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+function demoCalendarWeekStart(date){
+ const d=new Date(date);d.setHours(0,0,0,0);const day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d;
+}
+function demoCalendarStatusClass(status){
+ return status==="completed"?"approved":(status==="paused"||status==="urgent"?"urgent":"");
+}
+function renderDemoCalendar(weekOffset=0){
+ const base=new Date();base.setDate(base.getDate()+Number(weekOffset||0)*7);
+ const monday=demoCalendarWeekStart(base),days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d});
+ const weekLabel=days[0].toLocaleDateString("es-ES",{day:"2-digit",month:"short"})+" — "+days[6].toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"});
+ const byDay=days.map(d=>DEMO_SERVICES.filter(s=>{const x=new Date(s.scheduled_at);return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x.getDate()===d.getDate()}).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at)));
+ let h='<div class="panel"><div class="panel-head"><div><h3>Calendario semanal</h3><div class="muted">DEMONSTRACIÓN · servicios ficticios · sin escritura en producción</div></div><div class="actions"><button class="btn" onclick="renderDemoCalendar('+(Number(weekOffset)-1)+')">‹ Semana anterior</button><button class="btn" onclick="renderDemoCalendar(0)">Hoy</button><button class="btn" onclick="renderDemoCalendar('+(Number(weekOffset)+1)+')">Semana siguiente ›</button></div></div><div class="notice" style="margin-bottom:12px"><strong>Semana:</strong> '+esc(weekLabel)+' · '+DEMO_SERVICES.length+' servicios ficticios</div><div style="display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;overflow-x:auto">';
+ days.forEach((d,i)=>{
+   const label=d.toLocaleDateString("es-ES",{weekday:"long"}),dateLabel=d.toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit"});
+   h+='<div class="panel" style="margin:0;padding:10px;min-height:300px;background:rgba(255,255,255,.45)"><div style="font-weight:800;text-transform:capitalize;margin-bottom:3px">'+esc(label)+'</div><div class="muted" style="margin-bottom:10px">'+esc(dateLabel)+'</div>';
+   if(!byDay[i].length)h+='<div class="empty" style="padding:20px 6px">Sin servicios</div>';
+   else byDay[i].forEach(s=>{
+     const emp=DEMO_EMPLOYEES.find(e=>e.id===s.assigned_employee_id);
+     h+='<div class="panel" style="margin:0 0 8px;padding:10px;border:1px solid rgba(120,90,30,.16);box-shadow:0 4px 12px rgba(0,0,0,.04)"><div style="font-size:18px;font-weight:900">'+esc(new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</div><strong>'+esc(s.code)+'</strong><div class="muted">'+esc(s.service_type)+'</div><div style="margin:4px 0"><span class="pill">'+esc(s.typology||"—")+'</span></div><div class="status '+demoCalendarStatusClass(s.status)+'" style="display:inline-block">'+esc(statusNames[s.status]||s.status)+'</div><div class="muted" style="margin-top:5px">'+esc(emp?.function_title||emp?.employee_code||"Sin funcionario")+'</div><div class="actions" style="margin-top:8px"><button class="btn" onclick="viewService(\''+s.id+'\')">Ver servicio</button><button class="btn gold" onclick="editDemoCalendarService(\''+s.id+'\')">Editar</button></div></div>';
+   });
+   h+='</div>';
+ });
+ h+='</div></div>';
+ $("content").innerHTML=h;
+}
+function editDemoCalendarService(id){
+ const s=DEMO_SERVICES.find(x=>x.id===id);if(!s){toast("Servicio demo no encontrado.");return}
+ const propertyOptions=DEMO_PROPERTIES.map(p=>'<option value="'+p.id+'" '+(p.id===s.property_id?"selected":"")+'>'+esc(p.code)+' · '+esc(p.name)+'</option>').join("");
+ const employeeOptions='<option value="">Sin asignar</option>'+DEMO_EMPLOYEES.map(e=>'<option value="'+e.id+'" '+(e.id===s.assigned_employee_id?"selected":"")+'>'+esc(e.employee_code)+' · '+esc(e.function_title)+'</option>').join("");
+ const typeOptions=["Check-in · Limpieza 5★","Check-out · Limpieza 5★","Limpieza Airbnb","Limpieza hotel 5★","Limpieza de oficina","Limpieza de clínica","Mantenimiento","Pintura","Fontanería","Electricidad","Lavandería","Supervisión"].map(v=>'<option value="'+esc(v)+'" '+(v===s.service_type?"selected":"")+'>'+esc(v)+'</option>').join("");
+ const statusOptions=Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(k===s.status?"selected":"")+'>'+esc(v)+'</option>').join("");
+ openModal("Editar servicio · DEMOSTRACIÓN",'<form onsubmit="saveDemoCalendarService(event,\''+id+'\')"><div class="demo-flag">DATOS FICTICIOS · NO PRODUCCIÓN</div><div class="two"><div class="field"><label>Código</label><input value="'+esc(s.code)+'" readonly></div><div class="field"><label>Fecha y hora</label><input id="dcsDate" type="datetime-local" value="'+demoCalendarDateTimeValue(s.scheduled_at)+'" required></div></div><div class="two"><div class="field"><label>Apartamento / propiedad</label><select id="dcsProperty">'+propertyOptions+'</select></div><div class="field"><label>Tipo de servicio</label><select id="dcsType">'+typeOptions+'</select></div></div><div class="two"><div class="field"><label>Tipología</label><select id="dcsTypology">'+["T1","T2","T3","T4","T5"].map(v=>'<option '+(v===s.typology?"selected":"")+'>'+v+'</option>').join("")+'</select></div><div class="field"><label>Prioridad</label><select id="dcsPriority">'+["normal","high","urgent"].map(v=>'<option value="'+v+'" '+(v===s.priority?"selected":"")+'>'+esc(v==="normal"?"Normal":v==="high"?"Alta":"Urgente")+'</option>').join("")+'</select></div></div><div class="two"><div class="field"><label>Funcionario</label><select id="dcsEmployee">'+employeeOptions+'</select></div><div class="field"><label>Estado</label><select id="dcsStatus">'+statusOptions+'</select></div></div><button class="primary">Guardar cambios</button></form>');
+}
+function saveDemoCalendarService(e,id){
+ e.preventDefault();
+ const s=DEMO_SERVICES.find(x=>x.id===id);if(!s){toast("Servicio demo no encontrado.");return}
+ const type=$("dcsType").value,dateValue=$("dcsDate").value;
+ const scheduleError=romanoValidateServiceTime(type,new Date(dateValue).toISOString());
+ if(scheduleError){toast(scheduleError);return}
+ if(!dateValue){toast("Informe la fecha y hora.");return}
+ s.scheduled_at=new Date(dateValue).toISOString();
+ s.property_id=$("dcsProperty").value;s.service_type=type;s.typology=$("dcsTypology").value;s.priority=$("dcsPriority").value;s.assigned_employee_id=$("dcsEmployee").value||null;s.status=$("dcsStatus").value;
+ closeModal();toast("Servicio ficticio actualizado");renderDemoCalendar(0);
+}
+async function renderCalendar(){
+ if(demoMode){renderDemoCalendar(0);return}
+ const r=await sb.from("services").select("code,service_type,typology,status,scheduled_at").not("scheduled_at","is",null).order("scheduled_at",{ascending:true}).limit(100);
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario operativo</h3><span class="pill">Servicios programados</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(statusNames[x.status]||x.status)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios programados.</div>')+'</div>'
+}
 
 async function renderEmployees(){
  const r=demoMode?{data:DEMO_EMPLOYEES,error:null}:{data:null,error:null};
