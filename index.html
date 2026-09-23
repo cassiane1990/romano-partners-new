@@ -1216,12 +1216,12 @@ async function sendChatPremium(e){
  if(!body&&!files.length)return;
  try{
    if(body){
-     const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:__activeChatId,sender_id:currentUser.id,body});
+     const r=await sb.rpc("send_chat_message",{p_thread_id:__activeChatId,p_body:body});
      if(r.error)throw r.error;
    }
    for(const file of files){
      const media=await uploadChatMediaFile(file);
-     const r=await sb.from("chat_messages").insert({company_id:currentProfile.company_id,thread_id:__activeChatId,sender_id:currentUser.id,body:"",...media});
+     const r=await sb.rpc("send_chat_message",{p_thread_id:__activeChatId,p_body:"",...media});
      if(r.error){await sb.storage.from("chat-media").remove([media.media_path]);throw r.error}
    }
    input.value="";if(mediaInput)mediaInput.value="";await refreshChatMessages();
