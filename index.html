@@ -1057,7 +1057,7 @@ async function prepostoFormHtml(x={}){
 async function savePreposto(e,id=null){
  e.preventDefault();
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar prepostos.");return}
- const data={client_id:$("ppClient").value||null,name:$("ppName").value.trim(),role_title:$("ppRole").value.trim()||null,email:$("ppEmail").value.trim()||null,phone:$("ppPhone").value.trim()||null,address:$("ppAddress").value.trim()||null,notes:$("ppNotes").value.trim()||null,active:$("ppActive").value==="true",updated_at:new Date().toISOString()};
+ const data={client_id:$("ppClient")?.value||null,name:$("ppName")?.value.trim(),role_title:$("ppRole")?.value.trim()||null,email:$("ppEmail")?.value.trim()||null,phone:$("ppPhone")?.value.trim()||null,address:$("ppAddress")?.value.trim()||null,notes:$("ppNotes")?.value.trim()||null,active:$("ppActive")?.value==="true",updated_at:new Date().toISOString()};
  if(!data.name){toast("El nombre es obligatorio.");return}
  if(demoMode){
   window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS||[];
@@ -1065,12 +1065,17 @@ async function savePreposto(e,id=null){
   if(id){const i=window.__DEMO_PREPOSTOS.findIndex(x=>x.id===id);if(i>=0)window.__DEMO_PREPOSTOS[i]=row;else window.__DEMO_PREPOSTOS.unshift(row)}else window.__DEMO_PREPOSTOS.unshift(row);
   closeModal();toast("Preposto guardado en demo");return renderPrepostosPremium();
  }
- const q=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"prepostos",action:id?"update":"create",id,payload:data}});
- if(q.error||q.data?.error){toast("No se pudo guardar el preposto: "+(q.data?.error||q.error?.message||"error desconocido"));return}
- closeModal();toast(id?"Preposto actualizado":"Preposto creado");await renderPrepostosPremium();
+ try{
+  let q;
+  if(id)q=await sb.from("prepostos").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+  else q=await sb.from("prepostos").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,created_by:currentUser.id,...data}).select("id").single();
+  if(q.error)throw q.error;
+  if(id&&!q.data)throw new Error("Preposto no encontrado o no pertenece a esta empresa.");
+  closeModal();toast(id?"Preposto actualizado correctamente":"Preposto creado correctamente");await renderPrepostosPremium();
+ }catch(err){toast("No se pudo guardar el preposto: "+(err?.message||String(err)))}
 }
 async function viewPreposto(id){
- const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).single();
+ const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
  const x=q.data;openModal("Ficha del preposto",'<div class="panel"><div class="two"><div><b>Nombre</b><div>'+esc(x.name)+'</div></div><div><b>Cargo</b><div>'+esc(x.role_title||"—")+'</div></div><div><b>Email</b><div>'+esc(x.email||"—")+'</div></div><div><b>Teléfono</b><div>'+esc(x.phone||"—")+'</div></div><div><b>Dirección</b><div>'+esc(x.address||"—")+'</div></div><div><b>Estado</b><div>'+esc(x.active?"Activo":"Inactivo")+'</div></div></div><div style="margin-top:12px"><b>Observaciones</b><div>'+esc(x.notes||"—")+'</div></div></div>');
 }
@@ -1080,9 +1085,11 @@ async function deletePreposto(id){
  if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
  if(!confirm("¿Eliminar "+(q.data.name||"este preposto")+"? Esta acción no se puede deshacer."))return;
  if(demoMode){window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS||[];window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS.filter(x=>x.id!==id);toast("Preposto eliminado");return renderPrepostosPremium()}
- const r=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"prepostos",action:"delete",id}});
- if(r.error||r.data?.error){toast("No se puede eliminar el preposto: "+(r.data?.error||r.error?.message||"error desconocido"));return}
- toast("Preposto eliminado");await renderPrepostosPremium();
+ try{
+  const r=await sb.from("prepostos").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+  if(r.error)throw r.error;
+  toast("Preposto eliminado correctamente");await renderPrepostosPremium();
+ }catch(err){toast("No se puede eliminar el preposto: "+(err?.message||String(err)))}
 }
 
 const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance_catalog:["Catálogo de Mantenimiento",maintenance],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],prepostos:["Prepostos / Representantes",renderPrepostosPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],service_journey:["Jornada de servicios",renderServiceJourneyBoard],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],cleaning_catalog:["Catálogo de Limpieza",renderCleaningCatalog],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderReceiptsPremium],invoices:["Facturas",renderInvoicesPremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
@@ -1815,22 +1822,30 @@ function romanoCatalogModal(category,x){
 }
 async function romanoCatalogSave(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
- const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
- const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:id?"update":"create",id,payload}});
- if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
+ const name=$("rcName")?.value.trim(); if(!name){toast("Indique el nombre.");return}
+ const payload={company_id:currentProfile.company_id,category,code:$("rcCode")?.value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription")?.value.trim()||null,unit:$("rcUnit")?.value.trim()||"unidad",price:Math.max(0,Number($("rcPrice")?.value||0)),tax_included:$("rcTax")?.value==="true",active:$("rcActive")?.value==="true",updated_at:new Date().toISOString()};
+ try{
+  let q;
+  if(id) q=await sb.from("service_catalog").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+  else q=await sb.from("service_catalog").insert({id:crypto.randomUUID(),...payload}).select("id").single();
+  if(q.error)throw q.error;
+  if(id&&!q.data)throw new Error("Artículo no encontrado o no pertenece a esta empresa.");
+  closeModal();toast(id?"Artículo actualizado correctamente":"Artículo creado correctamente");await romanoCatalogManager(category);
+ }catch(e){toast("No se pudo guardar: "+(e?.message||String(e)))}
 }
 async function romanoCatalogDelete(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
+ if(!id)return;
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
  category=category||($("pageTitle")?.textContent?.includes("Lavandería")?"laundry":$("pageTitle")?.textContent?.includes("Ropa")?"linen":"amenities");
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:"delete",id}});
- if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- toast("Artículo eliminado");await romanoCatalogManager(category);
+ try{
+  const q=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+  if(q.error)throw q.error;
+  toast("Artículo eliminado correctamente");await romanoCatalogManager(category);
+ }catch(e){toast("No se pudo eliminar: "+(e?.message||String(e)))}
 }
 async function romanoStockManager(){
- const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
+ const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("company_id",currentProfile.company_id).order("name");
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],canWrite=demoMode||canManage();
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Materiales y Stock</h3><div class="muted">El catálogo de materiales alimenta este stock. Cada artículo puede editarse y eliminarse.</div></div>'+(canWrite?'<button class="btn gold" onclick="romanoStockModal(null)">＋ Nuevo material</button>':'')+'</div>'+
@@ -1839,7 +1854,8 @@ async function romanoStockManager(){
  '</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>';
 }
 async function romanoStockModal(id){
- let x=null;if(id){const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("id",id).single();if(r.error){toast(r.error.message);return}x=r.data}
+ let x=null;
+ if(id){const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("id",id).eq("company_id",currentProfile.company_id).single();if(r.error){toast(r.error.message);return}x=r.data}
  openModal(x?"Editar material":"Nuevo material",
  '<div class="two"><div class="field"><label>Material</label><input id="rsName" value="'+esc(x?.name||"")+'" required></div><div class="field"><label>SKU</label><input id="rsSku" value="'+esc(x?.sku||"")+'"></div></div>'+
  '<div class="two"><div class="field"><label>Unidad</label><input id="rsUnit" value="'+esc(x?.unit||"unidad")+'"></div><div class="field"><label>Categoría</label><input id="rsCategory" value="'+esc(x?.category||"material")+'"></div></div>'+
@@ -1849,18 +1865,25 @@ async function romanoStockModal(id){
 }
 async function romanoStockSave(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar materiales.");return}
- const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
+ const payload={name:$("rsName")?.value.trim(),sku:$("rsSku")?.value.trim()||null,unit:$("rsUnit")?.value.trim()||"unidad",category:$("rsCategory")?.value.trim()||"material",quantity:Math.max(0,Number($("rsQty")?.value||0)),min_quantity:Math.max(0,Number($("rsMin")?.value||0)),unit_cost:Math.max(0,Number($("rsCost")?.value||0)),notes:$("rsNotes")?.value.trim()||null,updated_at:new Date().toISOString()};
  if(!payload.name){toast("Indique el material.");return}
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:id?"update":"create",id,payload}});
- if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
+ try{
+  let q;
+  if(id)q=await sb.from("stock_items").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+  else q=await sb.from("stock_items").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,...payload}).select("id").single();
+  if(q.error)throw q.error;
+  if(id&&!q.data)throw new Error("Material no encontrado o no pertenece a esta empresa.");
+  closeModal();toast(id?"Material actualizado correctamente":"Material creado correctamente");await romanoStockManager();
+ }catch(e){toast("No se pudo guardar: "+(e?.message||String(e)))}
 }
 async function romanoStockDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}
- if(!confirm("¿Eliminar este material del stock?"))return;
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:"delete",id}});
- if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- toast("Material eliminado");await romanoStockManager();
+ if(!id||!confirm("¿Eliminar este material del stock?"))return;
+ try{
+  const q=await sb.from("stock_items").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+  if(q.error)throw q.error;
+  toast("Material eliminado correctamente");await romanoStockManager();
+ }catch(e){toast("No se pudo eliminar: "+(e?.message||String(e)))}
 }
 async function romanoRecurringManager(){
  const r=await sb.from("recurring_services").select("id,client_id,property_id,frequency,typology,priority,active,next_run_at,instructions").order("next_run_at",{ascending:true});
