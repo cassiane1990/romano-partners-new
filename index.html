@@ -1918,11 +1918,11 @@ async function saveTeamSchedule(e){
  closeModal();toast("Jornada guardada correctamente");teams();
 }
 async function renderTeamsPremium(){return teams()}
-async function renderStockPremium(){return renderStock()}
-async function renderLinenPremium(){return linen()}
-async function renderLaundryPremium(){return laundry()}
-async function renderAmenitiesPremium(){return amenities()}
-async function renderRecurringPremium(){return recurring()}
+async function renderStockPremium(){return romanoStockManager()}
+async function renderLinenPremium(){return romanoCatalogManager("linen")}
+async function renderLaundryPremium(){return romanoCatalogManager("laundry")}
+async function renderAmenitiesPremium(){return romanoCatalogManager("amenities")}
+async function renderRecurringPremium(){return romanoRecurringManager()}
 async function renderQuotesPremium(){return quotes()}
 async function renderFinancePremium(){return renderFinance()}
 
