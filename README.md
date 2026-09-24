@@ -23,5 +23,5 @@ A base de dados foi limpa antes da implantação deste projeto. Nenhum dado oper
 - Backup lógico: Edge Function `romano-backup` + bucket privado `romano-backups`.
 - Backup/DR do projeto: utilizar os mecanismos nativos de backup/PITR da Supabase e manter cópia externa conforme a política operacional.
 
-
 <!-- Cloudflare production redeploy trigger: 2026-09-23 -->
+<!-- Responsive agenda patch trigger: 2026-09-24 -->
