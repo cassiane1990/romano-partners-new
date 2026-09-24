@@ -1489,9 +1489,17 @@ async function findOrCreateRoleThread(targetRole){
  return {id:c.data,title,thread_type:"direct",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
 }
 function stopChatPolling(){if(window.__chatPoll){clearInterval(window.__chatPoll);window.__chatPoll=null}}
+function stopChatRealtime(){if(window.__chatRealtime){try{sb.removeChannel(window.__chatRealtime)}catch(e){}window.__chatRealtime=null}}
+function startChatRealtime(){
+ stopChatRealtime();
+ if(!__activeChatId||!sb?.channel)return;
+ window.__chatRealtime=sb.channel("romano-chat-"+__activeChatId)
+   .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages",filter:"thread_id=eq."+__activeChatId},()=>refreshChatMessages())
+   .subscribe();
+}
 function startChatPolling(){stopChatPolling();window.__chatPoll=setInterval(()=>{if(__activeChatId)refreshChatMessages()},3000)}
 async function renderChatPremium(){
- stopChatPolling();__activeChatId=null;__activeChatTitle="";
+ stopChatPolling();stopChatRealtime();__activeChatId=null;__activeChatTitle="";
  const isClient=role()==="client";
  const contact=isClient?'<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Supervisor y Administrador · chat interno</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
  $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto ou vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
@@ -1577,9 +1585,10 @@ async function openChatPremium(id,title){
  compose.style.display="flex";
  await refreshChatMessages();
  await renderChatContacts();
+ startChatRealtime();
  startChatPolling();
 }
-function closeMobileChat(){const p=$("romanoChatPage");if(p)p.classList.remove("mobile-open");__activeChatId=null;__activeChatTitle=""}
+function closeMobileChat(){const p=$("romanoChatPage");if(p)p.classList.remove("mobile-open");stopChatRealtime();stopChatPolling();__activeChatId=null;__activeChatTitle=""}
 async function sendChatPremium(e){
  e.preventDefault();if(!__activeChatId)return;
  const input=$("romanoChatBody"),body=input?.value.trim()||"",mediaInput=$("romanoChatMedia"),files=Array.from(mediaInput?.files||[]).slice(0,5);
