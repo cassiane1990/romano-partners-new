@@ -1479,15 +1479,27 @@ let __activeChatId=null,__activeChatTitle="",__chatRoleThreads={};
 function chatTitleFor(roleName){return "Cliente ↔ "+(roleName==="supervisor"?"Supervisor":"Administrador")}
 async function findOrCreateRoleThread(targetRole){
  const title=chatTitleFor(targetRole);
- const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").eq("company_id",currentProfile.company_id).eq("created_by",currentUser.id).eq("title",title).order("created_at",{ascending:true}).limit(1);
- if(q.error){toast(q.error.message);return null}
- if(q.data?.[0])return q.data[0];
  const p=await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name").limit(1);
  if(p.error){toast(p.error.message);return null}
  const target=p.data?.[0];if(!target){toast("No hay "+(targetRole==="supervisor"?"supervisor":"administrador")+" disponible.");return null}
- const c=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:title});
- if(c.error){toast(c.error.message);return null}
- return {id:c.data,title,thread_type:"direct",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+ const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").eq("company_id",currentProfile.company_id).eq("created_by",currentUser.id).eq("title",title).eq("thread_type","direct").order("created_at",{ascending:true}).limit(1);
+ if(q.error){toast(q.error.message);return null}
+ let thread=q.data?.[0];
+ if(!thread){
+   const c=await sb.rpc("create_client_staff_chat",{target_profile_id:target.id,chat_title:title});
+   if(c.error){toast(c.error.message);return null}
+   thread={id:c.data,title,thread_type:"direct",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+ }
+ // Garantir que o cliente e o contacto continuam participantes da conversa existente.
+ const members=await sb.from("chat_members").select("profile_id").eq("thread_id",thread.id);
+ if(members.error){toast(members.error.message);return null}
+ const have=new Set((members.data||[]).map(x=>x.profile_id));
+ const missing=[currentUser.id,target.id].filter(id=>!have.has(id)).map(profile_id=>({thread_id:thread.id,profile_id}));
+ if(missing.length){
+   const add=await sb.from("chat_members").insert(missing);
+   if(add.error){toast(add.error.message);return null}
+ }
+ return thread;
 }
 function stopChatPolling(){if(window.__chatPoll){clearInterval(window.__chatPoll);window.__chatPoll=null}}
 function stopChatRealtime(){if(window.__chatRealtime){try{sb.removeChannel(window.__chatRealtime)}catch(e){}window.__chatRealtime=null}}
