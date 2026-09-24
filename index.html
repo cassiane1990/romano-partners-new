@@ -403,11 +403,29 @@ async function renderCleaningCatalog(){
  const rows=q.data||[];
  let h='<div class="panel"><div class="panel-head"><div><h3>Catálogo de servicios de limpieza</h3><div class="muted">Edita tipologías, valores e IVA. Este catálogo no crea pedidos.</div></div><button class="btn gold" onclick="newCleaningCatalogItem()">＋ Añadir línea</button></div>';
  if(q.error)h+='<div class="msg">'+esc(q.error.message)+'</div>';
- else if(rows.length)h+='<table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Valor (€)</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.code)+'</td><td><b>'+esc(x.name)+'</b></td><td>'+ (x.price==null?'Consultar':Number(x.price).toFixed(2)+' €')+'</td><td>'+(x.price==null?'Consultar':x.tax_included?'Incluido':'No incluido')+'</td><td>'+(x.active?'Sí':'No')+'</td><td><button class="btn" onclick="editCleaningCatalogItem(\''+x.id+'\')">Editar</button></td></tr>').join("")+'</tbody></table>';
+ else if(rows.length)h+='<table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Valor (€)</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.code)+'</td><td><b>'+esc(x.name)+'</b></td><td>'+ (x.price==null?'Consultar':Number(x.price).toFixed(2)+' €')+'</td><td>'+(x.price==null?'Consultar':x.tax_included?'Incluido':'No incluido')+'</td><td>'+(x.active?'Sí':'No')+'</td><td><button class="btn" onclick="editCleaningCatalogItem(\''+x.id+'\')">Editar</button> <button class="btn" onclick="deleteCleaningCatalogItem(\''+x.id+'\')">Eliminar</button></td></tr>').join("")+'</tbody></table>';
  else h+='<div class="empty">No hay servicios de limpieza en el catálogo.</div>';
  h+='</div>';$("content").innerHTML=h;
 }
+async function deleteMaintenanceCatalogItem(id){
+ if(!canManage()||!id)return;
+ const x=await sb.from("service_catalog").select("name,code").eq("id",id).single();
+ if(x.error){toast(x.error.message);return}
+ if(!confirm("¿Eliminar el servicio "+(x.data?.name||x.data?.code||"")+"? Esta acción no se puede deshacer."))return;
+ const q=await sb.from("service_catalog").delete().eq("id",id);
+ if(q.error){toast(q.error.message);return}
+ toast("Servicio eliminado.");await maintenance();
+}
 async function newCleaningCatalogItem(){openCleaningCatalogModal(null)}
+async function deleteCleaningCatalogItem(id){
+ if(!canManage()||!id)return;
+ const x=await sb.from("service_catalog").select("name,code").eq("id",id).single();
+ if(x.error){toast(x.error.message);return}
+ if(!confirm("¿Eliminar el servicio "+(x.data?.name||x.data?.code||"")+"? Esta acción no se puede deshacer."))return;
+ const q=await sb.from("service_catalog").delete().eq("id",id);
+ if(q.error){toast(q.error.message);return}
+ toast("Servicio de limpieza eliminado.");await renderCleaningCatalog();
+}
 async function editCleaningCatalogItem(id){
  const q=demoMode?{data:(window.__DEMO_CLEANING_CATALOG||[]).find(x=>x.id===id),error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active").eq("id",id).single();
  if(q.error||!q.data){toast(q.error?.message||"Servicio no encontrado.");return}
@@ -1915,7 +1933,7 @@ async function maintenance(){
  const rows=q.data||[];
  let h='<div class="panel"><div class="panel-head"><div><h3>Catálogo de servicios de mantenimiento</h3><div class="muted">Aquí puedes editar los servicios, valores e IVA. Estos datos son del catálogo y no crean un pedido.</div></div><button class="btn gold" onclick="newMaintenanceCatalogItem()">＋ Añadir línea</button></div>';
  if(q.error)h+='<div class="msg">'+esc(q.error.message)+'</div>';
- else if(rows.length)h+='<table class="table"><thead><tr><th>Servicio</th><th>Valor (€)</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+Number(x.price||0).toFixed(2)+' €</td><td>'+(x.tax_included?'Incluido':'No incluido')+'</td><td>'+(x.active?'Sí':'No')+'</td><td><button class="btn" onclick="editMaintenanceCatalogItem(\''+x.id+'\')">Editar</button></td></tr>').join("")+'</tbody></table>';
+ else if(rows.length)h+='<table class="table"><thead><tr><th>Servicio</th><th>Valor (€)</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+Number(x.price||0).toFixed(2)+' €</td><td>'+(x.tax_included?'Incluido':'No incluido')+'</td><td>'+(x.active?'Sí':'No')+'</td><td><button class="btn" onclick="editMaintenanceCatalogItem(\''+x.id+'\')">Editar</button> <button class="btn" onclick="deleteMaintenanceCatalogItem(\''+x.id+'\')">Eliminar</button></td></tr>').join("")+'</tbody></table>';
  else h+='<div class="empty">No hay servicios en el catálogo.</div>';
  h+='</div>';$("content").innerHTML=h;
 }
