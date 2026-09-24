@@ -685,16 +685,13 @@ function closeModal(){$("modal").classList.add("hidden")}
 function role(){return currentProfile?.role}
 function canManage(){return ["admin","supervisor"].includes(role())}
 function canSeeFinance(){return ["admin","client"].includes(role())}
-function greeting(){const h=new Date().getHours();return h>=5&&h<12?"Bom dia":h>=12&&h<19?"Boa tarde":"Boa noite"}
-function greetingFirstName(name){const raw=String(name||currentProfile?.full_name||currentUser?.email||"").trim();return (raw.split("@")[0].trim().split(/\s+/)[0]||"").trim()||"Cliente"}
-function startGreetingClock(){if(window.__romanoGreetingTimer)clearInterval(window.__romanoGreetingTimer);const tick=()=>{document.querySelectorAll("[data-romano-greeting]").forEach(el=>{const name=el.getAttribute("data-name")||currentProfile?.full_name||currentUser?.email||"Cliente";el.textContent=greeting()+", "+greetingFirstName(name)});};tick();window.__romanoGreetingTimer=setInterval(tick,30000)}
+function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
 function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
 async function profileLoad(){
  const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();
  if(error||!data)throw error||new Error("Perfil no encontrado.");
  currentProfile=data;
- startGreetingClock();
  currentProfile.avatar_display_url="";
  if(data.avatar_url){
   if(/^https?:\/\//i.test(data.avatar_url)) currentProfile.avatar_display_url=data.avatar_url;
@@ -762,46 +759,21 @@ async function changeStatus(id,status){if(!status)return;const r=await sb.from("
 async function newService(){const p=await sb.from("properties").select("id,name,property_type").order("name");openModal("Nuevo servicio",'<form onsubmit="saveService(event)"><div class="two"><div class="field"><label>Código</label><input id="sCode" required></div><div class="field"><label>Tipo de servicio</label><select id="sType"><option>limpieza_alojamiento</option><option>limpieza_hotel_5_estrellas</option><option>oficina</option><option>clinica</option><option>mantenimiento</option><option>pintura</option><option>fontaneria</option><option>electricidad</option><option>lavanderia</option></select></div></div><div class="two"><div class="field"><label>Propiedad</label><select id="sProp">'+(p.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.property_type||"")+'</option>').join("")+'</select></div><div class="field"><label>Tipología</label><select id="sTyp"><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div><div class="two"><div class="field"><label>Fecha y hora</label><input id="sDate" type="datetime-local"></div><div class="field"><label>Prioridad</label><select id="sPriority"><option>normal</option><option>high</option><option>urgent</option></select></div></div><div class="field"><label>Instrucciones</label><textarea id="sNotes"></textarea></div><button class="primary">Crear servicio</button></form>')}
 async function saveService(e){e.preventDefault();const prop=$("sProp").value;const r=await sb.from("properties").select("client_id").eq("id",prop).single();if(r.error){toast(r.error.message);return}const x=await sb.from("services").insert({company_id:currentProfile.company_id,client_id:r.data.client_id,property_id:prop,code:$("sCode").value.trim(),service_type:$("sType").value,typology:$("sTyp").value,priority:$("sPriority").value,scheduled_at:$("sDate").value?new Date($("sDate").value).toISOString():null,instructions:$("sNotes").value.trim()||null,status:"requested"});if(x.error){toast(x.error.message);return}closeModal();toast("Servicio creado");renderServices()}
 
-function embeddedPropertyCard(p,client,demo){
- const photo=demo?demoPropertyPhotoData(p.id):p.photo_url||"";
- return '<div class="panel" style="margin:12px 0 0;padding:16px"><form onsubmit="saveClientEmbeddedProperty(event,\\''+p.id+'\\',\\''+client.id+'\\',\\''+(demo?'demo':'real')+'\\')">'+
- '<div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="cepPhotoPreview_'+p.id+'">'+photoBox(photo,p.name,false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de la propiedad</label><input id="cepPhoto_'+p.id+'" type="file" accept="image/*" onchange="photoPreview(\\'cepPhoto_'+p.id+'\\',\\'cepPhotoPreview_'+p.id+'\\',\\''+esc(p.name||"Propiedad")+'\\')"><small class="muted">Seleccione una nueva foto para reemplazarla</small></div></div>'+
- '<div class="two"><div class="field"><label>Nombre</label><input id="cepName_'+p.id+'" value="'+esc(p.name||"")+'" required></div><div class="field"><label>Código</label><input id="cepCode_'+p.id+'" value="'+esc(p.code||"")+'" required></div></div>'+
- '<div class="two"><div class="field"><label>Tipología</label><select id="cepType_'+p.id+'">'+["T1","T2","T3","T4","T5"].map(t=>'<option '+(p.property_type===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div><div class="field"><label>Cliente</label><select id="cepClient_'+p.id+'"><option value="'+esc(client.id)+'" selected>'+esc(client.name||"")+'</option></select></div></div>'+
- '<div class="two"><div class="field"><label>Camas individuales</label><input id="cepBedsSingle_'+p.id+'" type="number" min="0" step="1" value="'+Number(p.beds_single||0)+'"></div><div class="field"><label>Camas dobles / King</label><input id="cepBedsDouble_'+p.id+'" type="number" min="0" step="1" value="'+Number(p.beds_double||0)+'"></div></div>'+
- '<div class="notice">La composición de camas queda guardada en la propiedad y se cargará automáticamente al crear el próximo servicio.</div>'+
- '<div class="field"><label>Dirección</label><input id="cepAddress_'+p.id+'" value="'+esc(p.address||"")+'"></div>'+
- '<div class="two"><div class="field"><label>Ciudad</label><input id="cepCity_'+p.id+'" value="'+esc(p.city||"")+'"></div><div class="field"><label>País</label><input id="cepCountry_'+p.id+'" value="'+esc(p.country||"España")+'"></div></div>'+
- '<div class="field"><label>Estado</label><select id="cepStatus_'+p.id+'"><option '+(p.status==="Activo"?"selected":"")+'>Activo</option><option '+(p.status==="En servicio"?"selected":"")+'>En servicio</option><option '+(p.status==="Mantenimiento"?"selected":"")+'>Mantenimiento</option><option '+(p.status==="Inactivo"?"selected":"")+'>Inactivo</option></select></div>'+
- '<button class="primary">Guardar cambios</button></form></div>';
-}
-async function saveClientEmbeddedProperty(e,id,clientId,mode){
- e.preventDefault();
- const data={code:$("cepCode_"+id).value.trim(),name:$("cepName_"+id).value.trim(),property_type:$("cepType_"+id).value,beds_single:Math.max(0,Number($("cepBedsSingle_"+id).value||0)),beds_double:Math.max(0,Number($("cepBedsDouble_"+id).value||0)),address:$("cepAddress_"+id).value.trim(),city:$("cepCity_"+id).value.trim(),country:$("cepCountry_"+id).value.trim(),client_id:clientId,status:$("cepStatus_"+id).value};
- const photo=$("cepPhoto_"+id)?.files?.[0]||null;
- if(mode==="demo"){const x=demoFindProperty(id);if(!x){toast("Propiedad demo no encontrada");return}if(photo)demoSavePropertyPhoto(id,await readDemoPhoto("cepPhoto_"+id));Object.assign(x,data);toast("Propiedad ficticia guardada");await viewClient(clientId);return}
- const realData=Object.assign({},data);delete realData.beds_single;delete realData.beds_double;
- const r=await sb.from("properties").update(realData).eq("id",id).eq("client_id",clientId);
- if(r.error){toast(r.error.message);return}
- if(photo){const up=await uploadPropertyPhoto(photo,id);if(up.error){toast(up.error.message);return}}
- toast("Propiedad actualizada");await viewClient(clientId);
-}
 async function viewClient(id){
  if(demoMode){
   const x=demoFindClient(id);if(!x){toast("Cliente demo no encontrado");return}
   const ps=DEMO_PROPERTIES.filter(p=>p.client_id===id),photo=demoPhotoData(x.id);
-  const propsHtml=ps.length?ps.map(p=>embeddedPropertyCard(p,x,true)).join(""):'<div class="empty">No hay apartamentos asociados.</div>';
-  openModal("Ficha del cliente · DEMOSTRACIÓN",'<div class="demo-flag">DATOS FICTICIOS · NO PRODUCCIÓN</div><div style="display:flex;gap:15px;align-items:center;margin:12px 0">'+photoBox(photo,x.name,false)+'<div><h3 style="margin:0">'+esc(x.name)+'</h3><div class="muted">Código cliente: '+esc(x.id.replace("demo-","DEMO-").toUpperCase())+'</div></div></div><div class="two"><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Inmuebles asociados</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
+  const propsHtml=ps.length?ps.map(p=>'<div class="panel" style="margin:10px 0;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><strong>'+esc(p.name||"Apartamento")+'</strong><div class="muted">Código: '+esc(p.code||"—")+' · '+esc(p.property_type||"—")+'</div><div class="muted">'+esc(p.address||"")+' · '+esc(p.city||"")+'</div></div><button class="btn" onclick="editProperty(\''+p.id+'\')">Abrir ficha completa</button></div></div>').join(""):'<div class="empty">No hay apartamentos asociados.</div>';
+  openModal("Ficha del cliente · DEMOSTRACIÓN",'<div class="demo-flag">DATOS FICTICIOS · NO PRODUCCIÓN</div><div style="display:flex;gap:15px;align-items:center;margin:12px 0">'+photoBox(photo,x.name,false)+'<div><h3 style="margin:0">'+esc(x.name)+'</h3><div class="muted">Código cliente: '+esc(x.id.replace("demo-","DEMO-").toUpperCase())+'</div></div></div><div class="two"><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
   return;
  }
- const r=await sb.from("clients").select("*").eq("id",id).single();
- if(r.error){toast(r.error.message);return}
+ const r=await sb.from("clients").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
  const x=r.data;
- const pr=await sb.from("properties").select("id,name,code,property_type,city,address,country,status,photo_url,beds_single,beds_double").eq("client_id",id).order("created_at",{ascending:false});
+ const pr=await sb.from("properties").select("id,name,code,property_type,city,address,status,photo_url").eq("client_id",id).order("created_at",{ascending:false});
  if(pr.error){toast(pr.error.message);return}
- const props=pr.data||[];
- const propsHtml=props.length?props.map(p=>embeddedPropertyCard(p,x,false)).join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
- openModal("Ficha del cliente",'<div style="display:flex;gap:15px;align-items:center;margin-bottom:15px">'+photoBox(x.photo_url,x.name,false)+'<div><h3 style="margin:0">'+esc(x.name)+'</h3><div class="muted">Código cliente: '+esc(x.id.slice(0,8).toUpperCase())+'</div></div></div><div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Inmuebles asociados</h3><div class="muted">'+props.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
+ const ps=pr.data||[];
+ const propsHtml=ps.length?ps.map(p=>'<div class="panel" style="margin:10px 0;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><strong>'+esc(p.name||"Apartamento")+'</strong><div class="muted">Código: '+esc(p.code||"—")+' · Tipología: '+esc(p.property_type||"—")+'</div><div class="muted">'+esc([p.address,p.city].filter(Boolean).join(" · ")||"—")+' · '+esc(p.status||"—")+'</div></div><button class="btn" onclick="editProperty(\''+p.id+'\')">Abrir ficha completa</button></div></div>').join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
+ openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
 }
 async function viewProperty(id){
  if(demoMode){
@@ -1634,7 +1606,6 @@ async function uploadChatMediaFile(file){
  return {media_type:mediaType,media_path:data.media_path,media_name:file.name,media_mime:type||null,media_size:file.size};
 }
 async function openChatPremium(id,title){
- await sb.from("notifications").update({read_at:new Date().toISOString()}).eq("recipient_id",currentUser.id).ilike("title","%Nuevo mensaje%").is("read_at",null);
  window.__chatLastSignature=null;
  const oldChatBox=$("romanoChatMessages");if(oldChatBox)oldChatBox.dataset.chatReady="0";
  __activeChatId=id;__activeChatTitle=title||"Conversación";
