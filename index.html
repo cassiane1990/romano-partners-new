@@ -864,7 +864,7 @@ async function viewClient(id){
  }
  const r=await sb.from("clients").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
  const x=r.data;
- const pr=await sb.from("properties").select("id,name,code,property_type,city,address,country,status,photo_url,beds_single,beds_double").eq("client_id",id).order("created_at",{ascending:false});
+ const pr=await sb.from("properties").select("id,name,code,property_type,city,address,country,status,photo_url,beds_single,beds_double,latitude,longitude").eq("client_id",id).order("created_at",{ascending:false});
  if(pr.error){toast(pr.error.message);return}
  const ps=pr.data||[];
  const propsHtml=ps.length?ps.map(p=>clientPropertyInlineHtml(p,x,"real")).join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
