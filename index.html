@@ -1794,7 +1794,7 @@ async function romanoCatalogManager(category){
  const rows=r.data||[],canWrite=demoMode||canManage();
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Catálogo · '+esc(title)+'</h3><div class="muted">Crea, edita, activa/desactiva y elimina los artículos que utiliza ROMANO PROPERTY CARE.</div></div>'+(canWrite?'<button class="btn gold" onclick="romanoCatalogNew(\''+category+'\')">＋ Añadir</button>':'')+'</div>'+
  (rows.length?'<table class="table"><thead><tr><th>Código</th><th>Nombre</th><th>Unidad</th><th>Valor</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+
- rows.map(x=>'<tr><td>'+esc(x.code||"—")+'</td><td><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.description||"")+'</div></td><td>'+esc(x.unit||"—")+'</td><td>'+masterMoney(x.price||0)+'</td><td>'+esc(x.tax_included?"Incluido":"No incluido")+'</td><td>'+esc(x.active?"Sí":"No")+'</td><td><button class="btn" onclick="romanoCatalogEdit('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoCatalogDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
+ rows.map(x=>'<tr><td>'+esc(x.code||"—")+'</td><td><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.description||"")+'</div></td><td>'+esc(x.unit||"—")+'</td><td>'+masterMoney(x.price||0)+'</td><td>'+esc(x.tax_included?"Incluido":"No incluido")+'</td><td>'+esc(x.active?"Sí":"No")+'</td><td><button class="btn" onclick="romanoCatalogEdit('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoCatalogDelete('+JSON.stringify(x.id)+',category)">Eliminar</button></td></tr>').join("")+
  '</tbody></table>':'<div class="empty">No hay artículos en este catálogo.</div>')+'</div>';
 }
 async function romanoCatalogNew(category){romanoCatalogModal(category,null)}
@@ -1821,10 +1821,10 @@ async function romanoCatalogSave(id,category){
  if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
 }
-async function romanoCatalogDelete(id){
+async function romanoCatalogDelete(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
- const category=$("pageTitle")?.textContent?.includes("Lavandería")?"laundry":$("pageTitle")?.textContent?.includes("Ropa")?"linen":"amenities";
+ category=category||($("pageTitle")?.textContent?.includes("Lavandería")?"laundry":$("pageTitle")?.textContent?.includes("Ropa")?"linen":"amenities");
  const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:"delete",id}});
  if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  toast("Artículo eliminado");await romanoCatalogManager(category);
