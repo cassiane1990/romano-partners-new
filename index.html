@@ -1488,7 +1488,7 @@ async function viewPayment(id){
    if(d.error)throw d.error;
    if(d.data?.length)docHtml='<div style="margin-top:12px"><b>Documentos anexos</b>'+d.data.map(x=>'<div class="line-item"><span>'+esc(x.file_name)+'</span><button class="btn" type="button" data-payment-path="'+esc(x.storage_path)+'" onclick="openPaymentDocument(this.dataset.paymentPath)">Abrir</button></div>').join("")+'</div>';
   }
-  openModal("Ficha del recibo",'<div class="panel"><div class="two"><div><b>Cliente</b><div>'+esc(x.client_id||"—")+'</div></div><div><b>Factura</b><div>'+esc(x.invoice_id||"—")+'</div></div><div><b>Valor</b><div><strong>'+Number(x.amount||0).toFixed(2)+' €</strong></div></div><div><b>Método</b><div>'+esc(x.method||"—")+'</div></div><div><b>Fecha</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleString("es-ES"):"—")+'</div></div></div><div style="margin-top:12px"><b>Referencia</b><div>'+esc(x.reference||"—")+'</div></div><div style="margin-top:12px"><b>Observaciones</b><div>'+esc(x.notes||"—")+'</div></div>'+docHtml+'</div>'+(canManage()?'<div class="actions"><button class="btn gold" type="button" data-payment-id="'+esc(key)+'" onclick="editPayment(this.dataset.paymentId)">Editar</button><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>':'<div class="actions"><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>'));
+  openModal("Ficha del recibo",'<div class="panel"><div class="two"><div><b>Cliente</b><div>'+esc(x.client_id||"—")+'</div></div><div><b>Factura</b><div>'+esc(x.invoice_id||"—")+'</div></div><div><b>Valor</b><div><strong>'+Number(x.amount||0).toFixed(2)+' €</strong></div></div><div><b>Método</b><div>'+esc(x.method||"—")+'</div></div><div><b>Fecha</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleString("es-ES"):"—")+'</div></div></div><div style="margin-top:12px"><b>Referencia</b><div>'+esc(x.reference||"—")+'</div></div><div style="margin-top:12px"><b>Observaciones</b><div>'+esc(x.notes||"—")+'</div></div>'+docHtml+'</div>'+(canManage()?'<div class="actions"><button class="btn gold" type="button" data-payment-id="'+esc(key)+'" onclick="editPayment(this.dataset.paymentId)">Editar</button><button class="btn" type="button" data-payment-id="'+esc(key)+'" onclick="sendFinancialPdfEmail("receipt",this.dataset.paymentId)">✉ Enviar PDF</button><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>':'<div class="actions"><button class="btn" type="button" data-payment-id="'+esc(key)+'" onclick="sendFinancialPdfEmail("receipt",this.dataset.paymentId)">✉ Enviar PDF</button><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>'));
  }catch(e){toast("No se pudo abrir el recibo: "+(e?.message||e))}
 }
 async function openPaymentDocument(path){
@@ -1505,7 +1505,7 @@ async function renderReceiptsPremium(){
   rows=r.data||[];
  }
  const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newPayment()">+ Nuevo recibo</button>':'';
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Recibos / Comprobantes</h3><div class="muted">Cada recibo é um registro de pagamento independente da fatura.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' recibo(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Factura</th><th>Valor</th><th>Método</th><th>Data</th><th>Referência</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.invoice_id||"—")+'</td><td><strong>'+Number(x.amount||0).toFixed(2)+' €</strong></td><td>'+esc(x.method||"—")+'</td><td>'+esc(x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"—")+'</td><td>'+esc(x.reference||"—")+'</td><td><button class="btn" type="button" data-payment-id="'+esc(String(x.id))+'" onclick="viewPayment(this.dataset.paymentId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-payment-id="'+esc(String(x.id))+'" onclick="editPayment(this.dataset.paymentId)">Editar</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay recibos / comprobantes registrados.</div>')+'</div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Recibos / Comprobantes</h3><div class="muted">Cada recibo é um registro de pagamento independente da fatura.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' recibo(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Factura</th><th>Valor</th><th>Método</th><th>Data</th><th>Referência</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.invoice_id||"—")+'</td><td><strong>'+Number(x.amount||0).toFixed(2)+' €</strong></td><td>'+esc(x.method||"—")+'</td><td>'+esc(x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"—")+'</td><td>'+esc(x.reference||"—")+'</td><td><button class="btn" type="button" data-payment-id="'+esc(String(x.id))+'" onclick="viewPayment(this.dataset.paymentId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-payment-id="'+esc(String(x.id))+'" onclick="editPayment(this.dataset.paymentId)">Editar</button> <button class="btn" type="button" data-payment-id="'+esc(String(x.id))+'" onclick="sendFinancialPdfEmail("receipt",this.dataset.paymentId)">✉ PDF</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay recibos / comprobantes registrados.</div>')+'</div>';
 }
 function invoiceModalHtml(x={}){
  const subtotal=Number(x.subtotal||0),rate=Number(x.tax_rate??21),tax=Number((subtotal*rate/100).toFixed(2)),total=Number((subtotal+tax).toFixed(2));
@@ -1584,16 +1584,63 @@ async function viewInvoice(id){
   openModal("Ficha de factura",body);
  }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
 }
-async function sendInvoiceByEmail(id){
- const x=__invoiceCache[String(id)]||null;
- if(!x){toast("Factura no encontrada.");return}
- const q=await sb.from("clients").select("name,email").eq("id",x.client_id).eq("company_id",currentProfile.company_id).maybeSingle();
- if(q.error){toast(q.error.message);return}
- if(!q.data?.email){toast("El cliente no tiene un e-mail registrado.");return}
- const subject="Factura "+(x.number||"")+" · ROMANO PROPERTY CARE";
- const body="Estimado/a "+(q.data.name||"cliente")+"\n\nFactura: "+(x.number||"")+"\nTotal: "+Number(x.total||0).toFixed(2)+" €\nVencimiento: "+(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+"\n\nROMANO PROPERTY CARE";
- window.location.href="mailto:"+encodeURIComponent(q.data.email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+function pdfSafe(v){return String(v??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/€/g,"EUR").replace(/[^\\x20-\\x7E]/g,"");}
+function pdfEsc(v){return pdfSafe(v).replace(/([\\\\()])/g,"\\\\$1");}
+function buildRomanoPdf(title,number,client,rows,totalLabel,total){
+ const W=595,H=842,ops=[];
+ const text=(s,x,y,size,bold=false)=>{ops.push("BT /F"+(bold?"2":"1")+" "+size+" Tf 0.12 0.11 0.09 rg 1 0 0 1 "+x+" "+y+" Tm ("+pdfEsc(s)+") Tj ET");};
+ ops.push("q 0.92 0.74 0.36 rg 42 750 72 48 re f Q");
+ text("R",67,762,25,true); text("ROMANO PROPERTY CARE",130,774,18,true); text("LIMPIEZA PREMIUM · MANTENIMIENTO · PROPERTY CARE",130,758,7,false);
+ text("Tel. +34 607250245",42,725,9); text("romanogestao@gmail.com",42,710,9);
+ ops.push("0.92 0.74 0.36 RG 42 694 511 0.8 re S");
+ text(title,42,650,22,true); text("Nº "+(number||"—"),42,628,10,true);
+ text("Cliente: "+(client?.name||"—"),42,602,11,true); text("E-mail: "+(client?.email||"—"),42,585,9);
+ let y=545;
+ ops.push("0.96 0.92 0.84 rg 42 "+(y-12)+" 511 28 re f");
+ text("DESCRIPCION",54,y,9,true); text("IMPORTE",465,y,9,true); y-=38;
+ rows.forEach(r=>{text(String(r.label||"—"),54,y,9,false);text(String(r.value||"—"),465,y,9,true);y-=25;ops.push("0.86 0.82 0.75 RG 42 "+(y+10)+" 511 0.5 re S")});
+ y-=10; text(totalLabel,350,y,10,true); text(Number(total||0).toFixed(2)+" EUR",465,y,13,true);
+ y-=55; text("ROMANO PROPERTY CARE",42,y,10,true); text("Gracias por confiar en nosotros.",42,y-18,9,false);
+ const stream=ops.join("\n");
+ const objs=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+W+" "+H+"] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>","<< /Length "+stream.length+" >>\\nstream\\n"+stream+"\\nendstream"];
+ let pdf="%PDF-1.4\\n",offs=[0];
+ objs.forEach((o,i)=>{offs[i+1]=pdf.length;pdf+=(i+1)+" 0 obj\\n"+o+"\\nendobj\\n"});
+ const xref=pdf.length;pdf+="xref\\n0 "+(objs.length+1)+"\\n0000000000 65535 f \\n";for(let i=1;i<=objs.length;i++)pdf+=String(offs[i]).padStart(10,"0")+" 00000 n \\n";pdf+="trailer\\n<< /Size "+(objs.length+1)+" /Root 1 0 R >>\\nstartxref\\n"+xref+"\\n%%EOF";
+ return new Blob([pdf],{type:"application/pdf"});
 }
+async function sendFinancialPdfEmail(kind,id){
+ try{
+  let x=null;
+  if(kind==="invoice") x=__invoiceCache[String(id)]||null;
+  if(!x){const table=kind==="invoice"?"invoices":"payments";const q=await sb.from(table).select("*").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();if(q.error)throw q.error;x=q.data}
+  if(!x){toast("Documento no encontrado.");return}
+  const cq=await sb.from("clients").select("name,email").eq("id",x.client_id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(cq.error)throw cq.error;
+  const client=cq.data||{};
+  if(!client.email){toast("El cliente no tiene un e-mail registrado.");return}
+  let file,title,subject;
+  if(kind==="invoice"){
+   file=buildRomanoPdf("FACTURA",x.number,client,[{label:"Base imponible",value:Number(x.subtotal||0).toFixed(2)+" EUR"},{label:"IVA",value:Number(x.tax_amount||0).toFixed(2)+" EUR"},{label:"Vencimiento",value:x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—"}],"TOTAL",x.total);
+   title="Factura "+(x.number||"");
+   subject="Factura "+(x.number||"")+" · ROMANO PROPERTY CARE";
+  }else{
+   file=buildRomanoPdf("RECIBO / COMPROBANTE",x.id,client,[{label:"Factura",value:x.invoice_id||"—"},{label:"Metodo de pago",value:x.method||"—"},{label:"Fecha",value:x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"—"},{label:"Referencia",value:x.reference||"—"}],"TOTAL RECIBIDO",x.amount);
+   title="Recibo "+String(x.id).slice(0,8);
+   subject="Recibo de pago · ROMANO PROPERTY CARE";
+  }
+  const fileName=(kind==="invoice"?"Factura":"Recibo")+"-"+String(x.number||x.id).replace(/[^a-zA-Z0-9_-]/g,"_")+".pdf";
+  file=new File([file],fileName,{type:"application/pdf"});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+    await navigator.share({title, text:"Documento PDF de ROMANO PROPERTY CARE para "+(client.name||"cliente"), files:[file]});
+    toast("PDF listo para enviar por e-mail.");
+  }else{
+    const url=URL.createObjectURL(file);const a=document.createElement("a");a.href=url;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+    window.location.href="mailto:"+encodeURIComponent(client.email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent("Adjunto el documento PDF de ROMANO PROPERTY CARE.");
+    toast("PDF generado. Adjunte el archivo descargado al e-mail.");
+  }
+ }catch(e){if(e?.name!=="AbortError")toast("No se pudo preparar el PDF: "+(e?.message||e))}
+}
+async function sendInvoiceByEmail(id){return sendFinancialPdfEmail("invoice",id);}
 async function openMonthlyInvoiceSummary(){
  const opts=await financeClientsOptions("");
  openModal("Resumen mensual por cliente",'<div class="two"><div class="field"><label>Cliente</label><select id="sumClient">'+opts+'</select></div><div class="field"><label>Mes</label><input id="sumMonth" type="month" value="'+new Date().toISOString().slice(0,7)+'"></div></div><div id="monthlyInvoiceSummary" class="panel" style="margin-top:12px"><div class="empty">Seleccione cliente y mes.</div></div><div class="actions" style="margin-top:12px"><button class="btn gold" type="button" onclick="loadMonthlyInvoiceSummary()">Ver resumen</button><button class="btn" type="button" onclick="printMonthlyInvoiceSummary()">🖨 PDF</button><button class="btn" type="button" onclick="emailMonthlyInvoiceSummary()">✉ E-mail</button><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>');
