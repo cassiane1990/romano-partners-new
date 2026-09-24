@@ -826,7 +826,7 @@ async function viewService(id){
  const actorIds=[...new Set(auditRows.map(a=>a.actor_id).filter(Boolean))];
  let actorNames={};
  if(actorIds.length){const aq=await sb.from("profiles").select("id,full_name,email").in("id",actorIds);(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usuario");}
- const auditHtml=auditRows.length?auditRows.map(a=>'<div class="line"><span><strong>'+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.action||"modificación")+' · '+esc(a.metadata?.status||"")+'</small></span><span>'+esc(new Date(a.created_at).toLocaleString("es-ES"))+'</span></div>').join(""):'<div class="empty">Sin registros de auditoría.</div>';
+ const auditHtml=auditRows.length?auditRows.map(a=>{const al=a.action==="insert_service"?"Criado por":a.action==="update_service"?"Modificado por":a.action==="delete_service"?"Eliminado por":(a.action||"Acción");return '<div class="line"><span><strong>'+esc(al)+': '+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.metadata?.status||"")+'</small></span><span>'+esc(new Date(a.created_at).toLocaleString("es-ES"))+'</span></div>}).join(""):'<div class="empty">Sin registros de auditoría.</div>';
  const canUpdate=["admin","supervisor","employee"].includes(role());
  const isPendingAdmin=["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
