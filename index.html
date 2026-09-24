@@ -1639,7 +1639,7 @@ async function sendFinancialPdfEmail(kind,id){
    title="Factura "+(x.number||"");
    subject="Factura "+(x.number||"")+" · ROMANO PROPERTY CARE";
   }else{
-   file=await buildRomanoPdf("RECIBO / COMPROBANTE",x.id,client,[{label:"Factura",value:x.invoice_id||"—"},{label:"Metodo de pago",value:x.method||"—"},{label:"Fecha",value:x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"—"},{label:"Referencia",value:x.reference||"—"}],"TOTAL RECIBIDO",x.amount);
+   file=await buildRomanoPdf("RECIBO / COMPROBANTE","REC-"+String(x.id).slice(0,8).toUpperCase(),client,[{label:"Factura",value:x.invoice_id?String(x.invoice_id).slice(0,8).toUpperCase():"—"},{label:"Método de pago",value:x.method||"—"},{label:"Fecha",value:x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"—"},{label:"Referencia",value:x.reference?String(x.reference).slice(0,28):"—"}],"TOTAL RECIBIDO",x.amount);
    title="Recibo "+String(x.id).slice(0,8);
    subject="Recibo de pago · ROMANO PROPERTY CARE";
   }
