@@ -1490,7 +1490,7 @@ $("resetBtn").onclick=async()=>{
  const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
  if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
 };
-if($("demoBtn"))$("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
+$("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange(async(event,session)=>{if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
 (async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
