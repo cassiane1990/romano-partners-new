@@ -1584,6 +1584,41 @@ async function viewInvoice(id){
   openModal("Ficha de factura",body);
  }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
 }
+async function sendInvoiceByEmail(id){
+ const x=__invoiceCache[String(id)]||null;
+ if(!x){toast("Factura no encontrada.");return}
+ const q=await sb.from("clients").select("name,email").eq("id",x.client_id).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(q.error){toast(q.error.message);return}
+ if(!q.data?.email){toast("El cliente no tiene un e-mail registrado.");return}
+ const subject="Factura "+(x.number||"")+" · ROMANO PROPERTY CARE";
+ const body="Estimado/a "+(q.data.name||"cliente")+"\n\nFactura: "+(x.number||"")+"\nTotal: "+Number(x.total||0).toFixed(2)+" €\nVencimiento: "+(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+"\n\nROMANO PROPERTY CARE";
+ window.location.href="mailto:"+encodeURIComponent(q.data.email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+}
+async function openMonthlyInvoiceSummary(){
+ const opts=await financeClientsOptions("");
+ openModal("Resumen mensual por cliente",'<div class="two"><div class="field"><label>Cliente</label><select id="sumClient">'+opts+'</select></div><div class="field"><label>Mes</label><input id="sumMonth" type="month" value="'+new Date().toISOString().slice(0,7)+'"></div></div><div id="monthlyInvoiceSummary" class="panel" style="margin-top:12px"><div class="empty">Seleccione cliente y mes.</div></div><div class="actions" style="margin-top:12px"><button class="btn gold" type="button" onclick="loadMonthlyInvoiceSummary()">Ver resumen</button><button class="btn" type="button" onclick="printMonthlyInvoiceSummary()">🖨 PDF</button><button class="btn" type="button" onclick="emailMonthlyInvoiceSummary()">✉ E-mail</button><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>');
+}
+async function loadMonthlyInvoiceSummary(){
+ const clientId=$("sumClient")?.value,month=$("sumMonth")?.value,box=$("monthlyInvoiceSummary");
+ if(!clientId||!month||!box)return;
+ const start=month+"-01T00:00:00",end=new Date(month+"-01T00:00:00");end.setMonth(end.getMonth()+1);
+ const q=await sb.from("invoices").select("id,number,status,total,subtotal,tax_amount,created_at").eq("client_id",clientId).eq("company_id",currentProfile.company_id).gte("created_at",start).lt("created_at",end.toISOString()).order("created_at",{ascending:true});
+ if(q.error){box.innerHTML='<div class="msg">'+esc(q.error.message)+'</div>';return}
+ const rows=q.data||[],sub=rows.reduce((a,x)=>a+Number(x.subtotal||0),0),tax=rows.reduce((a,x)=>a+Number(x.tax_amount||0),0),total=rows.reduce((a,x)=>a+Number(x.total||0),0);
+ const client=await sb.from("clients").select("name,email").eq("id",clientId).eq("company_id",currentProfile.company_id).maybeSingle();
+ window.__monthlyInvoiceSummary={client:client.data,month,rows,sub,tax,total};
+ box.innerHTML='<h3>'+esc(client.data?.name||"Cliente")+'</h3><div class="muted">Resumen '+esc(month)+'</div>'+(rows.length?'<table class="table"><thead><tr><th>Factura</th><th>Fecha</th><th>Estado</th><th>Total</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+new Date(x.created_at).toLocaleDateString("es-ES")+'</td><td>'+esc(x.status||"—")+'</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas este mes.</div>')+'<div class="notice"><strong>Base:</strong> '+sub.toFixed(2)+' € · <strong>IVA:</strong> '+tax.toFixed(2)+' € · <strong>Total:</strong> '+total.toFixed(2)+' €</div>';
+}
+function printMonthlyInvoiceSummary(){
+ const s=window.__monthlyInvoiceSummary;if(!s){toast("Primero cargue el resumen.");return}
+ const w=window.open("","_blank");if(!w){toast("El navegador bloqueó la ventana.");return}
+ w.document.write('<html><head><title>Resumen mensual</title></head><body style="font-family:Arial;padding:30px"><h1>ROMANO PROPERTY CARE</h1><h2>Resumen mensual · '+esc(s.month)+'</h2><p><b>Cliente:</b> '+esc(s.client?.name||"")+'</p><table style="width:100%;border-collapse:collapse"><tr><th style="text-align:left">Factura</th><th>Fecha</th><th>Estado</th><th>Total</th></tr>'+s.rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+new Date(x.created_at).toLocaleDateString("es-ES")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.total||0).toFixed(2)+' €</td></tr>').join("")+'</table><h3>Total: '+s.total.toFixed(2)+' €</h3></body></html>');w.document.close();w.print();
+}
+function emailMonthlyInvoiceSummary(){
+ const s=window.__monthlyInvoiceSummary;if(!s?.client?.email){toast("Cargue primero un cliente con e-mail.");return}
+ const body="Resumen mensual "+s.month+"\n\n"+s.rows.map(x=>x.number+" · "+Number(x.total||0).toFixed(2)+" €").join("\n")+"\n\nBase: "+s.sub.toFixed(2)+" €\nIVA: "+s.tax.toFixed(2)+" €\nTotal: "+s.total.toFixed(2)+" €\n\nROMANO PROPERTY CARE";
+ window.location.href="mailto:"+encodeURIComponent(s.client.email)+"?subject="+encodeURIComponent("Resumen mensual "+s.month+" · ROMANO PROPERTY CARE")+"&body="+encodeURIComponent(body);
+}
 async function renderInvoicesPremium(){
  let rows=[];
  if(demoMode) rows=DEMO_INVOICES||[];
@@ -1594,8 +1629,8 @@ async function renderInvoicesPremium(){
  }
  Object.keys(__invoiceCache).forEach(k=>delete __invoiceCache[k]);
  rows.forEach(x=>{__invoiceCache[String(x.id)]=x});
- const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newInvoice()">+ Nueva factura</button>':'';
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Facturas</h3><div class="muted">Facturas separadas dos recibos de pagamento.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' factura(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td><td><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas registradas.</div>')+'</div>';
+ const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newInvoice()">+ Nueva factura</button><button class="btn" type="button" onclick="openMonthlyInvoiceSummary()">Resumen mensual</button>':'';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Facturas</h3><div class="muted">Facturas separadas dos recibos de pagamento.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' factura(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td><td><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button> <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="sendInvoiceByEmail(this.dataset.invoiceId)">✉ E-mail</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas registradas.</div>')+'</div>';
 }
 
 async function renderDocumentsPremium(){
