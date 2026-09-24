@@ -1610,7 +1610,10 @@ async function buildRomanoPdf(title,number,client,rows,totalLabel,total){
  ctx.fillStyle="#211f1b"; ctx.font="bold 18px Arial"; ctx.fillText("DESCRIPCIÓN",95,607); ctx.textAlign="right"; ctx.fillText("IMPORTE",1145,607); ctx.textAlign="left";
  let y=675;
  (rows||[]).forEach(r=>{ctx.fillStyle="#211f1b";ctx.font="18px Arial";ctx.fillText(String(r.label||"—"),95,y);ctx.font="bold 18px Arial";ctx.textAlign="right";ctx.fillText(String(r.value||"—"),1145,y);ctx.textAlign="left";ctx.strokeStyle="#ddd5c7";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(70,y+24);ctx.lineTo(1170,y+24);ctx.stroke();y+=62;});
- y+=38;ctx.font="bold 24px Arial";ctx.textAlign="right";ctx.fillText(String(totalLabel||"TOTAL"),970,y);ctx.font="bold 36px Arial";ctx.fillStyle="#b8860b";ctx.fillText(" "+Number(total||0).toFixed(2)+" EUR",1145,y);ctx.textAlign="left";
+ y+=48;
+ ctx.fillStyle="#211f1b";ctx.font="bold 24px Arial";ctx.textAlign="right";ctx.fillText(String(totalLabel||"TOTAL"),965,y);
+ ctx.fillStyle="#b8860b";ctx.font="bold 36px Arial";ctx.textAlign="left";ctx.fillText(Number(total||0).toFixed(2)+" EUR",985,y);
+ ctx.textAlign="left";
  ctx.fillStyle="#211f1b";ctx.font="bold 20px Arial";ctx.fillText("ROMANO PROPERTY CARE",70,1570);ctx.font="18px Arial";ctx.fillText("Gracias por confiar en nosotros.",70,1605);
  const data=canvas.toDataURL("image/jpeg",0.94).split(",")[1],bin=atob(data),img=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)img[i]=bin.charCodeAt(i);
  const w=1240,h=1754,NL=String.fromCharCode(10),content="q"+NL+"595 0 0 842 0 0 cm"+NL+"/Im1 Do"+NL+"Q"+NL;
