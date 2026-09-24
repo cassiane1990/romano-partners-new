@@ -987,7 +987,7 @@ async function saveEmployee(e){
  const data={employee_code:$("eCode").value.trim(),function_title:$("eFunction").value.trim(),email:$("eEmail").value.trim()||null,phone:$("ePhone").value.trim()||null,nif_nie:$("eNif").value.trim()||null,hire_date:$("eHire").value||null,salary:Number($("eSalary").value||0),active:$("eActive").value==="true"},photo=await readDemoPhoto("ePhoto");
  if(!data.employee_code||!data.function_title){toast("Código y función son obligatorios.");return}
  if(demoMode){const id="demo-e"+(DEMO_EMPLOYEES.length+1);if(photo)demoSavePhoto(id,photo);DEMO_EMPLOYEES.push({id,...data});closeModal();toast("Funcionario creado en modo demostración");renderEmployees();return}
- const r=await sb.from("employee_profiles").insert({company_id:currentProfile.company_id,...data});
+ const r=await sb.from("employee_profiles").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,...data});
  if(r.error){toast(r.error.message);return}
  closeModal();toast("Funcionario creado");renderEmployees();
 }
