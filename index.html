@@ -1674,6 +1674,19 @@ function romanoCatalogCategoryLabel(category){
  const m={linen:"Ropa / Linen",laundry:"Lavandería",amenities:"Amenities opcionales"};
  return m[category]||category;
 }
+async function romanoFunctionError(inv){
+ if(!inv) return "Error desconocido.";
+ if(inv.data?.error) return String(inv.data.error);
+ if(!inv.error) return "";
+ try{
+  if(inv.error.context){
+   const body=await inv.error.context.json();
+   if(body?.error) return String(body.error);
+   if(body?.message) return String(body.message);
+  }
+ }catch(_){}
+ return String(inv.error.message||"Error al comunicarse con el servidor.");
+}
 async function romanoCatalogManager(category){
  const title=romanoCatalogCategoryLabel(category);
  const r=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category",category).eq("company_id",currentProfile.company_id).order("name");
@@ -1706,7 +1719,8 @@ async function romanoCatalogSave(id,category){
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
  const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:id?"update":"create",id,payload}});
- if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ const ferr=await romanoFunctionError(inv);
+ if(ferr){toast("No se pudo guardar: "+ferr);return}
  closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
 }
 async function romanoCatalogDelete(id){
@@ -1715,7 +1729,8 @@ async function romanoCatalogDelete(id){
  const before=await sb.from("service_catalog").select("category").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(before.error){toast(before.error.message);return}
  const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:"delete",id}});
- if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ const ferr=await romanoFunctionError(inv);
+ if(ferr){toast("No se pudo eliminar: "+ferr);return}
  toast("Artículo eliminado");if(before.data?.category)await romanoCatalogManager(before.data.category);
 }
 async function romanoStockManager(){
@@ -1742,14 +1757,16 @@ async function romanoStockSave(id){
  const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
  if(!payload.name){toast("Indique el material.");return}
  const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:id?"update":"create",id,payload}});
- if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ const ferr=await romanoFunctionError(inv);
+ if(ferr){toast("No se pudo guardar: "+ferr);return}
  closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
 }
 async function romanoStockDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}
  if(!confirm("¿Eliminar este material del stock?"))return;
  const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:"delete",id}});
- if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ const ferr=await romanoFunctionError(inv);
+ if(ferr){toast("No se pudo eliminar: "+ferr);return}
  toast("Material eliminado");await romanoStockManager();
 }
 async function romanoRecurringManager(){
