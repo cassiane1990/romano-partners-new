@@ -1390,7 +1390,6 @@ async function viewInvoice(id){
   openModal("Ficha de factura",body);
  }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
 }
-}
 async function renderInvoicesPremium(){
  let rows=[];
  if(demoMode) rows=DEMO_INVOICES||[];
