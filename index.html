@@ -2188,9 +2188,11 @@ async function saveMaintenanceCatalogItem(id=null){
   closeModal();toast("Catálogo actualizado");maintenance();return;
  }
  const payload={category:"maintenance",code:id?undefined:"M-"+Date.now(),name,unit:"service",price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()};
- const q=id?await sb.from("service_catalog").update({name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
+ const q=id?await sb.from("service_catalog").update({name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id).select("id").single():await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
  if(q.error){toast(q.error.message);return}
- const verify=await sb.from("service_catalog").select("id").eq("id",id||q.data?.[0]?.id||"").maybeSingle();
+ const savedId=id||q.data?.id;
+ if(!savedId){toast("No se pudo confirmar el guardado. Revise la sesión y los permisos.");return}
+ const verify=await sb.from("service_catalog").select("id").eq("id",savedId).maybeSingle();
  if(verify.error){toast(verify.error.message);return}
  if(!verify.data){toast("No se pudo confirmar el guardado. Revise la sesión y los permisos.");return}
  closeModal();toast("Catálogo actualizado");maintenance();
