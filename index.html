@@ -39,7 +39,26 @@
 .rpc-person-day.work{border-left:4px solid #b7893f}
 .rpc-person-day.off{border-left:4px solid #777;background:#f1f1ef}
 .rpc-person-day.unset{border-style:dashed;opacity:.7}
-@media(max-width:760px){.rpc-weekdays,.rpc-month-grid{grid-template-columns:repeat(7,minmax(125px,1fr));min-width:875px}.rpc-month-day,.rpc-empty-day{min-height:150px}}
+@media(max-width:1100px){
+.rpc-month-calendar{overflow:hidden;width:100%;max-width:100%;box-sizing:border-box}
+.rpc-weekdays,.rpc-month-grid{width:100%;min-width:0;grid-template-columns:repeat(7,minmax(0,1fr))}
+.rpc-weekdays>div{min-width:0;padding:8px 2px;font-size:9px;white-space:nowrap;overflow:hidden}
+.rpc-month-day,.rpc-empty-day{min-width:0;min-height:125px;padding:5px 3px;overflow:hidden;box-sizing:border-box}
+.rpc-date{font-size:10px;margin-bottom:5px}
+.rpc-person-day{min-width:0;width:100%;box-sizing:border-box;padding:5px 3px;margin-bottom:4px;overflow:hidden}
+.rpc-person-day b,.rpc-person-day span{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpc-person-day b{font-size:8px}
+.rpc-person-day span{font-size:7px}
+}
+@media(max-width:600px){
+.rpc-month-calendar{border-radius:12px}
+.rpc-weekdays>div{padding:6px 1px;font-size:8px}
+.rpc-month-day,.rpc-empty-day{min-height:90px;padding:4px 2px}
+.rpc-date{font-size:9px;margin-bottom:3px}
+.rpc-person-day{padding:4px 2px;margin-bottom:3px;border-radius:6px;border-left-width:2px}
+.rpc-person-day b{font-size:7px}
+.rpc-person-day span{font-size:6px}
+}
 <style id="sj-quick-fix">
 .sj-employee{margin-top:7px;font-size:11px;font-weight:700;color:#6e542a}.sj-client{margin-top:4px;font-size:10px;color:#81786d}.sj-priority{display:inline-block;margin-top:5px;padding:4px 7px;border-radius:999px;background:#f4ead8;color:#80602d;font-size:9px;text-transform:capitalize}.sj-quick{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.sj-quick .btn{padding:6px 7px;font-size:9px}.sj-status{min-width:190px}.sj-card{display:grid;grid-template-columns:150px minmax(220px,1.2fr) minmax(190px,1fr) minmax(190px,.8fr);gap:14px;align-items:stretch}.sj-photo{min-height:150px}.sj-main,.sj-location,.sj-status{padding-top:6px}.sj-time{font:700 20px Georgia,serif}@media(max-width:1050px){.sj-card{grid-template-columns:120px 1fr 1fr}.sj-status{grid-column:2/-1}}@media(max-width:650px){.sj-card{display:block}.sj-photo{height:150px;margin-bottom:10px}.sj-main,.sj-location,.sj-status{padding-top:0;margin-top:10px}.sj-status{min-width:0}.sj-quick .btn{flex:1}}
 </style></style></style>
