@@ -676,7 +676,7 @@ async function renderServicesMaster(){
  }
  const rows=r.data||[];
  const cards=rows.length?rows.map(x=>{
-   const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+
+   const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       x.status==="scheduled"&&x.accepted_at&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
@@ -1194,39 +1194,35 @@ async function renderClients(){const r=demoMode?{data:DEMO_CLIENTS,error:null}:{
 async function deleteClient(id){
  if(!canManage()||!id)return;
  if(demoMode){const i=DEMO_CLIENTS.findIndex(x=>x.id===id);if(i<0){toast("Cliente no encontrado.");return}if(!confirm("¿Eliminar este cliente ficticio?"))return;DEMO_CLIENTS.splice(i,1);renderClients();toast("Cliente eliminado.");return}
- const q=await sb.from("clients").select("name").eq("id",id).single();
- if(q.error){toast(q.error.message);return}
+ const q=await sb.from("clients").select("name").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}
  if(!confirm("¿Eliminar el cliente "+(q.data?.name||"")+"? Esta acción no se puede deshacer."))return;
- const r=await sb.from("clients").delete().eq("id",id);
- if(r.error){toast("No se puede eliminar este cliente: "+r.error.message);return}
+ const b=await sb.from("laundry_orders").delete().eq("client_id",id);if(b.error){toast("No se puede eliminar el cliente: "+b.error.message);return}
+ const r=await sb.from("clients").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar este cliente: "+r.error.message);return}
  toast("Cliente eliminado.");await renderClients();
 }
 async function deleteProperty(id){
  if(!canManage()||!id)return;
  if(demoMode){const i=DEMO_PROPERTIES.findIndex(x=>x.id===id);if(i<0){toast("Propiedad no encontrada.");return}if(!confirm("¿Eliminar esta propiedad ficticia?"))return;DEMO_PROPERTIES.splice(i,1);renderProperties();toast("Propiedad eliminada.");return}
- const q=await sb.from("properties").select("name,code").eq("id",id).single();
- if(q.error){toast(q.error.message);return}
+ const q=await sb.from("properties").select("name,code").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}
  if(!confirm("¿Eliminar la propiedad "+(q.data?.name||q.data?.code||"")+"? Esta acción no se puede deshacer."))return;
- const r=await sb.from("properties").delete().eq("id",id);
- if(r.error){toast("No se puede eliminar esta propiedad: "+r.error.message);return}
+ for(const pair of [["laundry_orders","property_id"],["occurrences","property_id"]]){const b=await sb.from(pair[0]).delete().eq(pair[1],id);if(b.error){toast("No se puede eliminar la propiedad: "+b.error.message);return}}
+ const r=await sb.from("properties").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar la propiedad: "+r.error.message);return}
  toast("Propiedad eliminada.");await renderProperties();
 }
 async function deleteEmployee(id){
  if(!canManage()||!id)return;
  if(demoMode){const i=DEMO_EMPLOYEES.findIndex(x=>x.id===id);if(i<0){toast("Funcionario no encontrado.");return}if(!confirm("¿Eliminar este funcionario ficticio?"))return;DEMO_EMPLOYEES.splice(i,1);renderEmployees();toast("Funcionario eliminado.");return}
- const q=await sb.from("employee_profiles").select("full_name,employee_code").eq("id",id).single();
- if(q.error){toast(q.error.message);return}
+ const q=await sb.from("employee_profiles").select("full_name,employee_code").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}
  if(!confirm("¿Eliminar la ficha de "+(q.data?.full_name||q.data?.employee_code||"funcionario")+"? Esta acción no se puede deshacer."))return;
- const r=await sb.from("employee_profiles").delete().eq("id",id);
- if(r.error){toast("No se puede eliminar este funcionario: "+r.error.message);return}
+ const r=await sb.from("employee_profiles").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar este funcionario: "+r.error.message);return}
  toast("Funcionario eliminado.");await renderEmployees();
 }
 async function deleteService(id){
  if(!canManage()||!id)return;
  if(!confirm("¿Eliminar este servicio y sus registros operativos asociados? Esta acción no se puede deshacer."))return;
- const r=await sb.from("services").delete().eq("id",id);
- if(r.error){toast("No se puede eliminar este servicio: "+r.error.message);return}
- toast("Servicio eliminado.");await renderServices();
+ for(const pair of [["chat_threads","service_id"],["employee_locations","service_id"],["laundry_orders","service_id"],["material_requests","service_id"],["occurrences","service_id"]]){const b=await sb.from(pair[0]).delete().eq(pair[1],id);if(b.error){toast("No se puede eliminar el servicio: "+b.error.message);return}}
+ const r=await sb.from("services").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar este servicio: "+r.error.message);return}
+ toast("Servicio eliminado.");await renderServicesMaster();
 }
 function newClient(){
  openModal("Nuevo cliente",'<form onsubmit="saveClient(event)"><div class="demo-flag">MODO DEMOSTRACIÓN · CLIENTE FICTICIO</div><div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="cPhotoPreview">'+photoBox("","Cliente",false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de perfil</label><input id="cPhoto" type="file" accept="image/*" onchange="photoPreview(\'cPhoto\',\'cPhotoPreview\',\'Cliente\')"><small class="muted">JPG/PNG · se redimensiona para la prueba</small></div></div><div class="two"><div class="field"><label>Nombre</label><input id="cName" required></div><div class="field"><label>Email</label><input id="cEmail" type="email"></div></div><div class="field"><label>Teléfono</label><input id="cPhone"></div><div class="field"><label>Notas</label><textarea id="cNotes"></textarea></div><div class="panel" style="margin:14px 0"><div class="panel-head"><div><h3>Acesso ao ROMANO PARTNERS</h3><div class="muted">Envie um convite para o cliente criar a própria senha.</div></div></div><label><input id="cSendInvite" type="checkbox" checked> Enviar convite por e-mail ao criar</label></div><button class="primary">Guardar cliente</button></form>')
@@ -1778,28 +1774,22 @@ function romanoCatalogModal(category,x){
  '>Incluido</option></select></div></div><div class="field"><label>Activo</label><select id="rcActive"><option value="true" '+(x?.active!==false?"selected":"")+'>Sí</option><option value="false" '+(x?.active===false?"selected":"")+'>No</option></select></div>'+
  '<button type="button" class="primary" onclick="romanoCatalogSave('+JSON.stringify(x?.id||null)+','+JSON.stringify(category)+')">Guardar</button>');
 }
-async function romanoCatalogSave(id,category){
- if(!["amenities","linen","laundry"].includes(category)){toast("Categoría no válida.");return}
- if(!canManage()){toast("Solo Admin/Supervisor puede gestionar este catálogo.");return}
+async async function romanoCatalogSave(id,category){
+ if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
- const code=$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase();
- const data={company_id:currentProfile.company_id,category,code,name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
- const q=id
-   ?await sb.from("service_catalog").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single()
-   :await sb.from("service_catalog").insert(data).select("id").single();
- if(q.error){toast("No se pudo guardar: "+q.error.message);return}
- closeModal();toast(id?"Catálogo actualizado":"Catálogo creado");await romanoCatalogManager(category);
+ const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
+ const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:id?"update":"create",id,payload}});
+ if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
 }
 async function romanoCatalogDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
  const before=await sb.from("service_catalog").select("category").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(before.error){toast(before.error.message);return}
- if(!before.data){toast("Artículo no encontrado.");return}
- const r=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
- if(r.error){toast("No se pudo eliminar: "+r.error.message);return}
- toast("Artículo eliminado");
- if(before.data?.category)await romanoCatalogManager(before.data.category);
+ const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:"delete",id}});
+ if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ toast("Artículo eliminado");if(before.data?.category)await romanoCatalogManager(before.data.category);
 }
 async function romanoStockManager(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
@@ -1819,21 +1809,19 @@ async function romanoStockModal(id){
  '<div class="field"><label>Coste unitario (€)</label><input id="rsCost" type="number" min="0" step="0.01" value="'+Number(x?.unit_cost||0)+'"></div><div class="field"><label>Notas</label><textarea id="rsNotes">'+esc(x?.notes||"")+'</textarea></div>'+
  '<button type="button" class="primary" onclick="romanoStockSave('+JSON.stringify(id||null)+')">Guardar</button>');
 }
-async function romanoStockSave(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede gestionar materiales y stock.");return}
- const data={company_id:currentProfile.company_id,name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
- if(!data.name){toast("Indique el material.");return}
- const r=id
-   ?await sb.from("stock_items").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single()
-   :await sb.from("stock_items").insert(data).select("id").single();
- if(r.error){toast("No se pudo guardar: "+r.error.message);return}
+async async function romanoStockSave(id){
+ if(!canManage()){toast("Solo Admin/Supervisor puede guardar materiales.");return}
+ const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
+ if(!payload.name){toast("Indique el material.");return}
+ const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:id?"update":"create",id,payload}});
+ if(inv.error||inv.data?.error){toast("No se pudo guardar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
 }
 async function romanoStockDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}
- if(!confirm("¿Eliminar este material?"))return;
- const r=await sb.from("stock_items").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
- if(r.error){toast("No se pudo eliminar: "+r.error.message);return}
+ if(!confirm("¿Eliminar este material del stock?"))return;
+ const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:"delete",id}});
+ if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  toast("Material eliminado");await romanoStockManager();
 }
 async function romanoRecurringManager(){
