@@ -1584,8 +1584,8 @@ async function viewInvoice(id){
   openModal("Ficha de factura",body);
  }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
 }
-function pdfSafe(v){return String(v??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/€/g,"EUR").replace(/[^\\x20-\\x7E]/g,"");}
-function pdfEsc(v){return pdfSafe(v).replace(/([\\\\()])/g,"\\\\$1");}
+function pdfSafe(v){return String(v??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/€/g,"EUR").replace(/[^\x20-\x7E]/g,"");}
+function pdfEsc(v){return pdfSafe(v).replace(/([\\()])/g,"\\$1");}
 function buildRomanoPdf(title,number,client,rows,totalLabel,total){
  const W=595,H=842,ops=[];
  const text=(s,x,y,size,bold=false)=>{ops.push("BT /F"+(bold?"2":"1")+" "+size+" Tf 0.12 0.11 0.09 rg 1 0 0 1 "+x+" "+y+" Tm ("+pdfEsc(s)+") Tj ET");};
