@@ -2241,7 +2241,11 @@ function showApp(){closeMobileMenu();
  buildMasterNav();registerRomanoPWA();startRealtime();initOfflineSync();openPage("dashboard")
 }
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
-async function openPage(key){closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
+function enforceEmployeeUi(){
+ if(role()!=="employee")return;
+ document.querySelectorAll('[data-go="newservice"],[data-go="properties"],[data-go="documents"],[data-go="employees"],[data-go="clients"],button[onclick*="newservice"]').forEach(el=>el.remove());
+}
+async function openPage(key){closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]();enforceEmployeeUi()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 let __authBusy=false,__authReadyId=null;
 async function enterAppFromSession(session){
  if(!session?.user){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}
