@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "ROMANO PARTNERS · Property Care",
+  "short_name": "ROMANO",
+  "description": "ROMANO PROPERTY CARE · gestión de limpieza, mantenimiento y servicios en tiempo real.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay","standalone"],
+  "orientation": "any",
+  "background_color": "#f7f2e9",
+  "theme_color": "#1c1c19",
+  "prefer_related_applications": false,
+  "icons": [
+    {"src": "/icon.svg","sizes": "any","type": "image/svg+xml","purpose": "any maskable"}
+  ]
+}
