@@ -1026,9 +1026,9 @@ async function savePreposto(e,id=null){
   if(id){const i=window.__DEMO_PREPOSTOS.findIndex(x=>x.id===id);if(i>=0)window.__DEMO_PREPOSTOS[i]=row;else window.__DEMO_PREPOSTOS.unshift(row)}else window.__DEMO_PREPOSTOS.unshift(row);
   closeModal();toast("Preposto guardado en demo");return renderPrepostosPremium();
  }
- const q=id?await sb.from("prepostos").update(data).eq("id",id).eq("company_id",currentProfile.company_id):await sb.from("prepostos").insert({...data,id:crypto.randomUUID(),company_id:currentProfile.company_id,created_by:currentUser.id});
- if(q.error){toast("No se pudo guardar el preposto: "+q.error.message);return}
- closeModal();toast("Preposto guardado");await renderPrepostosPremium();
+ const q=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"prepostos",action:id?"update":"create",id,payload:data}});
+ if(q.error||q.data?.error){toast("No se pudo guardar el preposto: "+(q.data?.error||q.error?.message||"error desconocido"));return}
+ closeModal();toast(id?"Preposto actualizado":"Preposto creado");await renderPrepostosPremium();
 }
 async function viewPreposto(id){
  const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).single();
@@ -1041,8 +1041,8 @@ async function deletePreposto(id){
  if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
  if(!confirm("¿Eliminar el preposto "+(q.data.name||"")+"? Esta acción no se puede deshacer."))return;
  if(demoMode){window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS||[];window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS.filter(x=>x.id!==id);toast("Preposto eliminado");return renderPrepostosPremium()}
- const r=await sb.from("prepostos").delete().eq("id",id).eq("company_id",currentProfile.company_id);
- if(r.error){toast("No se puede eliminar el preposto: "+r.error.message);return}
+ const r=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"prepostos",action:"delete",id}});
+ if(r.error||r.data?.error){toast("No se puede eliminar el preposto: "+(r.data?.error||r.error?.message||"error desconocido"));return}
  toast("Preposto eliminado");await renderPrepostosPremium();
 }
 
