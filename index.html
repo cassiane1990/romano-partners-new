@@ -427,8 +427,9 @@ async function saveCleaningCatalogItem(e,id=null){
   if(idx>=0)arr[idx]={...arr[idx],...row};else arr.unshift(row);
   closeModal();toast("Catálogo de limpieza actualizado");renderCleaningCatalog();return;
  }
- const q=id?await sb.from("service_catalog").update({code,name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id):await sb.from("service_catalog").insert({company_id:currentProfile.company_id,category:"cleaning",code,name,unit:"service",price,tax_included:taxIncluded,active});
+ const q=id?await sb.from("service_catalog").update({code,name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id).select("id").maybeSingle():await sb.from("service_catalog").insert({company_id:currentProfile.company_id,category:"cleaning",code,name,unit:"service",price,tax_included:taxIncluded,active}).select("id").single();
  if(q.error){toast(q.error.message);return}
+ if(!q.data){toast("No se pudo guardar el catálogo. Revise los permisos de edición.");return}
  closeModal();toast("Catálogo de limpieza actualizado");renderCleaningCatalog();
 }
 
@@ -1940,8 +1941,9 @@ async function saveMaintenanceCatalogItem(e,id=null){
   closeModal();toast("Catálogo actualizado");maintenance();return;
  }
  const payload={category:"maintenance",code:id?undefined:"M-"+Date.now(),name,unit:"service",price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()};
- const q=id?await sb.from("service_catalog").update({name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
+ const q=id?await sb.from("service_catalog").update({name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id).select("id").maybeSingle():await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
  if(q.error){toast(q.error.message);return}
+ if(!q.data){toast("No se pudo guardar el catálogo. Revise los permisos de edición.");return}
  closeModal();toast("Catálogo actualizado");maintenance();
 }
 async function newMaintenance(){
