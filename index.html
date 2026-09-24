@@ -1832,6 +1832,11 @@ async function renderChatContacts(){
    const contacts=[["supervisor",sup,"Supervisor"],["admin",adm,"Administrador"]];
    el.innerHTML=contacts.map(([key,t,label])=>'<button class="romano-chat-contact '+(t?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+label+'</b><small>Conversación privada</small></span></button>').join("");
  }else{
+   if(role()==="admin"||role()==="supervisor"){
+     const targetRole=role()==="admin"?"supervisor":"admin";
+     const target=(await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name").limit(1)).data?.[0];
+     if(target){const c=await sb.rpc("create_staff_chat",{target_profile_id:target.id});if(c.error)toast(c.error.message);}
+   }
    const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").eq("company_id",currentProfile.company_id).eq("thread_type","direct").order("updated_at",{ascending:false});
    const rows=q.data||[];
    el.innerHTML=rows.map(x=>'<button class="romano-chat-contact '+(x.id===__activeChatId?"active":"")+'" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')"><span class="rc-avatar">R</span><span class="rc-info"><b>'+esc(x.title||"Conversación")+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">Sem conversas.</div>';
