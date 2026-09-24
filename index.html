@@ -1365,10 +1365,31 @@ async function editInvoice(id){
 }
 async function viewInvoice(id){
  try{
-  const x=demoMode?DEMO_INVOICES.find(v=>v.id===id):(await sb.from("invoices").select("*").eq("id",id).single()).data;
+  if(!id){toast("Factura no encontrada");return}
+  let x=null;
+  if(demoMode){
+   x=(DEMO_INVOICES||[]).find(v=>String(v.id)===String(id));
+  }else{
+   const q=await sb.from("invoices").select("id,company_id,client_id,service_id,number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").eq("id",id).maybeSingle();
+   if(q.error)throw q.error;
+   x=q.data;
+  }
   if(!x){toast("Factura no encontrada");return}
-  openModal("Ficha de factura",'<div class="panel"><div class="two"><div><b>Nº</b><div>'+esc(x.number)+'</div></div><div><b>Estado</b><div>'+esc(x.status)+'</div></div><div><b>Base</b><div>'+Number(x.subtotal||0).toFixed(2)+' €</div></div><div><b>IVA</b><div>'+Number(x.tax_amount||0).toFixed(2)+' €</div></div><div><b>Total</b><div><strong>'+Number(x.total||0).toFixed(2)+' €</strong></div></div><div><b>Vencimiento</b><div>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</div></div></div></div><div class="actions">'+(canManage()?'<button class="btn gold" onclick="editInvoice('+JSON.stringify(id)+')">Editar</button>':'')+'<button class="btn" onclick="closeModal()">Cerrar</button></div>');
- }catch(e){toast(e.message)}
+  const body='<div class="panel"><div class="two">'+
+   '<div><b>Nº</b><div>'+esc(x.number||"—")+'</div></div>'+
+   '<div><b>Estado</b><div>'+esc(x.status||"—")+'</div></div>'+
+   '<div><b>Cliente</b><div>'+esc(x.client_id||"—")+'</div></div>'+
+   '<div><b>Base</b><div>'+Number(x.subtotal||0).toFixed(2)+' €</div></div>'+
+   '<div><b>IVA</b><div>'+Number(x.tax_amount||0).toFixed(2)+' €</div></div>'+
+   '<div><b>Total</b><div><strong>'+Number(x.total||0).toFixed(2)+' €</strong></div></div>'+
+   '<div><b>Vencimiento</b><div>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</div></div>'+
+   '<div><b>Pago</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"Pendiente")+'</div></div>'+
+   '</div></div>'+
+   '<div class="actions">'+(canManage()?'<button class="btn gold" type="button" onclick="editInvoice('+JSON.stringify(id)+')">Editar</button>':'')+
+   '<button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>';
+  openModal("Ficha de factura",body);
+ }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
+}
 }
 async function renderInvoicesPremium(){
  let rows=[];
