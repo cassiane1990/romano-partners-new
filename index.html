@@ -1,5 +1,4 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
-<!-- ROMANO CRUD DEPLOY 2026-09-24 -->
 <!doctype html>
 <html lang="es">
 <head>
@@ -1675,22 +1674,9 @@ function romanoCatalogCategoryLabel(category){
  const m={linen:"Ropa / Linen",laundry:"Lavandería",amenities:"Amenities opcionales"};
  return m[category]||category;
 }
-async function romanoFunctionError(inv){
- if(!inv) return "Error desconocido.";
- if(inv.data?.error) return String(inv.data.error);
- if(!inv.error) return "";
- try{
-  if(inv.error.context){
-   const body=await inv.error.context.json();
-   if(body?.error) return String(body.error);
-   if(body?.message) return String(body.message);
-  }
- }catch(_){}
- return String(inv.error.message||"Error al comunicarse con el servidor.");
-}
 async function romanoCatalogManager(category){
  const title=romanoCatalogCategoryLabel(category);
- const r=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category",category).eq("company_id",currentProfile.company_id).order("name");
+ const r=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category",category).order("name");
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],canWrite=demoMode||canManage();
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Catálogo · '+esc(title)+'</h3><div class="muted">Crea, edita, activa/desactiva y elimina los artículos que utiliza ROMANO PROPERTY CARE.</div></div>'+(canWrite?'<button class="btn gold" onclick="romanoCatalogNew(\''+category+'\')">＋ Añadir</button>':'')+'</div>'+
@@ -1698,10 +1684,9 @@ async function romanoCatalogManager(category){
  rows.map(x=>'<tr><td>'+esc(x.code||"—")+'</td><td><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.description||"")+'</div></td><td>'+esc(x.unit||"—")+'</td><td>'+masterMoney(x.price||0)+'</td><td>'+esc(x.tax_included?"Incluido":"No incluido")+'</td><td>'+esc(x.active?"Sí":"No")+'</td><td><button class="btn" onclick="romanoCatalogEdit('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoCatalogDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
  '</tbody></table>':'<div class="empty">No hay artículos en este catálogo.</div>')+'</div>';
 }
-async function romanoCatalogNew(category){if(!canManage()){toast("Solo Admin/Supervisor puede crear artículos.");return}romanoCatalogModal(category,null)}
+async function romanoCatalogNew(category){romanoCatalogModal(category,null)}
 async function romanoCatalogEdit(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede editar artículos.");return}
- const r=await sb.from("service_catalog").select("id,category,code,name,description,unit,price,tax_included,active").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ const r=await sb.from("service_catalog").select("id,category,code,name,description,unit,price,tax_included,active").eq("id",id).single();
  if(r.error||!r.data){toast(r.error?.message||"Artículo no encontrado.");return}
  romanoCatalogModal(r.data.category,r.data);
 }
@@ -1716,22 +1701,21 @@ function romanoCatalogModal(category,x){
  '<button type="button" class="primary" onclick="romanoCatalogSave('+JSON.stringify(x?.id||null)+','+JSON.stringify(category)+')">Guardar</button>');
 }
 async function romanoCatalogSave(id,category){
- if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
+ if(!["amenities","linen","laundry"].includes(category)){toast("Categoría no válida.");return}
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const code=$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase();
- const args={p_action:id?"update":"insert",p_id:id||null,p_category:category,p_code:code,p_name:name,p_description:$("rcDescription").value.trim()||null,p_unit:$("rcUnit").value.trim()||"unidad",p_price:Math.max(0,Number($("rcPrice").value||0)),p_tax_included:$("rcTax").value==="true",p_active:$("rcActive").value==="true"};
- const q=await sb.rpc("romano_catalog_manage",args);
+ const q=await sb.rpc("romano_catalog_manage",{p_action:id?"update":"insert",p_id:id||null,p_category:category,p_code:code,p_name:name,p_description:$("rcDescription").value.trim()||null,p_unit:$("rcUnit").value.trim()||"unidad",p_price:Math.max(0,Number($("rcPrice").value||0)),p_tax_included:$("rcTax").value==="true",p_active:$("rcActive").value==="true"});
  if(q.error){toast("No se pudo guardar: "+q.error.message);return}
- closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
+ closeModal();toast(id?"Catálogo actualizado":"Catálogo creado");await romanoCatalogManager(category);
 }
 async function romanoCatalogDelete(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
  const before=await sb.from("service_catalog").select("category").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(before.error){toast(before.error.message);return}
- const q=await sb.rpc("romano_catalog_manage",{p_action:"delete",p_id:id});
- if(q.error){toast("No se pudo eliminar: "+q.error.message);return}
- toast("Artículo eliminado");if(before.data?.category)await romanoCatalogManager(before.data.category);
+ const r=await sb.rpc("romano_catalog_manage",{p_action:"delete",p_id:id});
+ if(r.error){toast("No se pudo eliminar: "+r.error.message);return}
+ toast("Artículo eliminado");
+ if(before.data?.category)await romanoCatalogManager(before.data.category);
 }
 async function romanoStockManager(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
@@ -1743,8 +1727,7 @@ async function romanoStockManager(){
  '</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>';
 }
 async function romanoStockModal(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede editar materiales.");return}
- let x=null;if(id){const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("id",id).eq("company_id",currentProfile.company_id).single();if(r.error){toast(r.error.message);return}x=r.data}
+ let x=null;if(id){const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("id",id).single();if(r.error){toast(r.error.message);return}x=r.data}
  openModal(x?"Editar material":"Nuevo material",
  '<div class="two"><div class="field"><label>Material</label><input id="rsName" value="'+esc(x?.name||"")+'" required></div><div class="field"><label>SKU</label><input id="rsSku" value="'+esc(x?.sku||"")+'"></div></div>'+
  '<div class="two"><div class="field"><label>Unidad</label><input id="rsUnit" value="'+esc(x?.unit||"unidad")+'"></div><div class="field"><label>Categoría</label><input id="rsCategory" value="'+esc(x?.category||"material")+'"></div></div>'+
@@ -1753,18 +1736,16 @@ async function romanoStockModal(id){
  '<button type="button" class="primary" onclick="romanoStockSave('+JSON.stringify(id||null)+')">Guardar</button>');
 }
 async function romanoStockSave(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede guardar materiales.");return}
  const payload={p_action:id?"update":"insert",p_id:id||null,p_name:$("rsName").value.trim(),p_sku:$("rsSku").value.trim()||null,p_unit:$("rsUnit").value.trim()||"unidad",p_category:$("rsCategory").value.trim()||"material",p_quantity:Math.max(0,Number($("rsQty").value||0)),p_min_quantity:Math.max(0,Number($("rsMin").value||0)),p_unit_cost:Math.max(0,Number($("rsCost").value||0)),p_notes:$("rsNotes").value.trim()||null};
  if(!payload.p_name){toast("Indique el material.");return}
- const q=await sb.rpc("romano_stock_manage",payload);
- if(q.error){toast("No se pudo guardar: "+q.error.message);return}
- closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
+ const r=await sb.rpc("romano_stock_manage",payload);
+ if(r.error){toast("No se pudo guardar: "+r.error.message);return}
+ closeModal();toast(id?"Stock actualizado":"Stock creado");await romanoStockManager();
 }
 async function romanoStockDelete(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}
- if(!confirm("¿Eliminar este material del stock?"))return;
- const q=await sb.rpc("romano_stock_manage",{p_action:"delete",p_id:id});
- if(q.error){toast("No se pudo eliminar: "+q.error.message);return}
+ if(!confirm("¿Eliminar este material?"))return;
+ const r=await sb.rpc("romano_stock_manage",{p_action:"delete",p_id:id});
+ if(r.error){toast("No se pudo eliminar: "+r.error.message);return}
  toast("Material eliminado");await romanoStockManager();
 }
 async function romanoRecurringManager(){
