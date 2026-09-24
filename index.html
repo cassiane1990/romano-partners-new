@@ -789,10 +789,10 @@ async function renderCleaningCatalog(){
 }
 async function deleteMaintenanceCatalogItem(id){
  if(!canManage()||!id)return;
- const x=await sb.from("service_catalog").select("name,code").eq("id",id).single();
+ const x=await sb.from("service_catalog").select("name,code").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(x.error){toast(x.error.message);return}
  if(!confirm("¿Eliminar el servicio "+(x.data?.name||x.data?.code||"")+"? Esta acción no se puede deshacer."))return;
- const q=await sb.from("service_catalog").delete().eq("id",id);
+ const q=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
  if(q.error){toast(q.error.message);return}
  toast("Servicio eliminado.");await maintenance();
 }
@@ -1956,7 +1956,7 @@ async function romanoRecurringSave(id){
  if(r.error){toast(r.error.message);return}
  closeModal();toast("Servicio recurrente guardado");romanoRecurringManager();
 }
-async function romanoRecurringDelete(id){if(!confirm("¿Eliminar este servicio recurrente?"))return;const r=await sb.from("recurring_services").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Recurrente eliminado");romanoRecurringManager()}
+async function romanoRecurringDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar recurrentes.");return}if(!confirm("¿Eliminar este servicio recurrente?"))return;const r=await sb.from("recurring_services").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Recurrente eliminado");romanoRecurringManager()}
 async function searchPage(){
  const q=prompt("Buscar en ROMANO PARTNERS:"); if(q===null)return; const term=q.trim(); if(!term){$("content").innerHTML='<div class="panel"><div class="empty">Escribe un término para buscar.</div></div>';return}
  const like="%"+term+"%";
@@ -2008,7 +2008,7 @@ async function romanoQuoteSave(id){
  if(r.error){toast(r.error.message);return}
  closeModal();toast("Presupuesto guardado");quotes();
 }
-async function romanoQuoteDelete(id){if(!confirm("¿Eliminar este presupuesto?"))return;const r=await sb.from("quotes").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Presupuesto eliminado");quotes()}
+async function romanoQuoteDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar presupuestos.");return}if(!confirm("¿Eliminar este presupuesto?"))return;const r=await sb.from("quotes").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Presupuesto eliminado");quotes()}
 
 async function renderStock(){const r=await sb.from("stock_items").select("name,sku,unit,quantity,min_quantity").order("name");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Materiales y stock</h3><span class="pill">Control operativo</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Cantidad</th><th>Mínimo</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+((Number(x.quantity)<=Number(x.min_quantity))?'<span class="status urgent">Reponer</span>':'<span class="status approved">OK</span>')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>'}
 
