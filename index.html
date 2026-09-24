@@ -1391,7 +1391,7 @@ async function viewInvoice(id){
    '<div><b>Vencimiento</b><div>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</div></div>'+
    '<div><b>Pago</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"Pendiente")+'</div></div>'+
    '</div></div>'+
-   '<div class="actions">'+(canManage()?'<button class="btn gold" type="button" onclick="editInvoice('+JSON.stringify(key)+')">Editar</button>':'')+
+   '<div class="actions">'+(canManage()?'<button class="btn gold" type="button" data-invoice-id="'+esc(key)+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button>':'')+
    '<button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>';
   openModal("Ficha de factura",body);
  }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
@@ -1407,7 +1407,7 @@ async function renderInvoicesPremium(){
  Object.keys(__invoiceCache).forEach(k=>delete __invoiceCache[k]);
  rows.forEach(x=>{__invoiceCache[String(x.id)]=x});
  const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newInvoice()">+ Nueva factura</button>':'';
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Facturas</h3><div class="muted">Facturas separadas dos recibos de pagamento.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' factura(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td><td><button class="btn" type="button" onclick="viewInvoice('+JSON.stringify(x.id)+')">Ver</button>'+(canManage()?' <button class="btn" type="button" onclick="editInvoice('+JSON.stringify(x.id)+')">Editar</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas registradas.</div>')+'</div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Facturas</h3><div class="muted">Facturas separadas dos recibos de pagamento.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' factura(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td><td><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas registradas.</div>')+'</div>';
 }
 
 async function renderDocumentsPremium(){
