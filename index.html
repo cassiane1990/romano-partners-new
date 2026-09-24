@@ -1529,6 +1529,159 @@ async function renderDocuments(){
 
 async function renderFinance(){const r=demoMode?{data:DEMO_INVOICES,error:null}:{data:null,error:null};const p=demoMode?{data:DEMO_PAYMENTS,error:null}:{data:null,error:null};if(!demoMode){const q=await sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100);const pp=await sb.from("payments").select("amount,method,paid_at").order("paid_at",{ascending:false}).limit(20);r.data=q.data;r.error=q.error;p.data=pp.data;p.error=pp.error}$("content").innerHTML='<div class="grid"><div class="stat"><small>Facturas</small><strong>'+((r.data||[]).length)+'</strong></div><div class="stat"><small>Total facturado</small><strong>'+((r.data||[]).reduce((a,x)=>a+Number(x.total||0),0)).toFixed(2)+' €</strong></div><div class="stat"><small>Pagos registrados</small><strong>'+((p.data||[]).length)+'</strong></div><div class="stat"><small>Pagado</small><strong>'+((p.data||[]).reduce((a,x)=>a+Number(x.amount||0),0)).toFixed(2)+' €</strong></div></div><div class="panel"><div class="panel-head"><h3>Facturación</h3><span class="pill">Servicio → factura → pago → costes → margen</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.status)+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas. Los valores reales de ROMANO PROPERTY CARE se introducirán cuando sean incorporados al sistema.</div>')+'</div>'}
 
+
+function romanoCatalogCategoryLabel(category){
+ const m={linen:"Ropa / Linen",laundry:"Lavandería",amenities:"Amenities opcionales"};
+ return m[category]||category;
+}
+async function romanoCatalogManager(category){
+ const title=romanoCatalogCategoryLabel(category);
+ const r=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category",category).order("name");
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ const rows=r.data||[];
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Catálogo · '+esc(title)+'</h3><div class="muted">Crea, edita, activa/desactiva y elimina los artículos que utiliza ROMANO PROPERTY CARE.</div></div><button class="btn gold" onclick="romanoCatalogNew(\''+category+'\')">＋ Añadir</button></div>'+
+ (rows.length?'<table class="table"><thead><tr><th>Código</th><th>Nombre</th><th>Unidad</th><th>Valor</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+
+ rows.map(x=>'<tr><td>'+esc(x.code||"—")+'</td><td><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.description||"")+'</div></td><td>'+esc(x.unit||"—")+'</td><td>'+masterMoney(x.price||0)+'</td><td>'+esc(x.tax_included?"Incluido":"No incluido")+'</td><td>'+esc(x.active?"Sí":"No")+'</td><td><button class="btn" onclick="romanoCatalogEdit('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoCatalogDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
+ '</tbody></table>':'<div class="empty">No hay artículos en este catálogo.</div>')+'</div>';
+}
+async function romanoCatalogNew(category){romanoCatalogModal(category,null)}
+async function romanoCatalogEdit(id){
+ const r=await sb.from("service_catalog").select("id,category,code,name,description,unit,price,tax_included,active").eq("id",id).single();
+ if(r.error||!r.data){toast(r.error?.message||"Artículo no encontrado.");return}
+ romanoCatalogModal(r.data.category,r.data);
+}
+function romanoCatalogModal(category,x){
+ const edit=!!x, title=romanoCatalogCategoryLabel(category);
+ openModal(edit?"Editar · "+title:"Añadir · "+title,
+ '<div class="two"><div class="field"><label>Código</label><input id="rcCode" value="'+esc(x?.code||"")+'" placeholder="Ej. LIN-001"></div><div class="field"><label>Unidad</label><input id="rcUnit" value="'+esc(x?.unit||"unidad")+'" placeholder="unidad, kg, kit..."></div></div>'+
+ '<div class="field"><label>Nombre</label><input id="rcName" value="'+esc(x?.name||"")+'" required></div>'+
+ '<div class="field"><label>Descripción</label><textarea id="rcDescription">'+esc(x?.description||"")+'</textarea></div>'+
+ '<div class="two"><div class="field"><label>Valor (€)</label><input id="rcPrice" type="number" min="0" step="0.01" value="'+Number(x?.price||0)+'"></div><div class="field"><label>IVA</label><select id="rcTax"><option value="false" '+(x?.tax_included?"":"selected")+'>No incluido</option><option value="true" '+(x?.tax_included?"selected":"")+
+ '>Incluido</option></select></div></div><div class="field"><label>Activo</label><select id="rcActive"><option value="true" '+(x?.active!==false?"selected":"")+'>Sí</option><option value="false" '+(x?.active===false?"selected":"")+'>No</option></select></div>'+
+ '<button type="button" class="primary" onclick="romanoCatalogSave('+JSON.stringify(x?.id||null)+','+JSON.stringify(category)+')">Guardar</button>');
+}
+async function romanoCatalogSave(id,category){
+ const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
+ const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+Date.now(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true",updated_at:new Date().toISOString()};
+ const q=id?await sb.from("service_catalog").update(payload).eq("id",id).select("id").single():await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
+ if(q.error){toast(q.error.message);return}
+ closeModal();toast("Catálogo guardado");romanoCatalogManager(category);
+}
+async function romanoCatalogDelete(id){
+ if(!confirm("¿Eliminar este artículo del catálogo?"))return;
+ const r=await sb.from("service_catalog").delete().eq("id",id);
+ if(r.error){toast(r.error.message);return}
+ toast("Artículo eliminado");
+ const current=document.querySelector('[onclick*="romanoCatalogNew"]');
+ if(current){const m=current.getAttribute("onclick").match(/romanoCatalogNew\\('([^']+)'/);if(m)romanoCatalogManager(m[1]);}
+}
+async function romanoStockManager(){
+ const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ const rows=r.data||[];
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Materiales y Stock</h3><div class="muted">El catálogo de materiales alimenta este stock. Cada artículo puede editarse y eliminarse.</div></div><button class="btn gold" onclick="romanoStockModal(null)">＋ Nuevo material</button></div>'+
+ (rows.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Stock</th><th>Mínimo</th><th>Coste</th><th></th></tr></thead><tbody>'+
+ rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+masterMoney(x.unit_cost||0)+'</td><td><button class="btn" onclick="romanoStockModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoStockDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
+ '</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>';
+}
+async function romanoStockModal(id){
+ let x=null;if(id){const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("id",id).single();if(r.error){toast(r.error.message);return}x=r.data}
+ openModal(x?"Editar material":"Nuevo material",
+ '<div class="two"><div class="field"><label>Material</label><input id="rsName" value="'+esc(x?.name||"")+'" required></div><div class="field"><label>SKU</label><input id="rsSku" value="'+esc(x?.sku||"")+'"></div></div>'+
+ '<div class="two"><div class="field"><label>Unidad</label><input id="rsUnit" value="'+esc(x?.unit||"unidad")+'"></div><div class="field"><label>Categoría</label><input id="rsCategory" value="'+esc(x?.category||"material")+'"></div></div>'+
+ '<div class="two"><div class="field"><label>Cantidad actual</label><input id="rsQty" type="number" min="0" step="0.01" value="'+Number(x?.quantity||0)+'"></div><div class="field"><label>Mínimo</label><input id="rsMin" type="number" min="0" step="0.01" value="'+Number(x?.min_quantity||0)+'"></div></div>'+
+ '<div class="field"><label>Coste unitario (€)</label><input id="rsCost" type="number" min="0" step="0.01" value="'+Number(x?.unit_cost||0)+'"></div><div class="field"><label>Notas</label><textarea id="rsNotes">'+esc(x?.notes||"")+'</textarea></div>'+
+ '<button type="button" class="primary" onclick="romanoStockSave('+JSON.stringify(id||null)+')">Guardar</button>');
+}
+async function romanoStockSave(id){
+ const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null,updated_at:new Date().toISOString()};
+ if(!payload.name){toast("Indique el material.");return}
+ const r=id?await sb.from("stock_items").update(payload).eq("id",id).select("id").single():await sb.from("stock_items").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Stock guardado");romanoStockManager();
+}
+async function romanoStockDelete(id){if(!confirm("¿Eliminar este material del stock?"))return;const r=await sb.from("stock_items").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Material eliminado");romanoStockManager()}
+async function romanoRecurringManager(){
+ const r=await sb.from("recurring_services").select("id,client_id,property_id,frequency,typology,priority,active,next_run_at,instructions").order("next_run_at",{ascending:true});
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ const rows=r.data||[];
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Servicios recurrentes</h3><div class="muted">Programa servicios automáticos y mantén cada regla editable.</div></div><button class="btn gold" onclick="romanoRecurringModal(null)">＋ Nuevo recurrente</button></div>'+
+ (rows.length?'<table class="table"><thead><tr><th>Frecuencia</th><th>Tipología</th><th>Prioridad</th><th>Próxima ejecución</th><th>Activo</th><th></th></tr></thead><tbody>'+
+ rows.map(x=>'<tr><td>'+esc(x.frequency)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(x.priority)+'</td><td>'+esc(x.next_run_at?new Date(x.next_run_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.active?"Sí":"No")+'</td><td><button class="btn" onclick="romanoRecurringModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoRecurringDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
+ '</tbody></table>':'<div class="empty">No hay servicios recurrentes.</div>')+'</div>';
+}
+async function romanoRecurringModal(id){
+ let x=null;if(id){const r=await sb.from("recurring_services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}x=r.data}
+ const clients=await sb.from("clients").select("id,name").order("name");const props=await sb.from("properties").select("id,name,code").order("name");
+ openModal(x?"Editar recurrente":"Nuevo recurrente",
+ '<div class="two"><div class="field"><label>Cliente</label><select id="rrClient"><option value="">—</option>'+(clients.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.client_id?"selected":"")+'>'+esc(v.name)+'</option>').join("")+'</select></div><div class="field"><label>Propiedad</label><select id="rrProperty"><option value="">—</option>'+(props.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.property_id?"selected":"")+'>'+esc(v.name)+' · '+esc(v.code||"")+'</option>').join("")+'</select></div></div>'+
+ '<div class="two"><div class="field"><label>Frecuencia</label><select id="rrFrequency"><option value="daily">Diario</option><option value="weekly">Semanal</option><option value="biweekly">Quincenal</option><option value="monthly">Mensual</option></select></div><div class="field"><label>Tipología</label><input id="rrTypology" value="'+esc(x?.typology||"")+'" placeholder="T1, T2, T3..."></div></div>'+
+ '<div class="two"><div class="field"><label>Prioridad</label><select id="rrPriority"><option value="normal">Normal</option><option value="urgent">Urgente</option><option value="high">Alta</option></select></div><div class="field"><label>Próxima ejecución</label><input id="rrNext" type="datetime-local" value="'+(x?.next_run_at?new Date(x.next_run_at).toISOString().slice(0,16):"")+'"></div></div>'+
+ '<div class="field"><label>Activo</label><select id="rrActive"><option value="true" '+(x?.active!==false?"selected":"")+'>Sí</option><option value="false" '+(x?.active===false?"selected":"")+'>No</option></select></div><div class="field"><label>Instrucciones</label><textarea id="rrInstructions">'+esc(x?.instructions||"")+'</textarea></div>'+
+ '<button type="button" class="primary" onclick="romanoRecurringSave('+JSON.stringify(id||null)+')">Guardar</button>');
+ if(x)$("rrFrequency").value=x.frequency||"weekly";
+}
+async function romanoRecurringSave(id){
+ const next=$("rrNext").value?new Date($("rrNext").value).toISOString():null;
+ const payload={client_id:$("rrClient").value||null,property_id:$("rrProperty").value||null,frequency:$("rrFrequency").value,typology:$("rrTypology").value.trim()||null,priority:$("rrPriority").value,active:$("rrActive").value==="true",next_run_at:next,instructions:$("rrInstructions").value.trim()||null,updated_at:new Date().toISOString()};
+ const r=id?await sb.from("recurring_services").update(payload).eq("id",id).select("id").single():await sb.from("recurring_services").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Servicio recurrente guardado");romanoRecurringManager();
+}
+async function romanoRecurringDelete(id){if(!confirm("¿Eliminar este servicio recurrente?"))return;const r=await sb.from("recurring_services").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Recurrente eliminado");romanoRecurringManager()}
+async function searchPage(){
+ const q=prompt("Buscar en ROMANO PARTNERS:"); if(q===null)return; const term=q.trim(); if(!term){$("content").innerHTML='<div class="panel"><div class="empty">Escribe un término para buscar.</div></div>';return}
+ const like="%"+term+"%";
+ const [c,p,s,e]=await Promise.all([
+  sb.from("clients").select("id,name,email,phone,client_code").or("name.ilike."+like+",email.ilike."+like+",phone.ilike."+like+",client_code.ilike."+like).limit(20),
+  sb.from("properties").select("id,name,code,address,city").or("name.ilike."+like+",code.ilike."+like+",address.ilike."+like+",city.ilike."+like).limit(20),
+  sb.from("services").select("id,code,service_type,typology,status").or("code.ilike."+like+",service_type.ilike."+like+",typology.ilike."+like+",status.ilike."+like).limit(20),
+  sb.from("employee_profiles").select("id,full_name,employee_code,function_title").or("full_name.ilike."+like+",employee_code.ilike."+like+",function_title.ilike."+like).limit(20)
+ ]);
+ const html=(title,rows,fn)=>'<div class="panel"><h3>'+title+'</h3>'+(rows.length?rows.map(x=>'<div class="line-item"><span><b>'+esc(x.name||x.full_name||x.code||x.employee_code||"Registro")+'</b><br><small>'+esc(Object.values(x).filter(v=>typeof v==="string"&&v!==(x.name||x.full_name||x.code||x.employee_code)).slice(0,3).join(" · "))+'</small></span></div>').join(""):'<div class="empty">Sin resultados.</div>')+'</div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Pesquisa global</h3><div class="muted">Resultados para: <b>'+esc(term)+'</b></div></div><button class="btn gold" onclick="searchPage()">Nueva búsqueda</button></div></div>'+html("Clientes",c.data||[])+html("Propiedades",p.data||[])+html("Servicios",s.data||[])+html("Funcionarios",e.data||[]);
+}
+async function reports(){
+ const [sv,cl,pr,st,inv]=await Promise.all([sb.from("services").select("id,status,agreed_amount,scheduled_at"),sb.from("clients").select("id"),sb.from("properties").select("id"),sb.from("stock_items").select("id,quantity,min_quantity"),sb.from("invoices").select("id,status,total")]);
+ const completed=(sv.data||[]).filter(x=>x.status==="completed").length,total=(sv.data||[]).reduce((a,x)=>a+Number(x.agreed_amount||0),0),low=(st.data||[]).filter(x=>Number(x.quantity)<=Number(x.min_quantity)).length;
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Relatórios</h3><div class="muted">Indicadores operativos de la empresa.</div></div></div><div class="grid"><div class="stat"><small>Servicios</small><strong>'+sv.data?.length+'</strong></div><div class="stat"><small>Finalizados</small><strong>'+completed+'</strong></div><div class="stat"><small>Clientes</small><strong>'+cl.data?.length+'</strong></div><div class="stat"><small>Propiedades</small><strong>'+pr.data?.length+'</strong></div><div class="stat"><small>Importe servicios</small><strong>'+masterMoney(total)+'</strong></div><div class="stat"><small>Stock a reponer</small><strong>'+low+'</strong></div><div class="stat"><small>Facturas</small><strong>'+inv.data?.length+'</strong></div></div></div>';
+}
+async function audit(){
+ const r=await sb.from("audit_logs").select("id,actor_id,action,object_type,object_id,metadata,created_at").order("created_at",{ascending:false}).limit(100);
+ const ids=[...new Set((r.data||[]).map(x=>x.actor_id).filter(Boolean))];let names={};if(ids.length){const p=await sb.from("profiles").select("id,full_name,email").in("id",ids);(p.data||[]).forEach(x=>names[x.id]=x.full_name||x.email||"Usuario")}
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Auditoría</h3><div class="muted">Registro de acciones realizadas en el sistema.</div></div></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Objeto</th><th>Detalle</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</td><td>'+esc(names[x.actor_id]||"Sistema")+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.object_type||"—")+'</td><td>'+esc(JSON.stringify(x.metadata||{}))+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay registros de auditoría.</div>')+'</div>';
+}
+async function privacy(){
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Privacidad / RGPD</h3><div class="muted">Centro de información y control de privacidad de ROMANO PARTNERS.</div></div></div><div class="master-cols"><div class="panel"><h3>Datos y acceso</h3><p>Los datos están separados por empresa y el acceso depende del perfil y las políticas del backend.</p><p>Clientes y funcionarios deben ver únicamente la información que corresponde a sus permisos.</p></div><div class="panel"><h3>Buenas prácticas</h3><p>Evita compartir contraseñas. Los documentos y comunicaciones deben permanecer dentro de los espacios autorizados.</p></div></div></div>';
+}
+async function quotes(){
+ const r=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at").order("created_at",{ascending:false});
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ const rows=r.data||[];
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Presupuestos</h3><div class="muted">Crea, edita, guarda y elimina presupuestos.</div></div><button class="btn gold" onclick="romanoQuoteModal(null)">＋ Nuevo presupuesto</button></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Título</th><th>Estado</th><th>Total</th><th>Válido hasta</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.status)+'</td><td>'+masterMoney(x.total)+'</td><td>'+esc(x.valid_until||"—")+'</td><td><button class="btn" onclick="romanoQuoteModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoQuoteDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay presupuestos.</div>')+'</div>';
+}
+async function romanoQuoteModal(id){
+ let x=null;if(id){const r=await sb.from("quotes").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}x=r.data}
+ const clients=await sb.from("clients").select("id,name").order("name");const props=await sb.from("properties").select("id,name,code").order("name");
+ openModal(x?"Editar presupuesto":"Nuevo presupuesto",
+ '<div class="two"><div class="field"><label>Número</label><input id="qNumber" value="'+esc(x?.number||("P-"+Date.now()))+'"></div><div class="field"><label>Estado</label><select id="qStatus"><option value="draft">Borrador</option><option value="sent">Enviado</option><option value="accepted">Aceptado</option><option value="rejected">Rechazado</option><option value="expired">Vencido</option></select></div></div>'+
+ '<div class="field"><label>Título</label><input id="qTitle" value="'+esc(x?.title||"")+'" required></div>'+
+ '<div class="two"><div class="field"><label>Cliente</label><select id="qClient"><option value="">—</option>'+(clients.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.client_id?"selected":"")+'>'+esc(v.name)+'</option>').join("")+'</select></div><div class="field"><label>Propiedad</label><select id="qProperty"><option value="">—</option>'+(props.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.property_id?"selected":"")+'>'+esc(v.name)+' · '+esc(v.code||"")+'</option>').join("")+'</select></div></div>'+
+ '<div class="two"><div class="field"><label>Subtotal (€)</label><input id="qSubtotal" type="number" min="0" step="0.01" value="'+Number(x?.subtotal||0)+'"></div><div class="field"><label>IVA (€)</label><input id="qTax" type="number" min="0" step="0.01" value="'+Number(x?.tax_amount||0)+'"></div></div>'+
+ '<div class="field"><label>Válido hasta</label><input id="qValid" type="date" value="'+esc(x?.valid_until||"")+'"></div><div class="field"><label>Notas</label><textarea id="qNotes">'+esc(x?.notes||"")+'</textarea></div>'+
+ '<button type="button" class="primary" onclick="romanoQuoteSave('+JSON.stringify(id||null)+')">Guardar</button>');
+ if(x)$("qStatus").value=x.status||"draft";
+}
+async function romanoQuoteSave(id){
+ const subtotal=Math.max(0,Number($("qSubtotal").value||0)),tax=Math.max(0,Number($("qTax").value||0));
+ const payload={number:$("qNumber").value.trim()||("P-"+Date.now()),title:$("qTitle").value.trim(),status:$("qStatus").value,client_id:$("qClient").value||null,property_id:$("qProperty").value||null,subtotal,tax_amount:tax,total:subtotal+tax,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,updated_at:new Date().toISOString()};
+ if(!payload.title){toast("Indique el título.");return}
+ const r=id?await sb.from("quotes").update(payload).eq("id",id).select("id").single():await sb.from("quotes").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Presupuesto guardado");quotes();
+}
+async function romanoQuoteDelete(id){if(!confirm("¿Eliminar este presupuesto?"))return;const r=await sb.from("quotes").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Presupuesto eliminado");quotes()}
+
 async function renderStock(){const r=await sb.from("stock_items").select("name,sku,unit,quantity,min_quantity").order("name");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Materiales y stock</h3><span class="pill">Control operativo</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Cantidad</th><th>Mínimo</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+((Number(x.quantity)<=Number(x.min_quantity))?'<span class="status urgent">Reponer</span>':'<span class="status approved">OK</span>')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>'}
 
 async function renderRecurring(){const r=await sb.from("recurring_services").select("id,frequency,typology,priority,active,next_run_at,instructions").order("next_run_at",{ascending:true});$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Servicios recurrentes</h3><span class="pill">Programación automática</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Frecuencia</th><th>Tipología</th><th>Prioridad</th><th>Próxima ejecución</th><th>Activo</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.frequency)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(x.priority)+'</td><td>'+esc(x.next_run_at?new Date(x.next_run_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.active?"Sí":"No")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios recurrentes.</div>')+'</div>'}
