@@ -40,7 +40,9 @@
 .rpc-person-day.off{border-left:4px solid #777;background:#f1f1ef}
 .rpc-person-day.unset{border-style:dashed;opacity:.7}
 @media(max-width:760px){.rpc-weekdays,.rpc-month-grid{grid-template-columns:repeat(7,minmax(125px,1fr));min-width:875px}.rpc-month-day,.rpc-empty-day{min-height:150px}}
-</style></style>
+<style id="sj-quick-fix">
+.sj-employee{margin-top:7px;font-size:11px;font-weight:700;color:#6e542a}.sj-client{margin-top:4px;font-size:10px;color:#81786d}.sj-priority{display:inline-block;margin-top:5px;padding:4px 7px;border-radius:999px;background:#f4ead8;color:#80602d;font-size:9px;text-transform:capitalize}.sj-quick{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.sj-quick .btn{padding:6px 7px;font-size:9px}.sj-status{min-width:190px}.sj-card{display:grid;grid-template-columns:150px minmax(220px,1.2fr) minmax(190px,1fr) minmax(190px,.8fr);gap:14px;align-items:stretch}.sj-photo{min-height:150px}.sj-main,.sj-location,.sj-status{padding-top:6px}.sj-time{font:700 20px Georgia,serif}@media(max-width:1050px){.sj-card{grid-template-columns:120px 1fr 1fr}.sj-status{grid-column:2/-1}}@media(max-width:650px){.sj-card{display:block}.sj-photo{height:150px;margin-bottom:10px}.sj-main,.sj-location,.sj-status{padding-top:0;margin-top:10px}.sj-status{min-width:0}.sj-quick .btn{flex:1}}
+</style></style></style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
 /* ROMANO PREMIUM RESPONSIVE SYSTEM — client validation pass */
@@ -402,31 +404,54 @@ async function renderCatalogMaster(){
 }
 async function renderServiceJourneyBoard(){
  const day=window.__sjDay||new Date().toLocaleDateString("sv-SE");
- let services=[],props=[];
+ let services=[],props=[],clients=[],employees=[];
  if(demoMode){
   services=(DEMO_SERVICES||[]).filter(x=>String(x.scheduled_at||"").slice(0,10)===day);
-  if(!services.length)services=(DEMO_SERVICES||[]).slice(0,6);
-  props=DEMO_PROPERTIES||[];
+  if(!services.length)services=(DEMO_SERVICES||[]).slice(0,8);
+  props=DEMO_PROPERTIES||[];clients=DEMO_CLIENTS||[];employees=DEMO_EMPLOYEES||[];
  }else{
-  const start=day+"T00:00:00",end=day+"T23:59:59.999"; let q;
+  const startDay=day+"T00:00:00",endDay=day+"T23:59:59.999"; let q;
+  const fields="id,code,property_id,client_id,assigned_employee_id,service_type,typology,status,scheduled_at,priority";
   if(role()==="client"){
    const cr=await sb.from("clients").select("id").eq("profile_id",currentUser.id).single();
    if(cr.error||!cr.data){$("content").innerHTML='<div class="panel"><div class="msg">No se encontró el cliente asociado.</div></div>';return}
-   q=await sb.from("services").select("id,code,property_id,service_type,typology,status,scheduled_at,priority").eq("client_id",cr.data.id).gte("scheduled_at",start).lt("scheduled_at",end).order("scheduled_at",{ascending:true});
-  }else if(role()==="employee")q=await sb.from("services").select("id,code,property_id,service_type,typology,status,scheduled_at,priority").eq("assigned_employee_id",currentUser.id).gte("scheduled_at",start).lt("scheduled_at",end).order("scheduled_at",{ascending:true});
-  else if(role()==="supervisor")q=await sb.from("services").select("id,code,property_id,service_type,typology,status,scheduled_at,priority").eq("assigned_supervisor_id",currentUser.id).gte("scheduled_at",start).lt("scheduled_at",end).order("scheduled_at",{ascending:true});
-  else q=await sb.from("services").select("id,code,property_id,service_type,typology,status,scheduled_at,priority").gte("scheduled_at",start).lt("scheduled_at",end).order("scheduled_at",{ascending:true});
+   q=await sb.from("services").select(fields).eq("client_id",cr.data.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }else if(role()==="employee"){
+   q=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }else if(role()==="supervisor"){
+   q=await sb.from("services").select(fields).eq("assigned_supervisor_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }else{
+   q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
   services=q.data||[];
-  const ids=[...new Set(services.map(s=>s.property_id).filter(Boolean))];
-  if(ids.length){const pr=await sb.from("properties").select("id,code,name,address,city,country,photo_url,property_type").in("id",ids);if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}props=pr.data||[]}
+  const ids=[...new Set(services.map(s=>s.property_id).filter(Boolean))],cids=[...new Set(services.map(s=>s.client_id).filter(Boolean))],eids=[...new Set(services.map(s=>s.assigned_employee_id).filter(Boolean))];
+  const [pr,cr,er]=await Promise.all([
+   ids.length?sb.from("properties").select("id,code,name,address,city,country,photo_url,property_type").in("id",ids):Promise.resolve({data:[]}),
+   cids.length?sb.from("clients").select("id,name").in("id",cids):Promise.resolve({data:[]}),
+   eids.length?sb.from("employee_profiles").select("id,full_name,employee_code,function_title,photo_url").in("id",eids):Promise.resolve({data:[]})
+  ]);
+  if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}
+  props=pr.data||[];clients=cr.data||[];employees=er.data||[];
  }
- const pm=Object.fromEntries(props.map(p=>[p.id,p])),photos={};
+ const pm=Object.fromEntries(props.map(p=>[p.id,p])),cm=Object.fromEntries(clients.map(x=>[x.id,x])),em=Object.fromEntries(employees.map(x=>[x.id,x]));
+ const photos={};
  if(!demoMode)await Promise.all(props.filter(p=>p.photo_url).map(async p=>{const u=await sb.storage.from("property-media").createSignedUrl(p.photo_url,900);if(!u.error)photos[p.id]=u.data.signedUrl}));
  const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
- const isMaint=s=>/manten|electric|plumb|pint|repar/i.test(String(s.service_type||"")),cleaning=services.filter(s=>!isMaint(s)).length,maintenance=services.length-cleaning;
- const cards=services.map(s=>{const p=pm[s.property_id]||{},photo=demoMode?demoPropertyPhotoData(p.id):photos[p.id]||"";return '<article class="sj-card"><div class="sj-photo">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type">'+(isMaint(s)?"MANTENIMIENTO":"LIMPIEZA")+'</span></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(s.service_type||"Servicio")+'</p></div><div class="sj-status"><span class="sj-dot"></span><b>'+esc(labels[s.status]||s.status||"Pendiente")+'</b><button class="sj-btn" onclick="viewService(\''+s.id+'\')">Ver jornada</button></div></article>'}).join("");
- $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>Vista diaria de apartamentos, limpiezas y mantenimiento.</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados</small><strong>'+services.filter(s=>["completed","approved"].includes(s.status)).length+'</strong></div></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
+ const statusIcon={requested:"○",scheduled:"◷",on_the_way:"🚗",in_progress:"▶",paused:"Ⅱ",supervised:"✓",completed:"✓",approved:"✓",rejected:"×",returned:"↩",cancelled:"×"};
+ const canStatus=["admin","supervisor","employee"].includes(role());
+ const isMaint=s=>/manten|electric|plumb|pint|repar/i.test(String(s.service_type||""));
+ const cleaning=services.filter(s=>!isMaint(s)).length,maintenance=services.length-cleaning;
+ const active=services.filter(s=>["on_the_way","in_progress","paused","supervised"].includes(s.status)).length;
+ const cards=services.map(s=>{
+   const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{};
+   const photo=demoMode?demoPropertyPhotoData(p.id):photos[p.id]||"";
+   const isOwn=role()==="employee"&&s.assigned_employee_id===currentUser.id;
+   const canAct=canStatus&&(role()!=="employee"||isOwn);
+   const quick=["on_the_way","in_progress","paused","supervised","completed"].map(st=>canAct&&s.status!==st?'<button type="button" class="btn '+(st==="completed"?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium(\''+s.id+'\',\''+st+'\')">'+statusIcon[st]+' '+labels[st]+'</button>':"").join("");
+   return '<article class="sj-card" onclick="viewService(\''+s.id+'\')"><div class="sj-photo">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type">'+(isMaint(s)?"MANTENIMIENTO":"LIMPIEZA")+'</span><div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||s.employee_name||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(s.service_type||"Servicio")+'</p><span class="sj-priority">'+esc(s.priority||"normal")+'</span></div><div class="sj-status"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><button class="sj-btn" onclick="event.stopPropagation();viewService(\''+s.id+'\')">Ver jornada</button>'+(quick?'<div class="sj-quick">'+quick+'</div>':"")+'</div></article>';
+ }).join("");
+ $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>Servicios del día · apartamento · cliente · funcionario · estado en tiempo real.</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados</small><strong>'+services.filter(s=>["completed","approved"].includes(s.status)).length+'</strong></div></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
  $("sjDay").onchange=()=>{window.__sjDay=$("sjDay").value;renderServiceJourneyBoard()};
 }
 async function renderJourneyMaster(){
