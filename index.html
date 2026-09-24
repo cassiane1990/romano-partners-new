@@ -1836,7 +1836,7 @@ async function renderChatPremium(){
  stopChatPolling();stopChatRealtime();startChatDirectoryRealtime();__activeChatId=null;__activeChatTitle="";
  const isClient=role()==="client";
  const contact=isClient?'<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Supervisor y Administrador · chat interno</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
- $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto ou vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
+ $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escriba un mensaje..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto o vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
  await renderChatContacts();
 }
 async function renderChatContacts(){
@@ -1855,7 +1855,7 @@ async function renderChatContacts(){
    }
    const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").eq("company_id",currentProfile.company_id).eq("thread_type","direct").order("updated_at",{ascending:false});
    const rows=q.data||[];
-   el.innerHTML=rows.map(x=>'<button class="romano-chat-contact '+(x.id===__activeChatId?"active":"")+'" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')"><span class="rc-avatar">R</span><span class="rc-info"><b>'+esc(x.title||"Conversación")+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">Sem conversas.</div>';
+   el.innerHTML=rows.map(x=>'<button class="romano-chat-contact '+(x.id===__activeChatId?"active":"")+'" onclick="openChatPremium(\''+x.id+'\',\''+esc(x.title||"Conversación")+'\')"><span class="rc-avatar">R</span><span class="rc-info"><b>'+esc(x.title||"Conversación")+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">No hay conversaciones.</div>';
  }
 }
 async function selectRoleChat(targetRole){
@@ -1866,7 +1866,7 @@ async function selectRoleChat(targetRole){
    __chatRoleThreads[targetRole]=thread;
  }else if(role()==="admin"||role()==="supervisor"){
    const target=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name").limit(1).maybeSingle();
-   if(target.error||!target.data){toast("Destinatário não disponível.");return}
+   if(target.error||!target.data){toast("Destinatario no disponible.");return}
    const c=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
    if(c.error){toast(c.error.message||"Não foi possível abrir a conversa.");return}
    thread={id:c.data,title:(currentProfile.full_name||"")+" ↔ "+(target.data.full_name|| (targetRole==="supervisor"?"Supervisor":"Administrador"))};
@@ -1899,9 +1899,9 @@ async function refreshChatMessages(){
      } else media='<div class="romano-chat-file romano-chat-file-error">📄 '+esc(x.media_name||"Documento")+'<small>Archivo no disponible</small></div>';
    }
    const content=x.deleted_for_everyone_at
-     ? '<div class="romano-deleted">🚫 Mensagem apagada</div>'
+     ? '<div class="romano-deleted">🚫 Mensaje eliminado</div>'
      : ((x.body?'<div class="romano-bubble-text">'+esc(x.body)+'</div>':"")+media);
-   const actions=x.deleted_for_everyone_at ? "" : '<button type="button" class="romano-bubble-more" aria-label="Mais opções" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'show-actions\')">⋯</button>'+(mine ? '<div class="romano-bubble-actions"><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'me\')">Apagar para mim</button><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'everyone\')">Apagar para todos</button></div>' : '<div class="romano-bubble-actions"><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'me\')">Apagar para mim</button></div>');
+   const actions=x.deleted_for_everyone_at ? "" : '<button type="button" class="romano-bubble-more" aria-label="Más opciones" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'show-actions\')">⋯</button>'+(mine ? '<div class="romano-bubble-actions"><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'me\')">Eliminar para mí</button><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'everyone\')">Eliminar para todos</button></div>' : '<div class="romano-bubble-actions"><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'me\')">Eliminar para mí</button></div>');
    return '<div class="romano-bubble-row '+(mine?"mine":"")+'"><div class="romano-bubble-wrap"><div class="romano-bubble '+(mine?"mine":"theirs")+'">'+content+'<div class="romano-bubble-time">'+esc(new Date(x.created_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</div></div>'+actions+'</div></div>';
  }));
  box.innerHTML=rendered.join("")||'<div class="romano-chat-empty"><div>Aún no hay mensajes.<br>Escriba el primero.</div></div>';
@@ -1910,9 +1910,9 @@ async function refreshChatMessages(){
 }
 async function deleteChatMessage(id,mode){
  const label=mode==="everyone"?"para todos":"solo para ti";
- if(!confirm("¿Apagar esta mensagem "+label+"?"))return;
+ if(!confirm("¿Eliminar este mensaje "+label+"?"))return;
  const r=await sb.rpc("delete_chat_message",{p_message_id:id,p_mode:mode});
- if(r.error){toast(r.error.message||"No se pudo apagar la mensagem.");return}
+ if(r.error){toast(r.error.message||"No se pudo eliminar el mensaje.");return}
  window.__chatLastSignature=null;
  await refreshChatMessages();
 }
