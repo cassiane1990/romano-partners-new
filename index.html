@@ -790,6 +790,21 @@ async function saveClientPropertyInline(e,id,clientId,mode){
  if(photo){const up=await uploadPropertyPhoto(photo,id);if(up.error){toast(up.error.message);return}}
  toast("Propiedad actualizada");await viewClient(clientId);
 }
+async function newClientProperty(clientId){
+ let client;
+ if(demoMode) client=demoFindClient(clientId);
+ else {const q=await sb.from("clients").select("id,name").eq("id",clientId).single();client=q.data}
+ if(!client){toast("Cliente no encontrado.");return}
+ openModal("Nuevo inmueble · "+esc(client.name),'<form onsubmit="saveClientProperty(event,\\''+esc(clientId)+'\\')"><div class="demo-flag">'+(demoMode?'MODO DEMOSTRACIÓN · PROPIEDAD FICTICIA':'NUEVO INMUEBLE DEL CLIENTE')+'</div><div class="two"><div class="field"><label>Nombre</label><input id="ncpName" required></div><div class="field"><label>Código</label><input id="ncpCode" required></div></div><div class="two"><div class="field"><label>Tipología</label><select id="ncpType"><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div><div class="field"><label>Cliente</label><input value="'+esc(client.name)+'" disabled></div></div><div class="two"><div class="field"><label>Camas individuales</label><input id="ncpSingle" type="number" min="0" value="0"></div><div class="field"><label>Camas dobles / King</label><input id="ncpDouble" type="number" min="0" value="0"></div></div><div class="field"><label>Dirección</label><input id="ncpAddress"></div><div class="two"><div class="field"><label>Ciudad</label><input id="ncpCity"></div><div class="field"><label>País</label><input id="ncpCountry" value="España"></div></div><button class="primary">Guardar inmueble</button></form>');
+}
+async function saveClientProperty(e,clientId){
+ e.preventDefault();
+ const data={code:$("ncpCode").value.trim(),name:$("ncpName").value.trim(),property_type:$("ncpType").value,beds_single:Math.max(0,Number($("ncpSingle").value||0)),beds_double:Math.max(0,Number($("ncpDouble").value||0)),address:$("ncpAddress").value.trim(),city:$("ncpCity").value.trim(),country:$("ncpCountry").value.trim(),client_id:clientId};
+ if(demoMode){const next=Math.max(0,...DEMO_PROPERTIES.map(x=>Number(String(x.id).replace("demo-p",""))||0))+1;DEMO_PROPERTIES.push({id:"demo-p"+next,status:"Activo",...data});closeModal();toast("Inmueble ficticio creado");await viewClient(clientId);return}
+ const r=await sb.from("properties").insert({company_id:currentProfile.company_id,...data}).select("id").single();
+ if(r.error){toast(r.error.message);return}
+ closeModal();toast("Inmueble creado");await viewClient(clientId);
+}
 async function viewClient(id){
  if(demoMode){
   const x=demoFindClient(id);if(!x){toast("Cliente demo no encontrado");return}
@@ -804,7 +819,7 @@ async function viewClient(id){
  if(pr.error){toast(pr.error.message);return}
  const ps=pr.data||[];
  const propsHtml=ps.length?ps.map(p=>clientPropertyInlineHtml(p,x,"real")).join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
- openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
+ openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="actions" style="margin:15px 0"><button class="btn" onclick="editClient(\\''+esc(id)+'\\')">Editar cliente</button><button class="btn gold" onclick="newClientProperty(\\''+esc(id)+'\\')">+ Nuevo inmueble</button></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
 }
 async function viewProperty(id){
  if(demoMode){
