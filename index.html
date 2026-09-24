@@ -484,7 +484,7 @@ function buildMasterNav(){
   admin:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
   supervisor:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
   employee:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
-  client:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","documents","service_history","chat","notifications","emergency","sync","profile"]
+  client:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]
  };
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
@@ -1678,8 +1678,8 @@ async function romanoCatalogManager(category){
  const title=romanoCatalogCategoryLabel(category);
  const r=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category",category).order("name");
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
- const rows=r.data||[];
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Catálogo · '+esc(title)+'</h3><div class="muted">Crea, edita, activa/desactiva y elimina los artículos que utiliza ROMANO PROPERTY CARE.</div></div><button class="btn gold" onclick="romanoCatalogNew(\''+category+'\')">＋ Añadir</button></div>'+
+ const rows=r.data||[],canWrite=demoMode||canManage();
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Catálogo · '+esc(title)+'</h3><div class="muted">Crea, edita, activa/desactiva y elimina los artículos que utiliza ROMANO PROPERTY CARE.</div></div>'+(canWrite?'<button class="btn gold" onclick="romanoCatalogNew(\''+category+'\')">＋ Añadir</button>':'')+'</div>'+
  (rows.length?'<table class="table"><thead><tr><th>Código</th><th>Nombre</th><th>Unidad</th><th>Valor</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+
  rows.map(x=>'<tr><td>'+esc(x.code||"—")+'</td><td><b>'+esc(x.name)+'</b><div class="muted">'+esc(x.description||"")+'</div></td><td>'+esc(x.unit||"—")+'</td><td>'+masterMoney(x.price||0)+'</td><td>'+esc(x.tax_included?"Incluido":"No incluido")+'</td><td>'+esc(x.active?"Sí":"No")+'</td><td><button class="btn" onclick="romanoCatalogEdit('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoCatalogDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
  '</tbody></table>':'<div class="empty">No hay artículos en este catálogo.</div>')+'</div>';
@@ -1719,10 +1719,10 @@ async function romanoCatalogDelete(id){
 async function romanoStockManager(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
- const rows=r.data||[];
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Materiales y Stock</h3><div class="muted">El catálogo de materiales alimenta este stock. Cada artículo puede editarse y eliminarse.</div></div><button class="btn gold" onclick="romanoStockModal(null)">＋ Nuevo material</button></div>'+
+ const rows=r.data||[],canWrite=demoMode||canManage();
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Materiales y Stock</h3><div class="muted">El catálogo de materiales alimenta este stock. Cada artículo puede editarse y eliminarse.</div></div>'+(canWrite?'<button class="btn gold" onclick="romanoStockModal(null)">＋ Nuevo material</button>':'')+'</div>'+
  (rows.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Stock</th><th>Mínimo</th><th>Coste</th><th></th></tr></thead><tbody>'+
- rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+masterMoney(x.unit_cost||0)+'</td><td><button class="btn" onclick="romanoStockModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoStockDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+
+ rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+masterMoney(x.unit_cost||0)+'</td><td>'+(canWrite?'<button class="btn" onclick="romanoStockModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoStockDelete('+JSON.stringify(x.id)+')">Eliminar</button>':'—')+'</td></tr>').join("")+
  '</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>';
 }
 async function romanoStockModal(id){
