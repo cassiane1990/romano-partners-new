@@ -3018,17 +3018,9 @@ async function renderChatContacts(){
  const q=await sb.from("profiles").select("id,full_name,email,role,avatar_url").eq("company_id",currentProfile.company_id).eq("active",true).in("role",allowedRoles).neq("id",currentUser.id).order("role").order("full_name");
  if(q.error){el.innerHTML='<div class="romano-chat-empty">'+esc(q.error.message)+'</div>';return}
  const profiles=q.data||[];
- const existing=await sb.from("chat_threads").select("id,title,thread_type,updated_at").eq("company_id",currentProfile.company_id).eq("thread_type","direct").order("updated_at",{ascending:false});
- const threads=existing.data||[];
- const byContact=new Map();
- for(const t of threads){
-   const m=await sb.from("chat_members").select("profile_id").eq("thread_id",t.id).neq("profile_id",currentUser.id);
-   (m.data||[]).forEach(x=>{if(!byContact.has(x.profile_id))byContact.set(x.profile_id,t)})
- }
  el.innerHTML=profiles.length?profiles.map(p=>{
-   const thread=byContact.get(p.id);
    const initials=esc((p.full_name||roleLabel[p.role]||"R").trim().charAt(0).toUpperCase());
-   return '<button class="romano-chat-contact '+(thread?.id===__activeChatId?"active":"")+'" onclick="openDirectChat(\''+p.id+'\',\''+esc(p.full_name||roleLabel[p.role]||"Contacto")+'\',\''+p.role+'\')"><span class="rc-avatar">'+initials+'</span><span class="rc-info"><b>'+esc(p.full_name||roleLabel[p.role]||"Contacto")+'</b><small>'+esc(roleLabel[p.role]||p.role)+(thread?" · Conversación":" · Nuevo contacto")+'</small></span></button>';
+   return '<button class="romano-chat-contact '+(String(p.full_name||"")===String(__activeChatTitle||"")?"active":"")+'" onclick="openDirectChat(\''+p.id+'\',\''+esc(p.full_name||roleLabel[p.role]||"Contacto")+'\',\''+p.role+'\')"><span class="rc-avatar">'+initials+'</span><span class="rc-info"><b>'+esc(p.full_name||roleLabel[p.role]||"Contacto")+'</b><small>'+esc(roleLabel[p.role]||p.role)+' · Chat privado</small></span></button>';
  }).join(""):'<div class="romano-chat-empty">No hay contactos disponibles.</div>';
 }
 async function openDirectChat(targetId,targetName,targetRole){
