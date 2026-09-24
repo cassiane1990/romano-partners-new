@@ -1617,12 +1617,7 @@ function buildRomanoPdf(title,number,client,rows,totalLabel,total){
  const data=canvas.toDataURL("image/jpeg",0.94).split(",")[1];
  const bin=atob(data), img=new Uint8Array(bin.length);
  for(let i=0;i<bin.length;i++)img[i]=bin.charCodeAt(i);
- let pos=2,w=0,h=0;
- while(pos<img.length){
-   const marker=(img[pos]<<8)|img[pos+1],len=(img[pos+2]<<8)|img[pos+3];
-   if(marker>=0xC0&&marker<=0xC3){h=(img[pos+5]<<8)|img[pos+6];w=(img[pos+7]<<8)|img[pos+8];break}
-   pos+=2+len;
- }
+ const w=1240,h=1754;
  const NL=String.fromCharCode(10);
  const content="q"+NL+"595 0 0 842 0 0 cm"+NL+"/Im1 Do"+NL+"Q"+NL;
  const objs=[
