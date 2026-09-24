@@ -1563,7 +1563,7 @@ function romanoCatalogModal(category,x){
 async function romanoCatalogSave(id,category){
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+Date.now(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true",updated_at:new Date().toISOString()};
- const q=id?await sb.from("service_catalog").update(payload).eq("id",id).select("id").single():await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
+ const q=id?await sb.from("service_catalog").update(payload).eq("id",id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
  if(q.error){toast(q.error.message);return}
  closeModal();toast("Catálogo guardado");romanoCatalogManager(category);
 }
@@ -1625,7 +1625,7 @@ async function romanoRecurringModal(id){
 async function romanoRecurringSave(id){
  const next=$("rrNext").value?new Date($("rrNext").value).toISOString():null;
  const payload={client_id:$("rrClient").value||null,property_id:$("rrProperty").value||null,frequency:$("rrFrequency").value,typology:$("rrTypology").value.trim()||null,priority:$("rrPriority").value,active:$("rrActive").value==="true",next_run_at:next,instructions:$("rrInstructions").value.trim()||null,updated_at:new Date().toISOString()};
- const r=id?await sb.from("recurring_services").update(payload).eq("id",id).select("id").single():await sb.from("recurring_services").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
+ const r=id?await sb.from("recurring_services").update(payload).eq("id",id):await sb.from("recurring_services").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id});
  if(r.error){toast(r.error.message);return}
  closeModal();toast("Servicio recurrente guardado");romanoRecurringManager();
 }
