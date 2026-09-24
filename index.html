@@ -1774,7 +1774,7 @@ function romanoCatalogModal(category,x){
  '>Incluido</option></select></div></div><div class="field"><label>Activo</label><select id="rcActive"><option value="true" '+(x?.active!==false?"selected":"")+'>Sí</option><option value="false" '+(x?.active===false?"selected":"")+'>No</option></select></div>'+
  '<button type="button" class="primary" onclick="romanoCatalogSave('+JSON.stringify(x?.id||null)+','+JSON.stringify(category)+')">Guardar</button>');
 }
-async async function romanoCatalogSave(id,category){
+async function romanoCatalogSave(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
@@ -1809,7 +1809,7 @@ async function romanoStockModal(id){
  '<div class="field"><label>Coste unitario (€)</label><input id="rsCost" type="number" min="0" step="0.01" value="'+Number(x?.unit_cost||0)+'"></div><div class="field"><label>Notas</label><textarea id="rsNotes">'+esc(x?.notes||"")+'</textarea></div>'+
  '<button type="button" class="primary" onclick="romanoStockSave('+JSON.stringify(id||null)+')">Guardar</button>');
 }
-async async function romanoStockSave(id){
+async function romanoStockSave(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar materiales.");return}
  const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
  if(!payload.name){toast("Indique el material.");return}
