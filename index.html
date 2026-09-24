@@ -412,6 +412,33 @@ img,video,canvas,svg{max-width:100%}
 #masterNav .master-nav-locked{opacity:.62;cursor:not-allowed}
 #masterNav .master-nav-locked:hover{background:transparent;transform:none}
 </style>
+<style id="romano-services-cleanup">
+.services-shell{background:transparent}
+.services-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px}
+.services-head h2{margin:2px 0 4px;font-size:24px;letter-spacing:-.3px}
+.services-head p{margin:0;color:#8a847b;font-size:12px}
+.eyebrow{font-size:8px;letter-spacing:2.4px;color:#b7893f;font-weight:800}
+.services-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px;padding:10px 12px;border:1px solid #e7dccb;border-radius:14px;background:#fffdf9;color:#777;font-size:10px}
+.services-flow span{padding:5px 8px;border-radius:999px;background:#f5eee2;color:#5d554b}
+.services-flow i{font-style:normal;color:#b7893f}
+.services-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.service-card{background:#fffdf9;border:1px solid #e5dac8;border-radius:18px;padding:14px;box-shadow:0 5px 16px #3b2d1a08;min-width:0}
+.service-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.service-card-head h3{margin:5px 0 0;font-size:14px}
+.service-code{font-size:9px;color:#9b7a43;font-weight:800;letter-spacing:.8px}
+.service-card-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+.service-card-meta>div,.service-card-finance>div{min-width:0;padding:8px 9px;border-radius:11px;background:#faf5ed}
+.service-card small{display:block;color:#999;font-size:8px;margin-bottom:3px}
+.service-card strong{display:block;font-size:11px;line-height:1.25;word-break:break-word}
+.service-card-finance{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #eee7dc}
+.service-card-finance b{font-size:11px}
+.service-assigned{margin-top:9px;font-size:10px;color:#8a847b}
+.service-card-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid #eee7dc}
+.service-card-actions .btn{font-size:10px}
+.service-empty{background:#fffdf9;border:1px dashed #dfd2be;border-radius:16px}
+@media(max-width:900px){.services-grid{grid-template-columns:1fr}.services-head{align-items:stretch}.services-head .btn{flex:0 0 auto}}
+@media(max-width:600px){.services-head{flex-direction:column}.services-head h2{font-size:21px}.services-flow{gap:5px}.service-card-meta{grid-template-columns:1fr 1fr}.service-card-finance{grid-template-columns:1fr 1fr}.service-card-head{align-items:flex-start}}
+</style>
 </head>
 <body>
 <div id="login" class="login"><div class="card login-card">
@@ -621,11 +648,46 @@ async function assignServiceEmployee(serviceId,employeeId,force=false){
  }
  closeModal();toast(r.data?.extra?"✓ Designação EXTRA enviada. O funcionário verá o conflito e decidirá se pode aceitar.":"✓ Funcionário designado. Aguardando aceitação dele.");await renderServicesMaster();
 }
+async function serviceTypeLabel(v){
+ const m={limpieza_alojamiento:"Limpieza alojamiento",limpieza_hotel_5_estrellas:"Limpieza hotel 5★",oficina:"Limpieza oficina",clinica:"Limpieza clínica",mantenimiento:"Mantenimiento",pintura:"Pintura",fontaneria:"Fontanería",electricidad:"Electricidad",lavanderia:"Lavandería",airbnb:"Limpieza Airbnb",hotel:"Limpieza hotel 5★"};
+ return m[v]||String(v||"Servicio").replaceAll("_"," ");
+}
+function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta",urgent:"Urgente"})[v]||v||"—"}
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
- if(!demoMode){const q=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id").order("scheduled_at",{ascending:true}).limit(100);r.data=q.data;r.error=q.error;}
- let fin={};if(canSeeFinance()&&r.data?.length){const q=await sb.from("service_financials").select("service_id,subtotal,tax_amount,total").in("service_id",r.data.map(x=>x.id));(q.data||[]).forEach(x=>fin[x.service_id]=x)}
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Servicios · objeto central</h3><div class="muted">Solicitado → Programado → A camino → En curso → Pausado → Supervisado → Finalizado</div></div><button class="btn gold" onclick="openPage(\'newservice\')">＋ Nuevo servicio</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Tipología</th><th>Estado</th><th>Fecha</th>'+(canSeeFinance()?'<th>Sin IVA</th><th>IVA</th><th>Total</th>':'')+'<th></th></tr></thead><tbody>'+(r.data?.length?r.data.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></td><td>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</td>'+(canSeeFinance()?'<td>'+masterMoney(fin[x.id]?.subtotal)+'</td><td>'+masterMoney(fin[x.id]?.tax_amount)+'</td><td><b>'+masterMoney(fin[x.id]?.total)+'</b></td>':'')+'<td><button class="btn" onclick="viewService(\''+x.id+'\')">Ver</button>'+(role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar servicio</button>':["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':x.status==="scheduled"&&x.accepted_at&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':x.assigned_employee_id?'<div class="muted" style="margin-top:5px">Funcionario designado · pendiente de aceptación</div>':'')+'</td></tr>').join(""):'<tr><td colspan="10"><div class="empty">No hay servicios.</div></td></tr>')+'</tbody></table></div></div>';
+ if(!demoMode){
+   const q=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id").order("scheduled_at",{ascending:true}).limit(100);
+   r.data=q.data;r.error=q.error;
+ }
+ let fin={};
+ if(canSeeFinance()&&r.data?.length){
+   const q=await sb.from("service_financials").select("service_id,subtotal,tax_amount,total").in("service_id",r.data.map(x=>x.id));
+   (q.data||[]).forEach(x=>fin[x.service_id]=x);
+ }
+ if(r.error){
+   $("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';
+   return;
+ }
+ const rows=r.data||[];
+ const cards=rows.length?rows.map(x=>{
+   const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+
+     (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar</button>':
+      ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
+      x.status==="scheduled"&&x.accepted_at&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
+   const f=fin[x.id];
+   return '<article class="service-card">'+
+     '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
+     '<div class="service-card-meta">'+
+       '<div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div>'+
+       '<div><small>Fecha</small><strong>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Sin programar")+'</strong></div>'+
+       '<div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div>'+
+     '</div>'+
+     (canSeeFinance()?'<div class="service-card-finance"><div><small>Sin IVA</small><b>'+masterMoney(f?.subtotal||0)+'</b></div><div><small>IVA</small><b>'+masterMoney(f?.tax_amount||0)+'</b></div><div><small>Total</small><b>'+masterMoney(f?.total||0)+'</b></div></div>':'')+
+     (x.assigned_employee_id?'<div class="service-assigned">Funcionario designado · pendiente de aceptación</div>':'')+
+     '<div class="service-card-actions">'+actions+'</div>'+
+   '</article>';
+ }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
+ $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div><button class="btn gold" onclick="openPage(\'newservice\')">＋ Nuevo servicio</button></div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
 }
 async function renderCleaningCatalog(){
  const q=demoMode?{data:window.__DEMO_CLEANING_CATALOG||[],error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category","cleaning").order("name");
@@ -1705,17 +1767,23 @@ function romanoCatalogModal(category,x){
 }
 async function romanoCatalogSave(id,category){
  if(!["amenities","linen","laundry"].includes(category)){toast("Categoría no válida.");return}
+ if(!canManage()){toast("Solo Admin/Supervisor puede gestionar este catálogo.");return}
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const code=$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase();
- const q=await sb.rpc("romano_catalog_manage",{p_action:id?"update":"insert",p_id:id||null,p_category:category,p_code:code,p_name:name,p_description:$("rcDescription").value.trim()||null,p_unit:$("rcUnit").value.trim()||"unidad",p_price:Math.max(0,Number($("rcPrice").value||0)),p_tax_included:$("rcTax").value==="true",p_active:$("rcActive").value==="true"});
+ const data={company_id:currentProfile.company_id,category,code,name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
+ const q=id
+   ?await sb.from("service_catalog").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single()
+   :await sb.from("service_catalog").insert(data).select("id").single();
  if(q.error){toast("No se pudo guardar: "+q.error.message);return}
  closeModal();toast(id?"Catálogo actualizado":"Catálogo creado");await romanoCatalogManager(category);
 }
 async function romanoCatalogDelete(id){
+ if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
  const before=await sb.from("service_catalog").select("category").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(before.error){toast(before.error.message);return}
- const r=await sb.rpc("romano_catalog_manage",{p_action:"delete",p_id:id});
+ if(!before.data){toast("Artículo no encontrado.");return}
+ const r=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
  if(r.error){toast("No se pudo eliminar: "+r.error.message);return}
  toast("Artículo eliminado");
  if(before.data?.category)await romanoCatalogManager(before.data.category);
@@ -1739,15 +1807,19 @@ async function romanoStockModal(id){
  '<button type="button" class="primary" onclick="romanoStockSave('+JSON.stringify(id||null)+')">Guardar</button>');
 }
 async function romanoStockSave(id){
- const payload={p_action:id?"update":"insert",p_id:id||null,p_name:$("rsName").value.trim(),p_sku:$("rsSku").value.trim()||null,p_unit:$("rsUnit").value.trim()||"unidad",p_category:$("rsCategory").value.trim()||"material",p_quantity:Math.max(0,Number($("rsQty").value||0)),p_min_quantity:Math.max(0,Number($("rsMin").value||0)),p_unit_cost:Math.max(0,Number($("rsCost").value||0)),p_notes:$("rsNotes").value.trim()||null};
- if(!payload.p_name){toast("Indique el material.");return}
- const r=await sb.rpc("romano_stock_manage",payload);
+ if(!canManage()){toast("Solo Admin/Supervisor puede gestionar materiales y stock.");return}
+ const data={company_id:currentProfile.company_id,name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
+ if(!data.name){toast("Indique el material.");return}
+ const r=id
+   ?await sb.from("stock_items").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single()
+   :await sb.from("stock_items").insert(data).select("id").single();
  if(r.error){toast("No se pudo guardar: "+r.error.message);return}
- closeModal();toast(id?"Stock actualizado":"Stock creado");await romanoStockManager();
+ closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
 }
 async function romanoStockDelete(id){
+ if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}
  if(!confirm("¿Eliminar este material?"))return;
- const r=await sb.rpc("romano_stock_manage",{p_action:"delete",p_id:id});
+ const r=await sb.from("stock_items").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
  if(r.error){toast("No se pudo eliminar: "+r.error.message);return}
  toast("Material eliminado");await romanoStockManager();
 }
