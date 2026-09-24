@@ -134,45 +134,34 @@
 }
 </style>
 <style id="romano-menu-standard">
-/* ROMANO — standard menu across profiles */
+/* ROMANO — same visual system, role-specific menu, responsive on every device */
 .side{width:250px!important;padding:18px 12px 14px!important}
 .main{margin-left:250px!important}
 .side-footer{display:block!important}
 .side-footer .sf-user{display:flex!important}
 .side-footer .sf-name,.side-footer .sf-role,.side-footer .sf-logout{display:block!important}
-.nav button{text-align:left!important;justify-content:flex-start!important}
+.nav button{text-align:left!important;justify-content:flex-start!important;display:flex!important;align-items:center!important;gap:0!important}
+.nav button .nav-icon{display:inline-flex!important;align-items:center;justify-content:center;width:24px!important;min-width:24px!important;color:#e2c27a!important}
 .nav button span:last-child{display:inline!important}
 .nav .master-group{display:block!important}
 
-/* ROMANO — clean form rhythm: one component per row, no visual collisions */
+/* clean form rhythm */
 .modal-card .wizard-grid{align-items:start;row-gap:18px}
 .modal-card .wizard-grid>div{min-width:0}
 .modal-card .wizard-grid .two{align-items:start;row-gap:16px}
 .modal-card .wizard-grid .field{min-width:0;margin:0}
 .modal-card .wizard-grid .field label{display:block;margin-bottom:7px;line-height:1.25}
-.modal-card .wizard-grid input,
-.modal-card .wizard-grid select,
-.modal-card .wizard-grid textarea{box-sizing:border-box;width:100%;min-height:48px}
+.modal-card .wizard-grid input,.modal-card .wizard-grid select,.modal-card .wizard-grid textarea{box-sizing:border-box;width:100%;min-height:48px}
 .modal-card .wizard-grid textarea{min-height:96px}
-.modal-card .wizard-grid .step{
- display:flex;align-items:center;gap:10px;
- min-height:42px;box-sizing:border-box;
- margin-top:18px!important;
- padding:10px 12px!important;
- border:1px solid #eadfce;border-radius:14px;
- background:linear-gradient(180deg,#fffdf9,#f8f0e3);
-}
+.modal-card .wizard-grid .step{display:flex;align-items:center;gap:10px;min-height:42px;box-sizing:border-box;margin-top:18px!important;padding:10px 12px!important;border:1px solid #eadfce;border-radius:14px;background:linear-gradient(180deg,#fffdf9,#f8f0e3)}
 .modal-card .wizard-grid .step:first-child{margin-top:0!important}
-.modal-card .wizard-grid .step b{
- flex:0 0 28px;width:28px;height:28px;border-radius:9px;
- display:grid;place-items:center;background:#b7893f;color:#fff;font-size:12px;
-}
+.modal-card .wizard-grid .step b{flex:0 0 28px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#b7893f;color:#fff;font-size:12px}
 .modal-card .wizard-grid .step strong{font-size:13px;line-height:1.2;color:#28231d}
 .modal-card .wizard-grid .notice{margin-top:12px;line-height:1.45}
 .modal-card .wizard-grid .line-item{min-height:38px;align-items:center}
 .modal-card .wizard-grid .actions{margin-top:12px}
 
-@media (max-width:900px){
+@media(max-width:900px){
  .side{width:230px!important;padding:16px 12px 14px!important}
  .main{margin-left:230px!important}
  .side-brand strong{font-size:22px}
@@ -181,18 +170,39 @@
  .side-footer .sf-name{font-size:10px}
  .side-footer .sf-role{font-size:8px}
  .wizard-grid{grid-template-columns:1fr!important;gap:14px}
- .modal-card{width:min(760px,calc(100vw - 24px));}
+ .modal-card{width:min(760px,calc(100vw - 24px))}
 }
-@media (max-width:600px){
- .side{width:210px!important;padding:14px 10px!important}
- .main{margin-left:210px!important}
- .content,.dashboard-page .content{padding:12px 10px 20px}
+
+@media(max-width:600px){
+ body{overflow-x:hidden}
+ .app{display:block!important}
+ .side{
+   position:fixed!important;
+   left:0!important;
+   top:0!important;
+   bottom:0!important;
+   width:min(286px,84vw)!important;
+   margin:0!important;
+   transform:translateX(-105%)!important;
+   transition:transform .22s ease!important;
+   box-shadow:18px 0 45px rgba(0,0,0,.24)!important;
+   z-index:2000!important;
+   overflow-y:auto!important;
+ }
+ .app.mobile-menu-open .side{transform:translateX(0)!important}
+ .main{margin-left:0!important;width:100%!important;min-width:0!important}
+ .top{padding-left:58px!important}
+ .content,.dashboard-page .content{padding:12px 10px 20px!important;max-width:100%!important;overflow-x:hidden!important}
+ .mobile-menu-toggle{display:flex!important;position:fixed;left:12px;top:10px;z-index:2100;width:38px;height:38px;border:1px solid #dfd2be;border-radius:11px;background:#fffdf9;color:#6f5126;align-items:center;justify-content:center;font-size:20px;box-shadow:0 5px 15px rgba(45,35,25,.1)}
+ .mobile-menu-backdrop{display:block!important;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:1999}
  .modal{padding:8px}
  .modal-card{width:calc(100vw - 16px);padding:16px;border-radius:18px}
  .modal-card .wizard-grid .two{grid-template-columns:1fr!important}
  .modal-card .wizard-grid .step{margin-top:14px!important}
- .modal-card .wizard-grid input,
- .modal-card .wizard-grid select{min-height:50px}
+ .modal-card .wizard-grid input,.modal-card .wizard-grid select{min-height:50px}
+}
+@media(min-width:601px){
+ .mobile-menu-toggle,.mobile-menu-backdrop{display:none!important}
 }
 </style><style id="romano-service-journey">
 .sj-board{max-width:1500px;margin:0 auto}.sj-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:18px}.sj-kicker{font-size:9px;letter-spacing:2.5px;color:#a77a34;font-weight:700}.sj-head h2{margin:5px 0 4px;font:400 30px Georgia,serif;color:#29231c}.sj-head p{margin:0;color:#81776b;font-size:11px}.sj-date{min-width:190px}.sj-date label{display:block;font-size:9px;color:#84796c;margin-bottom:6px}.sj-date input{width:100%;height:43px;border:1px solid #e1d5c4;border-radius:12px;background:#fffdf9;padding:0 12px;color:#4b4032}.sj-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}.sj-stat{background:#fffdf9;border:1px solid #e5dac8;border-radius:15px;padding:13px 15px}.sj-stat small{display:block;color:#8b8073;font-size:9px}.sj-stat strong{display:block;margin-top:4px;font:400 24px Georgia;color:#76531f}.sj-list{display:grid;gap:10px}.sj-card{display:grid;grid-template-columns:82px minmax(190px,1.25fr) minmax(220px,1fr) 150px;gap:16px;align-items:center;background:#fffdf9;border:1px solid #e4dacb;border-radius:17px;padding:12px 14px;box-shadow:0 7px 20px rgba(66,49,25,.045)}.sj-photo{width:82px;height:70px;border-radius:12px;overflow:hidden;background:#f1e9dd;border:1px solid #e4d8c7;display:grid;place-items:center;color:#b7893f;font-size:24px}.sj-photo img{width:100%;height:100%;object-fit:cover}.sj-main h3{margin:0 0 4px;font-size:14px;color:#2d2821}.sj-main p,.sj-location p{margin:3px 0;color:#7b7165;font-size:10px;line-height:1.35}.sj-type{display:inline-block;margin-top:5px;padding:4px 8px;border-radius:999px;background:#f4ead9;color:#795b2a;font-size:8px;font-weight:700;letter-spacing:.5px}.sj-time{font:400 18px Georgia;color:#73501d}.sj-status{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}.sj-dot{width:9px;height:9px;border-radius:50%;background:#c2964d;box-shadow:0 0 0 4px #c2964d18}.sj-status b{font-size:10px;color:#554a3d}.sj-btn{border:1px solid #dfd2c0;background:#fffdf9;border-radius:9px;padding:7px 9px;color:#76531f;font-size:9px}.sj-empty{padding:35px;text-align:center;color:#8a7f72;background:#fffdf9;border:1px dashed #ded2c0;border-radius:16px}@media(max-width:900px){.sj-card{grid-template-columns:70px 1fr 150px}.sj-location{grid-column:2/4}.sj-summary{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.sj-head{display:block}.sj-date{margin-top:13px}.sj-card{grid-template-columns:64px 1fr;gap:10px}.sj-photo{width:64px;height:60px}.sj-location{grid-column:2}.sj-status{grid-column:1/3;justify-content:flex-start;border-top:1px solid #eee7dc;padding-top:9px}.sj-head h2{font-size:25px}}
@@ -452,7 +462,7 @@ img,video,canvas,svg{max-width:100%}
 <p class="muted">Introduce el código de tu aplicación autenticadora.</p><div class="field"><label>Código MFA</label><input id="mfaCode" inputmode="numeric" maxlength="6"></div>
 <button id="mfaBtn" class="primary">Verificar</button><div id="mfaMsg" class="msg hidden"></div></div></div>
 
-<div id="app" class="app hidden"><aside class="side"><div class="side-brand"><div class="crown-r">R</div><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
+<div id="app" class="app hidden"><button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Abrir menú">☰</button><div id="mobileMenuBackdrop" class="mobile-menu-backdrop" style="display:none"></div><aside class="side"><div class="side-brand"><div class="crown-r">R</div><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
 <nav class="nav" id="masterNav"></nav><div class="side-footer"><div class="sf-user"><div class="sf-avatar">R</div><div><div class="sf-name" id="sideUserName">Rita Romano</div><div class="sf-role" id="sideUserRole">Administrador</div></div></div><div class="sf-logout" onclick="doLogout()">↪ Cerrar sesión</div></div></aside>
 <main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
 <div id="modal" class="modal hidden"><div class="card modal-card"><div class="panel-head"><h3 id="modalTitle"></h3><button class="btn" onclick="closeModal()">Cerrar</button></div><div id="modalBody"></div></div></div>
@@ -521,22 +531,15 @@ function buildMasterNav(){
  const ok=romanoProfileMaster().allowed;
  let h="";
  groups.forEach(g=>{
+  const visible=g[1].filter(i=>ok.includes(i[0]));
+  if(!visible.length)return;
   h+='<div class="master-group">'+g[0]+'</div>';
-  g[1].forEach(i=>{
-   const can=ok.includes(i[0]);
-   h+='<button data-page="'+i[0]+'" class="'+(can?"":"master-nav-locked")+'" '+(can?'':'type="button" title="Disponible según el perfil"')+'><span style="display:inline-block;width:24px;color:#e2c27a">'+i[1]+'</span><span>'+i[2]+'</span>'+(can?"":'<span style="float:right;opacity:.55;font-size:11px">🔒</span>')+'</button>';
+  visible.forEach(i=>{
+   h+='<button data-page="'+i[0]+'"><span class="nav-icon">'+i[1]+'</span><span>'+i[2]+'</span></button>';
   });
  });
  $("masterNav").innerHTML=h;
- document.querySelectorAll("#masterNav button").forEach(b=>{
-  b.onclick=()=>{
-   if(b.classList.contains("master-nav-locked")){
-    if(typeof toast==="function") toast("Esta función no está disponible para este perfil.");
-    return;
-   }
-   openPage(b.dataset.page);
-  };
- });
+ document.querySelectorAll("#masterNav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 }
 async function renderDashboardMaster(){
  const name=currentProfile?.full_name||currentUser?.email||"equipo";updateDate();
@@ -1153,6 +1156,13 @@ async function initOfflineSync(){if(__offlineListenersReady)return;__offlineList
 function toast(t){$("toast").textContent=t;$("toast").classList.remove("hidden");setTimeout(()=>$("toast").classList.add("hidden"),3000)}
 function openModal(t,html){$("modalTitle").textContent=t;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden")}
+function closeMobileMenu(){const a=$("app");if(a)a.classList.remove("mobile-menu-open")}
+function toggleMobileMenu(){const a=$("app");if(a)a.classList.toggle("mobile-menu-open")}
+document.addEventListener("click",e=>{
+ if(e.target.closest("#mobileMenuToggle")){toggleMobileMenu();return}
+ if(e.target.closest("#mobileMenuBackdrop")){closeMobileMenu();return}
+ const b=e.target.closest("#masterNav button");if(b)closeMobileMenu();
+});
 function role(){return currentProfile?.role}
 function canManage(){return ["admin","supervisor"].includes(role())}
 function canSeeFinance(){return ["admin","client"].includes(role())}
