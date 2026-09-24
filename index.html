@@ -1303,16 +1303,19 @@ async function editPayment(id){
 }
 async function viewPayment(id){
  try{
-  const q=demoMode?{data:DEMO_PAYMENTS.find(v=>v.id===id)}:await sb.from("payments").select("*").eq("id",id).single();
+  const key=String(id);
+  const q=demoMode?{data:(DEMO_PAYMENTS||[]).find(v=>String(v.id)===key),error:null}:await sb.from("payments").select("*").eq("id",key).maybeSingle();
+  if(q.error)throw q.error;
   const x=q.data;
-  if(!x){toast("Recibo no encontrado");return}
+  if(!x){toast("Recibo no encontrado ou sem permissão para visualizá-lo.");return}
   let docHtml="";
   if(!demoMode){
-   const d=await sb.from("documents").select("id,file_name,storage_path,created_at").eq("payment_id",id).order("created_at",{ascending:false});
-   if(d.data?.length)docHtml='<div style="margin-top:12px"><b>Documentos anexos</b>'+d.data.map(x=>'<div class="line-item"><span>'+esc(x.file_name)+'</span><button class="btn" onclick="openPaymentDocument('+JSON.stringify(x.storage_path)+')">Abrir</button></div>').join("")+'</div>';
+   const d=await sb.from("documents").select("id,file_name,storage_path,created_at").eq("payment_id",key).order("created_at",{ascending:false});
+   if(d.error)throw d.error;
+   if(d.data?.length)docHtml='<div style="margin-top:12px"><b>Documentos anexos</b>'+d.data.map(x=>'<div class="line-item"><span>'+esc(x.file_name)+'</span><button class="btn" type="button" data-payment-path="'+esc(x.storage_path)+'" onclick="openPaymentDocument(this.dataset.paymentPath)">Abrir</button></div>').join("")+'</div>';
   }
-  openModal("Ficha del recibo",'<div class="panel"><div class="two"><div><b>Cliente</b><div>'+esc(x.client_id||"—")+'</div></div><div><b>Factura</b><div>'+esc(x.invoice_id||"—")+'</div></div><div><b>Valor</b><div><strong>'+Number(x.amount||0).toFixed(2)+' €</strong></div></div><div><b>Método</b><div>'+esc(x.method||"—")+'</div></div><div><b>Fecha</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleString("es-ES"):"—")+'</div></div></div><div style="margin-top:12px"><b>Referencia</b><div>'+esc(x.reference||"—")+'</div></div><div style="margin-top:12px"><b>Observaciones</b><div>'+esc(x.notes||"—")+'</div></div>'+docHtml+'</div>'+(canManage()?'<div class="actions"><button class="btn gold" onclick="editPayment('+JSON.stringify(id)+')">Editar</button><button class="btn" onclick="closeModal()">Cerrar</button></div>':'<div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>'));
- }catch(e){toast(e.message)}
+  openModal("Ficha del recibo",'<div class="panel"><div class="two"><div><b>Cliente</b><div>'+esc(x.client_id||"—")+'</div></div><div><b>Factura</b><div>'+esc(x.invoice_id||"—")+'</div></div><div><b>Valor</b><div><strong>'+Number(x.amount||0).toFixed(2)+' €</strong></div></div><div><b>Método</b><div>'+esc(x.method||"—")+'</div></div><div><b>Fecha</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleString("es-ES"):"—")+'</div></div></div><div style="margin-top:12px"><b>Referencia</b><div>'+esc(x.reference||"—")+'</div></div><div style="margin-top:12px"><b>Observaciones</b><div>'+esc(x.notes||"—")+'</div></div>'+docHtml+'</div>'+(canManage()?'<div class="actions"><button class="btn gold" type="button" data-payment-id="'+esc(key)+'" onclick="editPayment(this.dataset.paymentId)">Editar</button><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>':'<div class="actions"><button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>'));
+ }catch(e){toast("No se pudo abrir el recibo: "+(e?.message||e))}
 }
 async function openPaymentDocument(path){
  const u=await sb.storage.from("company-documents").createSignedUrl(path,900);
@@ -1351,13 +1354,20 @@ async function saveInvoiceForm(e,id){
   if(id){const x=DEMO_INVOICES.find(v=>v.id===id);if(x)Object.assign(x,data)}else DEMO_INVOICES.unshift({id:"demo-inv-"+Date.now(),created_at:new Date().toISOString(),paid_at:null,...data});
   closeModal();await renderInvoicesPremium();toast("Factura guardada");return;
  }
- let q=id
-  ?await sb.from("invoices").update(data).eq("id",id).select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").single()
-  :await sb.from("invoices").insert({...data,company_id:currentProfile.company_id}).select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").single();
+ let q;
+ if(id){
+  q=await sb.from("invoices").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id");
+ }else{
+  q=await sb.from("invoices").insert({...data,company_id:currentProfile.company_id}).select("id");
+ }
  if(q.error){toast("No se pudo guardar la factura: "+q.error.message);return}
- if(!q.data){toast("La factura no fue guardada. No se recibió confirmación del servidor.");return}
- __invoiceCache[String(q.data.id)]=q.data;
- closeModal();await renderInvoicesPremium();toast(id?"Factura actualizada correctamente":"Factura creada correctamente");
+ if(!q.data?.length){toast("La factura no fue guardada. No se encontró el registro.");return}
+ const saved=await sb.from("invoices").select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").eq("id",q.data[0].id).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(saved.error||!saved.data){toast("La factura fue modificada pero no pudo confirmarse: "+(saved.error?.message||"sin datos"));return}
+ __invoiceCache[String(saved.data.id)]=saved.data;
+ await renderInvoicesPremium();
+ closeModal();
+ toast(id?"Factura actualizada correctamente":"Factura creada correctamente");
 }
 const __invoiceCache = window.__invoiceCache || (window.__invoiceCache={});
 async function editInvoice(id){
