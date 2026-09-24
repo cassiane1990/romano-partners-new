@@ -1107,27 +1107,80 @@ async function renderStock(){const r=await sb.from("stock_items").select("name,s
 
 async function renderRecurring(){const r=await sb.from("recurring_services").select("id,frequency,typology,priority,active,next_run_at,instructions").order("next_run_at",{ascending:true});$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Servicios recurrentes</h3><span class="pill">Programación automática</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Frecuencia</th><th>Tipología</th><th>Prioridad</th><th>Próxima ejecución</th><th>Activo</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.frequency)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(x.priority)+'</td><td>'+esc(x.next_run_at?new Date(x.next_run_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.active?"Sí":"No")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios recurrentes.</div>')+'</div>'}
 
-function playNotificationSound(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ac=new C();const run=()=>{const o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.value=880;g.gain.setValueAtTime(.001,ac.currentTime);g.gain.exponentialRampToValueAtTime(.11,ac.currentTime+.03);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.55);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.58)};if(ac.state==="suspended")ac.resume().then(run);else run()}catch(e){}}
-async function enableBrowserNotifications(){if(!("Notification" in window)){toast("Este navegador no admite notificaciones.");return}const p=await Notification.requestPermission();toast(p==="granted"?"Notificaciones del navegador activadas.":"Permiso de notificaciones no concedido.")}
-async function markNotificationRead(id){if(!id)return;const r=await sb.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id).eq("recipient_id",currentUser.id);if(r.error){toast(r.error.message);return}await renderNotifications();}
-async function openNotification(id){await markNotificationRead(id);}
+let __notificationAudioContext=null;
+function unlockNotificationAudio(){
+ try{
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+  if(!__notificationAudioContext)__notificationAudioContext=new C();
+  if(__notificationAudioContext.state==="suspended")__notificationAudioContext.resume().catch(()=>{});
+ }catch(e){}
+}
+function playNotificationSound(){
+ try{
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+  if(!__notificationAudioContext)__notificationAudioContext=new C();
+  const ac=__notificationAudioContext;
+  const run=()=>{
+   const o=ac.createOscillator(),g=ac.createGain();
+   o.type="sine";o.frequency.setValueAtTime(880,ac.currentTime);o.frequency.exponentialRampToValueAtTime(660,ac.currentTime+.18);
+   g.gain.setValueAtTime(.001,ac.currentTime);g.gain.exponentialRampToValueAtTime(.13,ac.currentTime+.03);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.65);
+   o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.68);
+  };
+  if(ac.state==="suspended")ac.resume().then(run).catch(()=>{});else run();
+ }catch(e){}
+}
+async function enableBrowserNotifications(){
+ if(!("Notification" in window)){toast("Este navegador no admite notificaciones.");return}
+ const p=await Notification.requestPermission();
+ unlockNotificationAudio();
+ toast(p==="granted"?"Notificaciones del navegador activadas.":"Permiso de notificaciones no concedido.");
+}
+async function markNotificationRead(id,refresh=true){
+ if(!id)return false;
+ const r=await sb.from("notifications").update({read_at:new Date().toISOString()}).eq("id",id).eq("recipient_id",currentUser.id);
+ if(r.error){toast(r.error.message||"No se pudo marcar la alerta.");return false}
+ if(refresh)await renderNotifications();
+ return true;
+}
+async function openChatFromNotification(title,body){
+ const text=String(body||"");
+ const senderName=text.split(":")[0].trim();
+ if(!senderName)return false;
+ const p=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("full_name",senderName).eq("active",true).limit(5);
+ const sender=p.data?.[0];
+ if(!sender)return false;
+ const m=await sb.from("chat_messages").select("id,thread_id,body,created_at").eq("sender_id",sender.id).order("created_at",{ascending:false}).limit(50);
+ const targetBody=text.includes(":")?text.slice(text.indexOf(":")+1).trim():text;
+ const msg=(m.data||[]).find(x=>String(x.body||"").trim()===targetBody);
+ if(!msg)return false;
+ const threads=await sb.from("chat_threads").select("id,title,thread_type,updated_at").eq("company_id",currentProfile.company_id).eq("thread_type","direct").order("updated_at",{ascending:false});
+ const thread=(threads.data||[]).find(x=>x.id===msg.thread_id);
+ if(!thread)return false;
+ await openPage("chat");
+ await openChatPremium(thread.id,thread.title||sender.full_name||"Conversación");
+ return true;
+}
 async function notificationAction(id,title,body){
- await markNotificationRead(id);
- const t=String(title||"").toLowerCase(), b=String(body||"");
+ const t=String(title||"").toLowerCase(),b=String(body||"");
+ if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){
+   const opened=await openChatFromNotification(title,body);
+   if(opened){await markNotificationRead(id,false);return}
+ }
+ await markNotificationRead(id,false);
  if(role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
    const m=b.match(/SRV-[A-Z0-9-]+/i);
    if(m){
-     const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",m[0]).maybeSingle();
-     if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){await viewService(q.data.id);return}
+    const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",m[0]).maybeSingle();
+    if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){await viewService(q.data.id);return}
    }
    openPage("services");return;
  }
- if(!["admin","supervisor"].includes(role()))return;
+ if(!["admin","supervisor"].includes(role())){await renderNotifications();return}
  if(/novo serviço|novo pedido de serviço/.test(t)){
    const m=b.match(/SRV-[A-Z0-9-]+/i);
    if(m){
-     const q=await sb.from("services").select("id,status").eq("code",m[0]).maybeSingle();
-     if(q.data?.id&&["requested","scheduled"].includes(q.data.status)&&!q.data.accepted_at){await viewService(q.data.id);return}
+    const q=await sb.from("services").select("id,status").eq("code",m[0]).maybeSingle();
+    if(q.data?.id&&["requested","scheduled"].includes(q.data.status)&&!q.data.accepted_at){await viewService(q.data.id);return}
    }
    openPage("services");return;
  }
@@ -1135,8 +1188,28 @@ async function notificationAction(id,title,body){
  if(/incidencia|emergencia/.test(t)){openPage("emergency");return}
  openPage("notifications");
 }
-async function renderNotifications(){const r=await sb.from("notifications").select("id,title,body,severity,read_at,created_at").eq("recipient_id",currentUser.id).order("created_at",{ascending:false}).limit(50);if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}const rows=r.data||[],unread=rows.filter(x=>!x.read_at).length;rows.forEach(x=>{if(x.title&&/novo serviço/i.test(x.title))x.title=String(x.title).replace(/\s*[·•-]?\s*5 minutos para aceitar/ig,"");if(x.body)x.body=String(x.body).replace(/\s*·?\s*resposta antes de\s*\d{1,2}:\d{2}/ig,"");});$("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{const t=String(x.title||"").toLowerCase(),isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t),action=(isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role()))),label=isEmployeeAssignment?"✓ VER Y ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEITAR COMO RECEBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";return '<div class="panel" style="margin-top:10px;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>'}).join(""):'<div class="empty">No hay alertas.</div>')+'</div>'}
-
+async function openNotification(id,title,body){
+ const t=String(title||"").toLowerCase();
+ if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){
+   const opened=await openChatFromNotification(title,body);
+   if(opened){await markNotificationRead(id,false);return}
+ }
+ await markNotificationRead(id,true);
+}
+async function renderNotifications(){
+ const r=await sb.from("notifications").select("id,title,body,severity,read_at,created_at").eq("recipient_id",currentUser.id).order("created_at",{ascending:false}).limit(50);
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ const rows=r.data||[],unread=rows.filter(x=>!x.read_at).length;
+ rows.forEach(x=>{if(x.title&&/novo serviço/i.test(x.title))x.title=String(x.title).replace(/\s*[·•-]?\s*5 minutos para aceitar/ig,"");if(x.body)x.body=String(x.body).replace(/\s*·?\s*resposta antes de\s*\d{1,2}:\d{2}/ig,"");});
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
+   const t=String(x.title||"").toLowerCase();
+   const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
+   const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
+   const action=(isMessage||isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
+   const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ VER Y ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
+   return '<div class="panel" style="margin-top:10px;cursor:pointer;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
+ }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';
+}
 
 async function renderSecurity(){const f=await sb.auth.mfa.listFactors();const enabled=f.data?.totp?.some(x=>x.status==="verified");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Seguridad y MFA</h3><span class="pill">'+(enabled?"MFA activo":"MFA no configurado")+'</span></div><p class="muted">El sistema utiliza Supabase Auth, sesiones reales y políticas RLS server-side. MFA TOTP se puede configurar para cuentas administrativas.</p><div class="actions"><button class="btn gold" onclick="enrollMFA()">Configurar MFA</button></div><div id="mfaSetup"></div></div>'}
 async function enrollMFA(){const e=await sb.auth.mfa.enroll({factorType:"totp",friendlyName:"ROMANO PARTNERS"});if(e.error){toast(e.error.message);return}$("mfaSetup").innerHTML='<div class="panel"><h3>Escanea el QR</h3><img style="width:220px;margin:15px 0" src="data:image/svg+xml;utf8,'+encodeURIComponent(e.data.totp.qr_code)+'"><div class="muted">Si no puedes escanearlo, usa el secreto: <strong>'+esc(e.data.totp.secret)+'</strong></div><div class="field"><label>Código del autenticador</label><input id="enrollCode" inputmode="numeric" maxlength="6"></div><button class="primary" onclick="verifyEnrollment(\''+e.data.id+'\')">Activar MFA</button></div>'}
@@ -1163,13 +1236,13 @@ async function startRealtime(){
    const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page||"";
    toast("🔔 "+(payload.new.title||"Nueva alerta")+(payload.new.body?" · "+payload.new.body:""));
    playNotificationSound();
-   if("Notification" in window&&Notification.permission==="granted"){try{const n=new Notification(payload.new.title||"ROMANO PROPERTY CARE",{body:payload.new.body||"Nueva alerta",tag:"romano-"+payload.new.id});n.onclick=()=>{window.focus();n.close();openPage("notifications")}}catch(e){}}
+   if("Notification" in window&&Notification.permission==="granted"){try{const n=new Notification(payload.new.title||"ROMANO PROPERTY CARE",{body:payload.new.body||"Nueva alerta",tag:"romano-"+payload.new.id});n.onclick=()=>{window.focus();n.close();openNotification(payload.new.id,payload.new.title,payload.new.body)}}catch(e){}}
    if(active==="notifications"||active==="dashboard")openPage(active);
  })
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshChatMessages();})
  .subscribe();
 }
-function doLogout(){sb.auth.signOut()}
+document.addEventListener("pointerdown",unlockNotificationAudio,{once:true,passive:true});document.addEventListener("keydown",unlockNotificationAudio,{once:true,passive:true});\nfunction doLogout(){sb.auth.signOut()}
 function showApp(){
  $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";
  $("roleBadge").textContent=roleNames[role()]||role();
