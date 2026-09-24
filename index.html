@@ -1237,7 +1237,7 @@ function paymentModalHtml(x={}){
  return '<form onsubmit="savePaymentForm(event,'+(x.id?JSON.stringify(x.id):'null')+')">'+
  '<div class="two"><div class="field"><label>Cliente</label><select id="payClient" onchange="loadPaymentInvoices()"><option value="">— Seleccionar —</option>'+x.clientOptions+'</select></div>'+
  '<div class="field"><label>Factura</label><select id="payInvoice"><option value="">— Sin factura vinculada —</option>'+String(x.invoiceOptions||"")+'</select></div></div>'+
- '<div class="two"><div class="field"><label>Valor (€)</label><input id="payAmount" type="number" min="0" step="0.01" value="'+esc(x.amount??"")+'" required></div>'+
+ '<div class="two"><div class="field"><label>Valor (€)</label><input id="payAmount" type="number" min="0.01" step="0.01" value="'+esc(x.amount??"")+'" required></div>'+
  '<div class="field"><label>Método</label><select id="payMethod"><option value="Transferencia" '+(x.method==="Transferencia"?"selected":"")+'>Transferencia</option><option value="Tarjeta" '+(x.method==="Tarjeta"?"selected":"")+'>Tarjeta</option><option value="Efectivo" '+(x.method==="Efectivo"?"selected":"")+'>Efectivo</option><option value="Otro" '+(x.method==="Otro"?"selected":"")+'>Otro</option></select></div></div>'+
  '<div class="two"><div class="field"><label>Fecha</label><input id="payDate" type="datetime-local" value="'+esc(x.paid_at?new Date(x.paid_at).toISOString().slice(0,16):new Date().toISOString().slice(0,16))+'" required></div>'+
  '<div class="field"><label>Referencia</label><input id="payReference" value="'+esc(x.reference||"")+'"></div></div>'+
@@ -1276,24 +1276,41 @@ async function attachPaymentDocument(paymentId){
 }
 async function savePaymentForm(e,id){
  e.preventDefault();
- const dateValue=$("payDate").value;
- const paidAt=dateValue?new Date(dateValue).toISOString():new Date().toISOString();
- const data={client_id:$("payClient").value||null,invoice_id:$("payInvoice").value||null,amount:Number($("payAmount").value),method:$("payMethod").value,reference:$("payReference").value.trim()||null,paid_at:paidAt,notes:$("payNotes").value.trim()||null};
- if(data.invoice_id&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.invoice_id)){toast("Seleccione una factura válida da lista.");return}
- if(!Number.isFinite(data.amount)||data.amount<0){toast("Valor inválido");return}
- if(demoMode){
-  let payment;
-  if(id){const x=DEMO_PAYMENTS.find(v=>v.id===id);if(x){Object.assign(x,data);payment=x}}else{payment={id:"demo-pay-"+Date.now(),...data};DEMO_PAYMENTS.unshift(payment)}
-  closeModal();await renderReceiptsPremium();toast("Recibo guardado");return;
- }
- let q=id?await sb.from("payments").update(data).eq("id",id).select("id").single():await sb.from("payments").insert({...data,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
- if(q.error){toast(q.error.message);return}
- const paymentId=q.data?.id||id;
- const file=$("payDocument")?.files?.[0];
- if(file){const ok=await attachPaymentDocument(paymentId);if(!ok)return}
- closeModal();await renderReceiptsPremium();toast(file?"Recibo y documento guardados":"Recibo guardado");
+ try{
+  const dateValue=$("payDate")?.value;
+  const paidAt=dateValue?new Date(dateValue).toISOString():new Date().toISOString();
+  const amount=Number($("payAmount")?.value);
+  if(!Number.isFinite(amount)||amount<=0){toast("El valor del recibo debe ser mayor que 0.");return}
+  const invoiceId=$("payInvoice")?.value||null;
+  if(invoiceId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(invoiceId)){toast("Seleccione una factura válida de la lista.");return}
+  if(!currentProfile?.company_id)throw new Error("Sesión sin empresa asociada.");
+  const data={client_id:$("payClient")?.value||null,invoice_id:invoiceId,amount,method:$("payMethod")?.value||"Transferencia",reference:$("payReference")?.value.trim()||null,paid_at:paidAt,notes:$("payNotes")?.value.trim()||null};
+  if(demoMode){
+   let payment;
+   if(id){payment=DEMO_PAYMENTS.find(v=>String(v.id)===String(id));if(!payment)throw new Error("Recibo no encontrado.");Object.assign(payment,data)}
+   else{payment={id:"demo-pay-"+Date.now(),...data};DEMO_PAYMENTS.unshift(payment)}
+   await renderReceiptsPremium();closeModal();toast("Recibo guardado");return;
+  }
+  let q;
+  if(id){
+   q=await sb.from("payments").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+  }else{
+   q=await sb.from("payments").insert({...data,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").maybeSingle();
+  }
+  if(q.error)throw q.error;
+  const paymentId=q.data?.id||id;
+  if(!paymentId)throw new Error("No se confirmó el guardado del recibo.");
+  const file=$("payDocument")?.files?.[0];
+  if(file){const ok=await attachPaymentDocument(paymentId);if(!ok)return}
+  const saved=await sb.from("payments").select("id,invoice_id,client_id,amount,method,reference,paid_at,notes,created_at").eq("id",paymentId).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(saved.error)throw saved.error;
+  if(!saved.data)throw new Error("El recibo se guardó pero no pudo ser recuperado.");
+  await renderReceiptsPremium();
+  closeModal();
+  toast(file?"Recibo y documento guardados":"Recibo guardado correctamente");
+ }catch(err){console.error("savePaymentForm",err);toast("No se pudo guardar el recibo: "+(err?.message||err))}
 }
-async function editPayment(id){
+function editPayment(id){
  if(!canManage()){await viewPayment(id);return}
  try{
   if(demoMode){const x=DEMO_PAYMENTS.find(v=>v.id===id);if(!x)return;openModal("Editar recibo / comprobante",paymentModalHtml({...x,clientOptions:await financeClientsOptions(x.client_id||""),invoiceOptions:await financeInvoiceOptions(x.invoice_id||"",x.client_id||"")}));return}
@@ -1347,27 +1364,33 @@ async function newInvoice(){
 }
 async function saveInvoiceForm(e,id){
  e.preventDefault();
- const subtotal=Number($("invSubtotal").value),tax_rate=Number($("invRate").value),tax_amount=Number((subtotal*tax_rate/100).toFixed(2)),total=Number((subtotal+tax_amount).toFixed(2));
- const data={client_id:$("invClient").value||null,number:$("invNumber").value.trim()||nextInvoiceNumber(),status:$("invStatus").value,subtotal,tax_rate,tax_amount,total,due_at:$("invDue").value?new Date($("invDue").value+"T23:59:59").toISOString():null};
- if(!Number.isFinite(subtotal)||subtotal<0||!Number.isFinite(tax_rate)||tax_rate<0){toast("Valores inválidos");return}
- if(demoMode){
-  if(id){const x=DEMO_INVOICES.find(v=>v.id===id);if(x)Object.assign(x,data)}else DEMO_INVOICES.unshift({id:"demo-inv-"+Date.now(),created_at:new Date().toISOString(),paid_at:null,...data});
-  closeModal();await renderInvoicesPremium();toast("Factura guardada");return;
- }
- let q;
- if(id){
-  q=await sb.from("invoices").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id");
- }else{
-  q=await sb.from("invoices").insert({...data,company_id:currentProfile.company_id}).select("id");
- }
- if(q.error){toast("No se pudo guardar la factura: "+q.error.message);return}
- if(!q.data?.length){toast("La factura no fue guardada. No se encontró el registro.");return}
- const saved=await sb.from("invoices").select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").eq("id",q.data[0].id).eq("company_id",currentProfile.company_id).maybeSingle();
- if(saved.error||!saved.data){toast("La factura fue modificada pero no pudo confirmarse: "+(saved.error?.message||"sin datos"));return}
- __invoiceCache[String(saved.data.id)]=saved.data;
- await renderInvoicesPremium();
- closeModal();
- toast(id?"Factura actualizada correctamente":"Factura creada correctamente");
+ try{
+  const subtotal=Number($("invSubtotal")?.value),tax_rate=Number($("invRate")?.value);
+  if(!Number.isFinite(subtotal)||subtotal<0||!Number.isFinite(tax_rate)||tax_rate<0){toast("Valores inválidos");return}
+  const tax_amount=Number((subtotal*tax_rate/100).toFixed(2)),total=Number((subtotal+tax_amount).toFixed(2));
+  const data={client_id:$("invClient")?.value||null,number:$("invNumber")?.value.trim()||nextInvoiceNumber(),status:$("invStatus")?.value||"draft",subtotal,tax_rate,tax_amount,total,due_at:$("invDue")?.value?new Date($("invDue").value+"T23:59:59").toISOString():null};
+  if(demoMode){
+   if(id){const x=DEMO_INVOICES.find(v=>String(v.id)===String(id));if(!x)throw new Error("Factura no encontrada.");Object.assign(x,data)}
+   else DEMO_INVOICES.unshift({id:"demo-inv-"+Date.now(),created_at:new Date().toISOString(),paid_at:null,...data});
+   await renderInvoicesPremium();closeModal();toast("Factura guardada");return;
+  }
+  if(!currentProfile?.company_id)throw new Error("Sesión sin empresa asociada.");
+  let q;
+  if(id){
+   q=await sb.from("invoices").update(data).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+  }else{
+   q=await sb.from("invoices").insert({...data,company_id:currentProfile.company_id}).select("id").maybeSingle();
+  }
+  if(q.error)throw q.error;
+  if(!q.data?.id)throw new Error("No se confirmó el guardado de la factura.");
+  const saved=await sb.from("invoices").select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").eq("id",q.data.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(saved.error)throw saved.error;
+  if(!saved.data)throw new Error("La factura se guardó pero no pudo ser recuperada.");
+  __invoiceCache[String(saved.data.id)]=saved.data;
+  await renderInvoicesPremium();
+  closeModal();
+  toast(id?"Factura actualizada correctamente":"Factura creada correctamente");
+ }catch(err){console.error("saveInvoiceForm",err);toast("No se pudo guardar la factura: "+(err?.message||err))}
 }
 const __invoiceCache = window.__invoiceCache || (window.__invoiceCache={});
 async function editInvoice(id){
