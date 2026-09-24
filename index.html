@@ -1719,9 +1719,13 @@ async function romanoCatalogSave(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true"};
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:id?"update":"create",id,payload}});
- const ferr=await romanoFunctionError(inv);
- if(ferr){toast("No se pudo guardar: "+ferr);return}
+ let q;
+ if(id){
+  q=await sb.from("service_catalog").update({category,code,name,description,unit,price,tax_included,active,updated_at:new Date().toISOString()}).eq("id",id).eq("company_id",currentProfile.company_id);
+ }else{
+  q=await sb.from("service_catalog").insert({company_id:currentProfile.company_id,category,code,name,description,unit,price,tax_included,active});
+ }
+ if(q.error){toast("No se pudo guardar: "+q.error.message);return}
  closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
 }
 async function romanoCatalogDelete(id){
@@ -1729,9 +1733,8 @@ async function romanoCatalogDelete(id){
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
  const before=await sb.from("service_catalog").select("category").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(before.error){toast(before.error.message);return}
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:"delete",id}});
- const ferr=await romanoFunctionError(inv);
- if(ferr){toast("No se pudo eliminar: "+ferr);return}
+ const q=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(q.error){toast("No se pudo eliminar: "+q.error.message);return}
  toast("Artículo eliminado");if(before.data?.category)await romanoCatalogManager(before.data.category);
 }
 async function romanoStockManager(){
@@ -1757,17 +1760,20 @@ async function romanoStockSave(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar materiales.");return}
  const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null};
  if(!payload.name){toast("Indique el material.");return}
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:id?"update":"create",id,payload}});
- const ferr=await romanoFunctionError(inv);
- if(ferr){toast("No se pudo guardar: "+ferr);return}
+ let q;
+ if(id){
+  q=await sb.from("stock_items").update({...payload,updated_at:new Date().toISOString()}).eq("id",id).eq("company_id",currentProfile.company_id);
+ }else{
+  q=await sb.from("stock_items").insert({...payload,company_id:currentProfile.company_id});
+ }
+ if(q.error){toast("No se pudo guardar: "+q.error.message);return}
  closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
 }
 async function romanoStockDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}
  if(!confirm("¿Eliminar este material del stock?"))return;
- const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"stock",action:"delete",id}});
- const ferr=await romanoFunctionError(inv);
- if(ferr){toast("No se pudo eliminar: "+ferr);return}
+ const q=await sb.from("stock_items").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(q.error){toast("No se pudo eliminar: "+q.error.message);return}
  toast("Material eliminado");await romanoStockManager();
 }
 async function romanoRecurringManager(){
