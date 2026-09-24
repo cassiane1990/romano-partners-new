@@ -1103,11 +1103,34 @@ function employeeFormHtml(x={},edit=false){
 function employeeDataFromForm(p){
  return {full_name:$(""+p+"Name").value.trim(),employee_code:$(""+p+"Code").value.trim(),function_title:$(""+p+"Function").value.trim(),email:$(""+p+"Email").value.trim()||null,phone:$(""+p+"Phone").value.trim()||null,nif_nie:$(""+p+"Nif").value.trim()||null,birth_date:$(""+p+"Birth").value||null,nationality:$(""+p+"Nationality").value.trim()||null,address:$(""+p+"Address").value.trim()||null,city:$(""+p+"City").value.trim()||null,postal_code:$(""+p+"Postal").value.trim()||null,country:$(""+p+"Country").value.trim()||"España",hire_date:$(""+p+"Hire").value||null,salary:Number($(""+p+"Salary").value||0),weekly_hours:Number($(""+p+"Hours").value||0)||null,contract_type:$(""+p+"Contract").value.trim()||null,social_security_number:$(""+p+"SS").value.trim()||null,emergency_contact_name:$(""+p+"EmergencyName").value.trim()||null,emergency_contact_phone:$(""+p+"EmergencyPhone").value.trim()||null,bank_iban:$(""+p+"Iban").value.trim()||null,notes:$(""+p+"Notes").value.trim()||null,active:$(""+p+"Active").value==="true"};
 }
-async function newEmployee(){const nextCode="RPC-"+String((DEMO_EMPLOYEES?.length||0)+1).padStart(3,"0");openModal("Nuevo funcionario",employeeFormHtml({employee_code:nextCode,hire_date:new Date().toISOString().slice(0,10),country:"España",active:true},false));}
+async function newEmployee(){
+ let nextCode="RPC-001";
+ if(demoMode){
+   nextCode="RPC-"+String((DEMO_EMPLOYEES?.length||0)+1).padStart(3,"0");
+ }else{
+   const q=await sb.from("employee_profiles").select("employee_code").eq("company_id",currentProfile.company_id).order("employee_code",{ascending:true});
+   if(!q.error){
+     const used=new Set((q.data||[]).map(x=>String(x.employee_code||"").trim().toUpperCase()));
+     let n=1;while(used.has("RPC-"+String(n).padStart(3,"0")))n++;
+     nextCode="RPC-"+String(n).padStart(3,"0");
+   }else{
+     nextCode="RPC-"+Date.now().toString().slice(-6);
+   }
+ }
+ openModal("Nuevo funcionario",employeeFormHtml({employee_code:nextCode,hire_date:new Date().toISOString().slice(0,10),country:"España",active:true},false));
+}
 async function saveEmployee(e){
  e.preventDefault();const data=employeeDataFromForm("e"),photo=await readDemoPhoto("ePhoto"),contractFile=$("eContractFile")?.files?.[0];if(!data.full_name||!data.employee_code||!data.function_title){toast("Nombre, código y función son obligatorios.");return}
  if(demoMode){const id="demo-e"+(DEMO_EMPLOYEES.length+1);if(photo)demoSavePhoto(id,photo);DEMO_EMPLOYEES.push({id,...data});closeModal();toast("Funcionario creado en modo demostración");renderEmployees();return}
- const r=await sb.from("employee_profiles").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,...data}).select("id").single();if(r.error){toast(r.error.message);return}const id=r.data.id;if(photo){const f=$("ePhoto")?.files?.[0];if(f){const path=currentProfile.company_id+"/employees/"+id+"/profile-"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]+/g,"_");const up=await sb.storage.from("company-documents").upload(path,f,{upsert:false,contentType:f.type||undefined});if(!up.error)await sb.from("employee_profiles").update({photo_url:path}).eq("id",id)}}if(contractFile)await uploadEmployeeDocument(id,contractFile,"contrato","Contrato de trabajo");closeModal();toast("Funcionario creado");renderEmployees();
+ const r=await sb.from("employee_profiles").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,...data}).select("id").single();
+ if(r.error){
+   const msg=r.error.code==="23505"?"El código interno ya existe. Use otro código.":r.error.message;
+   toast("No se pudo guardar el funcionario: "+msg);return
+ }
+ const id=r.data.id;
+ if(photo){const f=$("ePhoto")?.files?.[0];if(f){const path=currentProfile.company_id+"/employees/"+id+"/profile-"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]+/g,"_");const up=await sb.storage.from("company-documents").upload(path,f,{upsert:false,contentType:f.type||undefined});if(!up.error)await sb.from("employee_profiles").update({photo_url:path}).eq("id",id)}}
+ if(contractFile)await uploadEmployeeDocument(id,contractFile,"contrato","Contrato de trabajo");
+ closeModal();toast("Funcionario creado correctamente");renderEmployees();
 }
 async function loadEmployeeDocuments(id){
  const box=$("employeeDocs_"+id);if(!box)return;const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,expires_at,created_at").eq("employee_profile_id",id).order("created_at",{ascending:false});if(q.error){box.innerHTML='<div class="msg">'+esc(q.error.message)+'</div>';return}box.innerHTML='<div class="panel-head"><div><h3>Documentos del funcionario</h3><div class="muted">'+(q.data?.length||0)+' documentos</div></div></div><div class="field"><label>Añadir documento</label><input id="docFile_'+id+'" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"></div>'+(q.data?.length?q.data.map(d=>'<div class="line-item"><span><b>'+esc(d.title||d.file_name)+'</b><small class="muted" style="display:block">'+esc(d.document_type||"documento")+'</small></span><button class="btn" type="button" onclick="openEmployeeDocument(\''+esc(d.storage_path)+'\')">Abrir</button></div>').join(""):'<div class="empty">Sin documentos todavía.</div>')+'<button class="btn gold" type="button" style="margin-top:8px" onclick="uploadEmployeeDocumentFromInput(\''+id+'\')">＋ Guardar documento</button>';
