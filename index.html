@@ -381,6 +381,12 @@ img,video,canvas,svg{max-width:100%}
   .rpc-calendar-actions .btn.gold{grid-column:1/-1}
 }
 </style>
+
+<!-- ROMANO MASTER MENU STANDARD 2026-09-24 -->
+<style id="romano-master-menu-standard-2026-09-24">
+#masterNav .master-nav-locked{opacity:.62;cursor:not-allowed}
+#masterNav .master-nav-locked:hover{background:transparent;transform:none}
+</style>
 </head>
 <body>
 <div id="login" class="login"><div class="card login-card">
@@ -450,8 +456,8 @@ const SERVICE_CLEANING_CATALOG={
 
 function buildMasterNav(){
  const allowed={
-  admin:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
-  supervisor:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
+  admin:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
+  supervisor:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
   employee:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
   client:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","documents","service_history","chat","notifications","emergency","sync","profile"]
  };
@@ -466,9 +472,25 @@ function buildMasterNav(){
   ["DOCUMENTOS · COMUNICACIÓN",[["documents","▤","Documentos / Contratos"],["service_history","◷","Histórico de servicios"],["chat","◌","Chat"],["notifications","!","Alertas"],["search","⌕","Pesquisa global"]]],
   ["GESTIÓN",[["reports","▥","Relatórios"],["sync","⇄","Sincronización offline"],["backup","◫","Backup / Recuperación"],["ai","✦","ROMANO IA"],["audit","◫","Auditoría"],["privacy","◇","Privacidad / RGPD"],["security","⌘","Seguridad / MFA"],["profile","◎","Mi perfil"]]]
  ];
- const ok=allowed[role()]||allowed.client;let h="";
- groups.forEach(g=>{const items=g[1].filter(i=>ok.includes(i[0]));if(!items.length)return;h+='<div class="master-group">'+g[0]+'</div>';items.forEach(i=>h+='<button data-page="'+i[0]+'"><span style="display:inline-block;width:24px;color:#e2c27a">'+i[1]+'</span><span>'+i[2]+'</span></button>')});
- $("masterNav").innerHTML=h;document.querySelectorAll("#masterNav button").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
+ const ok=allowed[role()]||allowed.client;
+ let h="";
+ groups.forEach(g=>{
+  h+='<div class="master-group">'+g[0]+'</div>';
+  g[1].forEach(i=>{
+   const can=ok.includes(i[0]);
+   h+='<button data-page="'+i[0]+'" class="'+(can?"":"master-nav-locked")+'" '+(can?'':'type="button" title="Disponible según el perfil"')+'><span style="display:inline-block;width:24px;color:#e2c27a">'+i[1]+'</span><span>'+i[2]+'</span>'+(can?"":'<span style="float:right;opacity:.55;font-size:11px">🔒</span>')+'</button>';
+  });
+ });
+ $("masterNav").innerHTML=h;
+ document.querySelectorAll("#masterNav button").forEach(b=>{
+  b.onclick=()=>{
+   if(b.classList.contains("master-nav-locked")){
+    if(typeof toast==="function") toast("Esta función no está disponible para este perfil.");
+    return;
+   }
+   openPage(b.dataset.page);
+  };
+ });
 }
 async function renderDashboardMaster(){
  const name=currentProfile?.full_name||currentUser?.email||"equipo";updateDate();
