@@ -382,6 +382,31 @@ img,video,canvas,svg{max-width:100%}
 }
 </style>
 
+<!-- ROMANO LAYOUT REPAIR 2026-09-24 -->
+<style id="romano-layout-repair-2026-09-24">
+/* Keep every workspace inside the same shell. Tables may scroll inside the panel, never move the whole page. */
+.content> .panel{width:100%;box-sizing:border-box;min-width:0}
+.panel{box-sizing:border-box}
+.panel-head{min-width:0}
+.panel-head>div{min-width:0}
+.actions{min-width:0;flex-wrap:wrap}
+.table{width:100%;max-width:100%;box-sizing:border-box}
+@media (min-width:768px){
+  .table{display:table;table-layout:fixed}
+  .table th,.table td{white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:middle}
+  .table th:last-child,.table td:last-child{width:150px}
+  .table .actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-start}
+}
+@media (max-width:1199px){
+  .content{box-sizing:border-box;overflow-x:hidden}
+  .content>*,.panel{max-width:100%;box-sizing:border-box}
+}
+@media (max-width:767px){
+  .table{display:block;overflow-x:auto;table-layout:auto;white-space:nowrap}
+  .table th,.table td{white-space:normal}
+}
+</style>
+
 <!-- ROMANO MASTER MENU STANDARD 2026-09-24 -->
 <style id="romano-master-menu-standard-2026-09-24">
 #masterNav .master-nav-locked{opacity:.62;cursor:not-allowed}
@@ -456,7 +481,7 @@ const SERVICE_CLEANING_CATALOG={
 
 function buildMasterNav(){
  const allowed={
-  admin:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
+  admin:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
   supervisor:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
   employee:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
   client:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","documents","service_history","chat","notifications","emergency","sync","profile"]
@@ -464,7 +489,7 @@ function buildMasterNav(){
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
   ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de cambio de horario"],["emergency","⚠","Emergencia 24H"],["maintenance_catalog","€","Catálogo de Mantenimiento"],["cleaning_catalog","🧹","Catálogo de Limpieza"],["quality","✓","Checklists / Calidad"]]],
-  ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"]]],
+  ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"],["prepostos","♙","Prepostos / Representantes"]]],
   ["EQUIPO · JORNADAS",[["employees","♧","Funcionarios"],["teams","♙","Equipos / Plan mensual"],["journey","◷","Mi Jornada"],["service_journey","◷","Jornada de servicios"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"]]],
   ["RECURSOS",[["stock","▥","Materiales / Stock"],["linen","▤","Ropa / Linen"],["laundry","◌","Lavandería"],["amenities","▥","Amenities opcionales"]]],
   ["SERVICIOS · PRECIOS",[["recurring","↻","Servicios recurrentes"],["catalog","€","Tipologías y Precios"],["quotes","◇","Presupuestos"]]],
@@ -876,7 +901,81 @@ async function uploadProfilePhoto(input){
  currentProfile.avatar_url=path;currentProfile.avatar_display_url=signed.data?.signedUrl||"";
  showApp();toast("Foto de perfil actualizada");
 }
-const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance_catalog:["Catálogo de Mantenimiento",maintenance],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],service_journey:["Jornada de servicios",renderServiceJourneyBoard],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],cleaning_catalog:["Catálogo de Limpieza",renderCleaningCatalog],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderReceiptsPremium],invoices:["Facturas",renderInvoicesPremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
+
+async function renderPrepostosPremium(){
+ if(demoMode){
+  const rows=window.__DEMO_PREPOSTOS||[];
+  return renderPrepostosRows(rows,[]);
+ }
+ const [pr,cr]=await Promise.all([
+  sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").order("created_at",{ascending:false}),
+  sb.from("clients").select("id,name,client_code").order("name")
+ ]);
+ if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}
+ return renderPrepostosRows(pr.data||[],cr.data||[]);
+}
+function renderPrepostosRows(rows,clients){
+ const cm=new Map((clients||[]).map(x=>[x.id,x]));
+ const canWrite=demoMode||canManage();
+ const body=(rows||[]).map(x=>{
+  const cl=cm.get(x.client_id);
+  return '<tr><td><b>'+esc(x.name)+'</b><small class="muted" style="display:block">'+esc(x.role_title||"Representante")+'</small></td><td>'+esc(cl?.name||"—")+'</td><td>'+esc(x.email||"—")+'</td><td>'+esc(x.phone||"—")+'</td><td>'+esc(x.address||"—")+'</td><td><span class="status '+(x.active?"approved":"urgent")+'">'+(x.active?"Activo":"Inactivo")+'</span></td><td><div class="actions">'+(canWrite?'<button class="btn" onclick="editPreposto(\''+esc(x.id)+'\')">Editar</button><button class="btn" onclick="deletePreposto(\''+esc(x.id)+'\')">Eliminar</button>':'<button class="btn" onclick="viewPreposto(\''+esc(x.id)+'\')">Ver</button>')+'</div></td></tr>';
+ }).join("");
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Prepostos / Representantes</h3><div class="muted">Contactos de representación vinculados a cada cliente.</div></div><div class="actions"><span class="pill">'+rows.length+' registros</span>'+(canWrite?'<button class="btn gold" onclick="newPreposto()">＋ Nuevo preposto</button>':'')+'</div></div>'+
+ (rows.length?'<table class="table"><thead><tr><th>Nombre</th><th>Cliente</th><th>Email</th><th>Teléfono</th><th>Dirección</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>'+body+'</tbody></table>':'<div class="empty">No hay prepostos registrados.</div>')+'</div>';
+}
+async function prepostoClientsOptions(selected=""){
+ if(demoMode)return (DEMO_CLIENTS||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===selected?"selected":"")+'>'+esc(x.name||"Cliente")+' · '+esc(x.client_code||"")+'</option>').join("");
+ const q=await sb.from("clients").select("id,name,client_code").order("name");
+ if(q.error)throw q.error;
+ return (q.data||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===selected?"selected":"")+'>'+esc(x.name||"Cliente")+' · '+esc(x.client_code||"")+'</option>').join("");
+}
+async function newPreposto(){
+ if(!canManage()){toast("Solo Admin/Supervisor puede crear prepostos.");return}
+ openModal("Nuevo preposto",await prepostoFormHtml({active:true}));
+}
+async function editPreposto(id){
+ if(!canManage()){return viewPreposto(id)}
+ const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).single();
+ if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
+ openModal("Editar preposto",await prepostoFormHtml(q.data));
+}
+async function prepostoFormHtml(x={}){
+ let opts=await prepostoClientsOptions(x.client_id||"");
+ return '<form onsubmit="savePreposto(event,'+JSON.stringify(x.id||null)+')"><div class="field"><label>Cliente</label><select id="ppClient"><option value="">— Sin cliente —</option>'+opts+'</select></div><div class="two"><div class="field"><label>Nombre *</label><input id="ppName" value="'+esc(x.name||"")+'" required></div><div class="field"><label>Cargo / función</label><input id="ppRole" value="'+esc(x.role_title||"")+'"></div></div><div class="two"><div class="field"><label>Email</label><input id="ppEmail" type="email" value="'+esc(x.email||"")+'"></div><div class="field"><label>Teléfono</label><input id="ppPhone" value="'+esc(x.phone||"")+'"></div></div><div class="field"><label>Dirección</label><input id="ppAddress" value="'+esc(x.address||"")+'"></div><div class="field"><label>Observaciones</label><textarea id="ppNotes">'+esc(x.notes||"")+'</textarea></div><div class="field"><label>Estado</label><select id="ppActive"><option value="true" '+(x.active!==false?"selected":"")+'>Activo</option><option value="false" '+(x.active===false?"selected":"")+'>Inactivo</option></select></div><div class="actions"><button class="primary" type="submit">Guardar preposto</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>';
+}
+async function savePreposto(e,id=null){
+ e.preventDefault();
+ if(!canManage()){toast("Solo Admin/Supervisor puede guardar prepostos.");return}
+ const data={client_id:$("ppClient").value||null,name:$("ppName").value.trim(),role_title:$("ppRole").value.trim()||null,email:$("ppEmail").value.trim()||null,phone:$("ppPhone").value.trim()||null,address:$("ppAddress").value.trim()||null,notes:$("ppNotes").value.trim()||null,active:$("ppActive").value==="true",updated_at:new Date().toISOString()};
+ if(!data.name){toast("El nombre es obligatorio.");return}
+ if(demoMode){
+  window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS||[];
+  const row={id:id||"demo-pp-"+Date.now(),...data};
+  if(id){const i=window.__DEMO_PREPOSTOS.findIndex(x=>x.id===id);if(i>=0)window.__DEMO_PREPOSTOS[i]=row;else window.__DEMO_PREPOSTOS.unshift(row)}else window.__DEMO_PREPOSTOS.unshift(row);
+  closeModal();toast("Preposto guardado en demo");return renderPrepostosPremium();
+ }
+ const q=id?await sb.from("prepostos").update(data).eq("id",id).eq("company_id",currentProfile.company_id):await sb.from("prepostos").insert({...data,id:crypto.randomUUID(),company_id:currentProfile.company_id,created_by:currentUser.id});
+ if(q.error){toast("No se pudo guardar el preposto: "+q.error.message);return}
+ closeModal();toast("Preposto guardado");await renderPrepostosPremium();
+}
+async function viewPreposto(id){
+ const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).single();
+ if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
+ const x=q.data;openModal("Ficha del preposto",'<div class="panel"><div class="two"><div><b>Nombre</b><div>'+esc(x.name)+'</div></div><div><b>Cargo</b><div>'+esc(x.role_title||"—")+'</div></div><div><b>Email</b><div>'+esc(x.email||"—")+'</div></div><div><b>Teléfono</b><div>'+esc(x.phone||"—")+'</div></div><div><b>Dirección</b><div>'+esc(x.address||"—")+'</div></div><div><b>Estado</b><div>'+esc(x.active?"Activo":"Inactivo")+'</div></div></div><div style="margin-top:12px"><b>Observaciones</b><div>'+esc(x.notes||"—")+'</div></div></div>');
+}
+async function deletePreposto(id){
+ if(!canManage()){toast("Solo Admin/Supervisor puede eliminar prepostos.");return}
+ const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("name").eq("id",id).single();
+ if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
+ if(!confirm("¿Eliminar el preposto "+(q.data.name||"")+"? Esta acción no se puede deshacer."))return;
+ if(demoMode){window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS||[];window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS.filter(x=>x.id!==id);toast("Preposto eliminado");return renderPrepostosPremium()}
+ const r=await sb.from("prepostos").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("No se puede eliminar el preposto: "+r.error.message);return}
+ toast("Preposto eliminado");await renderPrepostosPremium();
+}
+
+const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance_catalog:["Catálogo de Mantenimiento",maintenance],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],prepostos:["Prepostos / Representantes",renderPrepostosPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],service_journey:["Jornada de servicios",renderServiceJourneyBoard],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],cleaning_catalog:["Catálogo de Limpieza",renderCleaningCatalog],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderReceiptsPremium],invoices:["Facturas",renderInvoicesPremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
@@ -1604,7 +1703,7 @@ function romanoCatalogModal(category,x){
 async function romanoCatalogSave(id,category){
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
  const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+Date.now(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true",updated_at:new Date().toISOString()};
- const q=id?await sb.from("service_catalog").update(payload).eq("id",id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
+ const q=id?await sb.from("service_catalog").update(payload).eq("id",id).eq("company_id",currentProfile.company_id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
  if(q.error){toast(q.error.message);return}
  closeModal();toast("Catálogo guardado");romanoCatalogManager(category);
 }
@@ -1612,7 +1711,7 @@ async function romanoCatalogDelete(id){
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
  const before=await sb.from("service_catalog").select("category").eq("id",id).maybeSingle();
  if(before.error){toast(before.error.message);return}
- const r=await sb.from("service_catalog").delete().eq("id",id);
+ const r=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
  if(r.error){toast(r.error.message);return}
  toast("Artículo eliminado");
  if(before.data?.category)romanoCatalogManager(before.data.category);
@@ -1638,7 +1737,7 @@ async function romanoStockModal(id){
 async function romanoStockSave(id){
  const payload={name:$("rsName").value.trim(),sku:$("rsSku").value.trim()||null,unit:$("rsUnit").value.trim()||"unidad",category:$("rsCategory").value.trim()||"material",quantity:Math.max(0,Number($("rsQty").value||0)),min_quantity:Math.max(0,Number($("rsMin").value||0)),unit_cost:Math.max(0,Number($("rsCost").value||0)),notes:$("rsNotes").value.trim()||null,updated_at:new Date().toISOString()};
  if(!payload.name){toast("Indique el material.");return}
- const r=id?await sb.from("stock_items").update(payload).eq("id",id).select("id").single():await sb.from("stock_items").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
+ const r=id?await sb.from("stock_items").update(payload).eq("id",id).eq("company_id",currentProfile.company_id):await sb.from("stock_items").insert({...payload,company_id:currentProfile.company_id});
  if(r.error){toast(r.error.message);return}
  closeModal();toast("Stock guardado");romanoStockManager();
 }
