@@ -3,7 +3,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ROMANO PARTNERS · Property Care</title>
+<title>ROMANO PARTNERS · Property Care</title><link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#1c1c19"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ROMANO PARTNERS"><link rel="apple-touch-icon" href="/icon.svg">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f2e9;color:#1c1c19}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -550,7 +550,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
 
 <div id="app" class="app hidden"><button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Abrir menú">☰</button><div id="mobileMenuBackdrop" class="mobile-menu-backdrop" style="display:none"></div><aside class="side"><div class="side-brand"><div class="crown-r">R</div><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
 <nav class="nav" id="masterNav"></nav><div class="side-footer"><div class="sf-user"><div class="sf-avatar">R</div><div><div class="sf-name" id="sideUserName">Rita Romano</div><div class="sf-role" id="sideUserRole">Administrador</div></div></div><div class="sf-logout" onclick="doLogout()">↪ Cerrar sesión</div></div></aside>
-<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
+<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="installAppBtn" class="btn" onclick="installRomanoApp()">📲 Instalar app</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
 <div id="modal" class="modal hidden"><div class="card modal-card"><div class="panel-head"><h3 id="modalTitle"></h3><button class="btn" onclick="closeModal()">Cerrar</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 
@@ -707,7 +707,7 @@ async function openServiceAssignment(serviceId){
  if(s.error){toast(s.error.message);return}
  if(s.data.status!=="scheduled"||s.data.assigned_employee_id){toast("El servicio debe estar aceptado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
-   sb.from("properties").select("id,name,code,latitude,longitude").eq("id",s.data.property_id).maybeSingle(),
+   sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",s.data.property_id).eq("company_id",currentProfile.company_id).maybeSingle(),
    sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name"),
    sb.from("employee_locations").select("profile_id,latitude,longitude,recorded_at").eq("company_id",currentProfile.company_id).order("recorded_at",{ascending:false}).limit(500)
  ]);
@@ -717,9 +717,9 @@ async function openServiceAssignment(serviceId){
  const rad=x=>x*Math.PI/180;
  const dist=(a,b,c,d)=>{if([a,b,c,d].some(v=>v==null)||prop?.latitude==null||prop?.longitude==null)return null;const R=6371,la1=rad(prop.latitude),la2=rad(c),dl=rad(c)-la1,dlo=rad(d)-rad(prop.longitude);const h=Math.sin(dl/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dlo/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
  const employees=(er.data||[]).map(e=>({...e,location:latest[e.id]||null,distance:latest[e.id]?dist(prop?.latitude,prop?.longitude,latest[e.id].latitude,latest[e.id].longitude):null})).sort((a,b)=>(a.distance==null?1:b.distance==null?-1:a.distance-b.distance));
- openModal("Designar funcionario · "+esc(s.data.code),
-   '<div class="notice"><strong>Propiedad:</strong> '+esc(prop?.name||prop?.code||"—")+'<br><strong>Horário:</strong> '+esc(s.data.scheduled_at?new Date(s.data.scheduled_at).toLocaleString("es-ES"):"—")+'</div>'+
-   '<div class="muted" style="margin:10px 0">Funcionarios ativos · primeiro aparecem los que tienen la ubicación más cercana. La designación no inicia el servicio: o funcionario ainda precisa aceitar.</div>'+
+ openModal("Designar funcionario · "+esc(prop?.name||s.data.code),
+   '<div class="notice"><strong>Cliente / apartamento:</strong> '+esc(prop?.name||prop?.code||"—")+'<br><strong>Dirección:</strong> '+esc([prop?.address,prop?.city,prop?.country].filter(Boolean).join(", ")||"—")+'<br><strong>Horario:</strong> '+esc(s.data.scheduled_at?new Date(s.data.scheduled_at).toLocaleString("es-ES"):"—")+'</div>'+
+   '<div class="muted" style="margin:10px 0">Funcionarios activos · primero aparecen los que tienen la ubicación más cercana. La designación no inicia el servicio: o funcionario ainda precisa aceitar.</div>'+
    '<div>'+(employees.length?employees.map(e=>'<div class="panel" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>'+esc(e.full_name||e.email||"Funcionario")+'</strong><div class="muted">'+(e.distance!=null?e.distance.toFixed(1)+" km de la propiedad":"Ubicación GPS no disponible")+(e.location?.recorded_at?" · "+new Date(e.location.recorded_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"")+'</div></div><button class="btn gold" onclick="assignServiceEmployee(\''+s.data.id+'\',\''+e.id+'\')">Designar</button></div>').join(""):'<div class="empty">Ningún funcionario activo disponible.</div>')+'</div>');
 }
 async function assignServiceEmployee(serviceId,employeeId,force=false){
@@ -745,8 +745,18 @@ function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta"
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
-   const q=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id").order("scheduled_at",{ascending:true}).limit(100);
+   const q=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").order("scheduled_at",{ascending:true}).limit(100);
    r.data=q.data;r.error=q.error;
+   if(!r.error&&r.data?.length){
+     const clientIds=[...new Set(r.data.map(x=>x.client_id).filter(Boolean))],propertyIds=[...new Set(r.data.map(x=>x.property_id).filter(Boolean))];
+     const [cq,pq]=await Promise.all([
+       clientIds.length?sb.from("clients").select("id,name").in("id",clientIds):Promise.resolve({data:[]}),
+       propertyIds.length?sb.from("properties").select("id,name,code,address,city,country,photo_url").in("id",propertyIds):Promise.resolve({data:[]})
+     ]);
+     const cm={},pm={};(cq.data||[]).forEach(x=>cm[x.id]=x);(pq.data||[]).forEach(x=>pm[x.id]=x);
+     const signed=await Promise.all(Object.values(pm).filter(x=>x.photo_url).map(async x=>{const u=await sb.storage.from("property-media").createSignedUrl(x.photo_url,900);if(u.data?.signedUrl)x._photoUrl=u.data.signedUrl}));
+     r.data.forEach(x=>{x._client=cm[x.client_id]||null;x._property=pm[x.property_id]||null});
+   }
  }
  let fin={};
  if(canSeeFinance()&&r.data?.length){
@@ -767,6 +777,9 @@ async function renderServicesMaster(){
    return '<article class="service-card">'+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      '<div class="service-card-meta">'+
+       '<div><small>Cliente</small><strong>'+esc(x._client?.name||"—")+'</strong></div>'+
+       '<div><small>Apartamento</small><strong>'+esc(x._property?.name||x._property?.code||"—")+'</strong></div>'+
+       '<div><small>Dirección</small><strong>'+esc([x._property?.address,x._property?.city,x._property?.country].filter(Boolean).join(", ")||"—")+'</strong></div>'+
        '<div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div>'+
        '<div><small>Fecha</small><strong>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Sin programar")+'</strong></div>'+
        '<div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div>'+
@@ -923,7 +936,7 @@ const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcion
 const ROMANO_PROFILE_MASTER=Object.freeze({
  admin:Object.freeze({key:"admin",label:"Administrador",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
  supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
- employee:Object.freeze({key:"employee",label:"Funcionario",allowed:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"]}),
+ employee:Object.freeze({key:"employee",label:"Funcionario",allowed:["dashboard","services","calendar","chat","notifications","profile"]}),
  client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]})
 });
 function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
@@ -1419,9 +1432,20 @@ async function savePropertyEdit(e,id){e.preventDefault();const photo=$("epPhoto"
 async function renderServices(){const r=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,assigned_employee_id,assigned_supervisor_id").order("scheduled_at",{ascending:true}).limit(100);let h='<div class="panel"><div class="panel-head"><h3>Servicios</h3><div class="actions"><button class="btn" onclick="reloadCurrentPage()">Actualizar</button><button class="btn gold" onclick="newService()">+ Nuevo servicio</button></div></div>';h+=r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?'<table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Tipología</th><th>Prioridad</th><th>Estado</th><th>Acción</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(x.priority)+'</td><td><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></td><td>'+statusAction(x)+(canManage()?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios.</div>';$("content").innerHTML=h+"</div>"}
 function statusAction(x){if(!["admin","supervisor","employee"].includes(role()))return"—";const allowed=role()==="employee"?["on_the_way","in_progress","paused","completed"]:["scheduled","on_the_way","in_progress","paused","supervised","completed","approved","rejected"];return'<select class="btn" onchange="changeStatus(\''+x.id+'\',this.value)"><option value="">Cambiar estado</option>'+allowed.map(s=>'<option value="'+s+'">'+statusNames[s]+'</option>').join("")+'</select>'}
 async function changeStatus(id,status){if(!status)return;const r=await sb.from("services").update({status}).eq("id",id);if(r.error)toast(r.error.message);else{toast("Estado actualizado");renderServices()}}
-async function newService(){const p=await sb.from("properties").select("id,name,property_type").order("name");openModal("Nuevo servicio",'<form onsubmit="saveService(event)"><div class="two"><div class="field"><label>Código</label><input id="sCode" required></div><div class="field"><label>Tipo de servicio</label><select id="sType"><option>limpieza_alojamiento</option><option>limpieza_hotel_5_estrellas</option><option>oficina</option><option>clinica</option><option>mantenimiento</option><option>pintura</option><option>fontaneria</option><option>electricidad</option><option>lavanderia</option></select></div></div><div class="two"><div class="field"><label>Propiedad</label><select id="sProp">'+(p.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.property_type||"")+'</option>').join("")+'</select></div><div class="field"><label>Tipología</label><select id="sTyp"><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div><div class="two"><div class="field"><label>Fecha y hora</label><input id="sDate" type="datetime-local"></div><div class="field"><label>Prioridad</label><select id="sPriority"><option>normal</option><option>high</option><option>urgent</option></select></div></div><div class="field"><label>Instrucciones</label><textarea id="sNotes"></textarea></div><button class="primary">Crear servicio</button></form>')}
+async function newService(){
+ if(role()==="employee"){toast("El funcionario no puede crear servicios. Solo puede consultar sus servicios y calendario.");return}
+ let p;
+ if(role()==="client"){
+   const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+   if(c.error||!c.data){toast("No se encontró el cliente asociado.");return}
+   p=await sb.from("properties").select("id,name,property_type,address,city,country,photo_url").eq("client_id",c.data.id).eq("company_id",currentProfile.company_id).order("name");
+ }else{
+   p=await sb.from("properties").select("id,name,property_type,address,city,country,photo_url").eq("company_id",currentProfile.company_id).order("name");
+ }
+ openModal("Nuevo servicio",'<form onsubmit="saveService(event)"><div class="two"><div class="field"><label>Código</label><input id="sCode" required></div><div class="field"><label>Tipo de servicio</label><select id="sType"><option>limpieza_alojamiento</option><option>limpieza_hotel_5_estrellas</option><option>oficina</option><option>clinica</option><option>mantenimiento</option><option>pintura</option><option>fontaneria</option><option>electricidad</option><option>lavanderia</option></select></div></div><div class="two"><div class="field"><label>Propiedad</label><select id="sProp">'+(p.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.property_type||"")+'</option>').join("")+'</select></div><div class="field"><label>Tipología</label><select id="sTyp"><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div><div class="two"><div class="field"><label>Fecha y hora</label><input id="sDate" type="datetime-local"></div><div class="field"><label>Prioridad</label><select id="sPriority"><option>normal</option><option>high</option><option>urgent</option></select></div></div><div class="field"><label>Instrucciones</label><textarea id="sNotes"></textarea></div><button class="primary">Crear servicio</button></form>')}
 async function saveService(e){
  e.preventDefault();
+ if(role()==="employee"){toast("El funcionario no puede crear servicios.");return}
  const prop=$("sProp").value;
  if(!prop){toast("Seleccione una propiedad.");return}
  const r=await sb.from("properties").select("id,client_id").eq("id",prop).eq("company_id",currentProfile.company_id).single();
@@ -1552,11 +1576,13 @@ async function viewService(id){
  const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
-  sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
-  sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle(),
+  sb.from("clients").select("id,name,profile_id,email,phone").eq("id",x.client_id).eq("company_id",currentProfile.company_id).maybeSingle(),
+  sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url,beds_single,beds_double,property_type").eq("id",x.property_id).eq("company_id",currentProfile.company_id).maybeSingle(),
   sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30)
  ]);
  const client=clientQ.data,prop=propQ.data;
+ let propPhoto="";
+ if(prop?.photo_url){const pu=await sb.storage.from("property-media").createSignedUrl(prop.photo_url,900);propPhoto=pu.data?.signedUrl||""}
  const auditRows=auditQ?.data||[];
  const actorIds=[...new Set(auditRows.map(a=>a.actor_id).filter(Boolean))];
  let actorNames={};
@@ -1565,9 +1591,10 @@ async function viewService(id){
  const isPendingAdmin=["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visual y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- openModal(isPendingAdmin?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
-  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceitar. La aceptación quedará registrada en su perfil.</div>':"")+
-  '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propiedad / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de servicio</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
+ openModal(isPendingAdmin?"Pedido recibido · "+esc(client?.name||"Cliente")+" · "+esc(prop?.name||"Apartamento"):"Ficha del servicio · "+esc(client?.name||"Cliente"),
+  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise cliente, apartamento, foto y dirección antes de aceptar. La aceptación quedará registrada en su perfil.</div>':"")+
+  '<div class="panel" style="margin:0 0 12px;padding:14px"><div style="display:flex;gap:14px;align-items:center">'+(propPhoto?'<img src="'+esc(propPhoto)+'" alt="Propiedad" style="width:96px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #e5dac8">':'<div class="profile-photo-placeholder-sm">⌂</div>')+'<div><small class="muted">Cliente</small><h3 style="margin:3px 0">'+esc(client?.name||"—")+'</h3><div class="muted">'+esc(prop?.name||"Apartamento")+(prop?.code?" · "+esc(prop.code):"")+'</div><div class="muted" style="margin-top:4px">'+esc([prop?.address,prop?.city,prop?.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</div></div></div></div>'+
+  '<div class="two"><div><small class="muted">Tipo de servicio</small><p><strong>'+esc(serviceTypeLabel(x.service_type))+'</strong></p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Fecha / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Prioridad</small><p>'+esc(servicePriorityLabel(x.priority))+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Código interno</small><p>'+esc(x.code||"—")+'</p></div></div>'+
   '<div class="field"><label>Descripción / observaciones</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
   (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+clientAdvanceButton+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])])+'</div></div>'+
@@ -2050,6 +2077,36 @@ function playNotificationSound(){
   if(ac.state==="suspended")ac.resume().then(run).catch(()=>{});else run();
  }catch(e){}
 }
+let __romanoDeferredInstallPrompt=null,__romanoPushRegistration=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();__romanoDeferredInstallPrompt=e;const b=$("installAppBtn");if(b)b.classList.add("gold")});
+window.addEventListener("appinstalled",()=>{__romanoDeferredInstallPrompt=null;toast("ROMANO PARTNERS instalado en el dispositivo.")});
+async function registerRomanoPWA(){
+ if(!("serviceWorker" in navigator))return null;
+ try{__romanoPushRegistration=await navigator.serviceWorker.register("/sw.js",{scope:"/"});await __romanoPushRegistration.update();return __romanoPushRegistration}catch(e){console.warn("PWA",e);return null}
+}
+function isIOSDevice(){return /iphone|ipad|ipod/i.test(navigator.userAgent)}
+function isStandalonePWA(){return window.matchMedia?.("(display-mode: standalone)")?.matches||window.navigator.standalone===true}
+async function installRomanoApp(){
+ if(__romanoDeferredInstallPrompt){await __romanoDeferredInstallPrompt.prompt();await __romanoDeferredInstallPrompt.userChoice;__romanoDeferredInstallPrompt=null;return}
+ const ios=isIOSDevice();
+ openModal("Instalar ROMANO PARTNERS",'<div class="panel" style="margin:0"><h3 style="margin-top:0">Deje el app instalado en el teléfono</h3><p class="muted">Use el enlace de este app. En iPhone/iPad: abra la página en el navegador, pulse <b>Compartir</b> y elija <b>Añadir a pantalla de inicio</b>. Si aparece la opción <b>Abrir como app web</b>, déjela activada.</p><div class="notice"><strong>Enlace de instalación</strong><br><input readonly value="'+esc(window.location.href.split("#")[0])+'" onclick="this.select()" style="margin-top:8px"></div><p class="muted">'+(ios?"Después de instalar, abra ROMANO desde el icono de la pantalla de inicio y pulse «Activar notificaciones» para recibir avisos incluso con el app cerrado.":"En Android/Chrome puede pulsar «Instalar app» y aceptar. Después active las notificaciones.")+'</p><div class="actions"><button class="btn gold" onclick="subscribePushNotifications()">🔔 Activar notificaciones</button><button class="btn" onclick="closeModal()">Cerrar</button></div></div>');
+}
+function urlBase64ToUint8Array(base64String){const padding="=".repeat((4-base64String.length%4)%4),base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/"),raw=window.atob(base64);return Uint8Array.from([...raw].map(ch=>ch.charCodeAt(0)))}
+async function subscribePushNotifications(){
+ if(!("Notification" in window)||!("PushManager" in window)||!("serviceWorker" in navigator)){toast("Este dispositivo/navegador no admite notificaciones push web.");return}
+ if(isIOSDevice()&&!isStandalonePWA()){openModal("Primero instale el app","<div class='panel' style='margin:0'><h3 style='margin-top:0'>Instale ROMANO PARTNERS en la pantalla de inicio</h3><p class='muted'>En iPhone/iPad: Compartir → Añadir a pantalla de inicio → abra ROMANO desde el icono. Luego vuelva aquí y pulse «Activar notificaciones».</p><button class='btn gold' onclick='closeModal();installRomanoApp()'>📲 Ver enlace de instalación</button></div>");return}
+ const reg=await registerRomanoPWA();if(!reg){toast("No se pudo preparar el sistema de notificaciones.");return}
+ const perm=await Notification.requestPermission();if(perm!=="granted"){toast("Permiso de notificaciones no concedido.");return}
+ const pk=await sb.functions.invoke("romano-push",{body:{action:"public-key"}});
+ if(pk.error||!pk.data?.publicKey){toast("No se pudo obtener la clave de notificaciones.");return}
+ let sub=await reg.pushManager.getSubscription();
+ if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(pk.data.publicKey)});
+ const json=sub.toJSON();
+ const q=await sb.from("push_subscriptions").upsert({company_id:currentProfile.company_id,user_id:currentUser.id,endpoint:json.endpoint,p256dh:json.keys?.p256dh,auth:json.keys?.auth,user_agent:navigator.userAgent,updated_at:new Date().toISOString()},{onConflict:"user_id,endpoint"});
+ if(q.error){toast("No se pudo guardar el dispositivo: "+q.error.message);return}
+ unlockNotificationAudio();toast("✓ Notificaciones activadas en este dispositivo.");
+ closeModal();
+}
 async function enableBrowserNotifications(){
  if(!("Notification" in window)){toast("Este navegador no admite notificaciones.");return}
  const p=await Notification.requestPermission();
@@ -2122,7 +2179,7 @@ async function renderNotifications(){
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],unread=rows.filter(x=>!x.read_at).length;
  rows.forEach(x=>{if(x.title&&/novo servicio/i.test(x.title))x.title=String(x.title).replace(/\s*[·•-]?\s*5 minutos para aceitar/ig,"");if(x.body)x.body=String(x.body).replace(/\s*·?\s*resposta antes de\s*\d{1,2}:\d{2}/ig,"");});
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn gold" onclick="subscribePushNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
    const t=String(x.title||"").toLowerCase();
    const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
    const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
@@ -2172,7 +2229,7 @@ function showApp(){closeMobileMenu();
  const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML=currentProfile?.avatar_display_url?'<img src="'+esc(currentProfile.avatar_display_url)+'" alt="Foto de perfil">':esc((currentProfile?.full_name||"R").charAt(0).toUpperCase());sf.classList.toggle("has-photo",!!currentProfile?.avatar_display_url)}
  if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usuario";
  if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();
- buildMasterNav();startRealtime();initOfflineSync();openPage("dashboard")
+ buildMasterNav();registerRomanoPWA();startRealtime();initOfflineSync();openPage("dashboard")
 }
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
