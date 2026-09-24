@@ -11,9 +11,10 @@ self.addEventListener("fetch",event=>{
 self.addEventListener("push",event=>{
  let data={};
  try{data=event.data?.json()||{}}catch(e){data={body:event.data?.text()||"Nueva alerta"}}
- const title=data.title||"ROMANO PROPERTY CARE";
- const options={body:data.body||"Nueva alerta",icon:"/icon.svg",badge:"/icon.svg",tag:data.tag||"romano-alert",renotify:true,data:{url:data.url||"/"},silent:false};
- event.waitUntil(self.registration.showNotification(title,options).then(()=>self.registration.getNotifications().then(ns=>ns.length&&self.registration.setAppBadge?self.registration.setAppBadge(ns.length):null)));
+ const n=data.notification||data;
+ const title=n.title||data.title||"ROMANO PROPERTY CARE";
+ const options={body:n.body||data.body||"Nueva alerta",icon:n.icon||data.icon||"/icon.svg",badge:n.badge||data.badge||"/icon.svg",tag:n.tag||data.tag||"romano-alert",renotify:true,data:{url:n.navigate||data.url||"/"},silent:n.silent===true};
+ event.waitUntil(self.registration.showNotification(title,options));
 });
 self.addEventListener("notificationclick",event=>{
  event.notification.close();
