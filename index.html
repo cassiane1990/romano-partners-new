@@ -850,7 +850,9 @@ async function viewClient(id){
  if(pr.error){toast(pr.error.message);return}
  const ps=pr.data||[];
  const propsHtml=ps.length?ps.map(p=>clientPropertyInlineHtml(p,x,"real")).join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
- openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.client_code||"—")+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div><div class="actions" style="margin:15px 0"><button class="btn" onclick="editClient(\''+esc(id)+'\')">Editar cliente</button><button class="btn gold" onclick="newClientProperty(\''+esc(id)+'\')">+ Nuevo inmueble</button></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div>');
+ let docs=[];
+ try{docs=await loadClientDocuments(id)}catch(e){toast(e.message||"No se pudieron cargar los documentos.")}
+ openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.client_code||"—")+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Observaciones</small><p>'+esc(x.notes||"—")+'</p></div></div><div class="actions" style="margin:15px 0"><button class="btn" onclick="editClient(\''+esc(id)+'\')">Editar cliente</button><button class="btn gold" onclick="newClientProperty(\''+esc(id)+'\')">+ Nuevo inmueble</button></div><div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">'+ps.length+' apartamento(s)</div></div></div>'+propsHtml+'</div><div id="romanoClientDocuments_'+esc(id)+'">'+clientDocumentsHtml(id,docs)+'</div>');
 }
 async function viewProperty(id){
  if(demoMode){
@@ -1099,7 +1101,62 @@ async function saveEmployeeEdit(e,id){
  if(r.error){toast(r.error.message);return}
  closeModal();toast("Funcionario actualizado");renderEmployees();
 }
-async function renderDocuments(){const r=await sb.from("documents").select("id,title,document_type,file_name,created_at,client_id").order("created_at",{ascending:false}).limit(100);$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Documentos seguros</h3><span class="pill">Storage + RLS</span></div><p class="muted">Contratos, recibos, facturas y documentos quedan vinculados al registro y sujetos a permisos del backend.</p>'+(r.data?.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.title)+'</td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos cargados.</div>')+'</div>'}
+function documentTypeLabel(t){return ({service_contract:"Contrato de prestación de servicio",signed_contract:"Contrato firmado",pdf:"PDF",scanned:"Documento digitalizado",receipt:"Recibo",photo:"Foto",other:"Otros documentos"}[t]||t||"Otros documentos")}
+async function loadClientDocuments(clientId){
+ const q=await sb.from("documents").select("id,title,document_type,storage_path,file_name,mime_type,size_bytes,uploaded_by,created_at").eq("client_id",clientId).order("created_at",{ascending:false});
+ if(q.error)throw q.error;
+ const rows=q.data||[];
+ return await Promise.all(rows.map(async x=>{
+   const s=await sb.storage.from("company-documents").createSignedUrl(x.storage_path,900);
+   return {...x,_url:s.data?.signedUrl||null};
+ }));
+}
+function formatFileSize(n){n=Number(n||0);if(!n)return "—";if(n<1024)return n+" B";if(n<1024*1024)return (n/1024).toFixed(1)+" KB";return (n/1024/1024).toFixed(1)+" MB"}
+function clientDocumentsHtml(clientId,rows){
+ const canUpload=canManage()||role()==="client";
+ const uploadBtn=canUpload?'<button type="button" class="btn gold" onclick="openClientDocumentUpload(\''+esc(clientId)+'\')">＋ Subir documento</button>':"";
+ const cards=rows.length?rows.map(x=>'<div class="line-item" style="align-items:center;gap:12px"><span><strong>'+esc(x.title)+'</strong><small class="muted" style="display:block">'+esc(documentTypeLabel(x.document_type))+' · '+esc(x.file_name)+' · '+formatFileSize(x.size_bytes)+' · '+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</small></span><span class="actions">'+(x._url?'<a class="btn" href="'+esc(x._url)+'" target="_blank" rel="noopener">Ver / Descargar</a>':"")+(canManage()?'<button type="button" class="btn" onclick="deleteClientDocument(\''+x.id+'\',\''+esc(x.storage_path)+'\',\''+esc(clientId)+'\')">Eliminar</button>':"")+'</span></div>').join(""):'<div class="empty">No hay documentos asociados a este cliente.</div>';
+ return '<div class="panel" style="margin-top:15px"><div class="panel-head"><div><h3>Documentación del cliente</h3><div class="muted">Contrato, contratos firmados, PDFs, documentos digitalizados, recibos, fotos y otros.</div></div>'+uploadBtn+'</div>'+cards+'</div>';
+}
+async function openClientDocumentUpload(clientId){
+ if(!(canManage()||role()==="client")){toast("No tiene permisos para subir documentos.");return}
+ openModal("Documentación del cliente",'<form onsubmit="saveClientDocument(event,\''+esc(clientId)+'\')"><div class="field"><label>Tipo de documento</label><select id="cdType"><option value="service_contract">Contrato de prestación de servicio</option><option value="signed_contract">Contrato firmado</option><option value="pdf">PDF</option><option value="scanned">Documento digitalizado</option><option value="receipt">Recibo</option><option value="photo">Foto</option><option value="other">Otros documentos</option></select></div><div class="field"><label>Título</label><input id="cdTitle" placeholder="Ej.: Contrato 2026" required></div><div class="field"><label>Archivo</label><input id="cdFile" type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" required><small class="muted">Máximo 50 MB.</small></div><button class="primary">Subir documento</button></form>');
+}
+async function saveClientDocument(e,clientId){
+ e.preventDefault();
+ const file=$("cdFile")?.files?.[0];if(!file){toast("Seleccione un archivo.");return}
+ if(file.size>50*1024*1024){toast("El archivo no puede superar 50 MB.");return}
+ const title=$("cdTitle").value.trim();const documentType=$("cdType").value;
+ const safeName=file.name.replace(/[^a-zA-Z0-9._-]+/g,"_");
+ const path=currentProfile.company_id+"/"+clientId+"/"+crypto.randomUUID()+"_"+safeName;
+ const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream"});
+ if(up.error){toast(up.error.message||"No se pudo subir el documento.");return}
+ const ins=await sb.from("documents").insert({company_id:currentProfile.company_id,client_id:clientId,title,document_type:documentType,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id});
+ if(ins.error){await sb.storage.from("company-documents").remove([path]);toast(ins.error.message||"No se pudo registrar el documento.");return}
+ closeModal();toast("Documento guardado en la ficha del cliente.");
+ if($("romanoClientDocuments_"+clientId)) await renderClientDocumentsSection(clientId);
+ else if(document.querySelector("#content")) renderDocuments();
+}
+async function deleteClientDocument(id,path,clientId){
+ if(!canManage())return;
+ if(!confirm("¿Eliminar este documento?"))return;
+ const d=await sb.from("documents").delete().eq("id",id).eq("client_id",clientId);
+ if(d.error){toast(d.error.message);return}
+ const s=await sb.storage.from("company-documents").remove([path]);
+ if(s.error){toast("Registro eliminado, pero no se pudo eliminar el archivo del almacenamiento.");return}
+ toast("Documento eliminado.");await renderClientDocumentsSection(clientId);await renderDocuments();
+}
+async function renderClientDocumentsSection(clientId){
+ const host=$("romanoClientDocuments_"+clientId);if(!host)return;
+ try{host.innerHTML=clientDocumentsHtml(clientId,await loadClientDocuments(clientId))}catch(e){host.innerHTML='<div class="msg">'+esc(e.message||"No se pudieron cargar los documentos.")+'</div>'}
+}
+async function renderDocuments(){
+ const r=await sb.from("documents").select("id,title,document_type,file_name,storage_path,size_bytes,created_at,client_id,clients(name)").order("created_at",{ascending:false}).limit(100);
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ const rows=r.data||[];
+ const cards=await Promise.all(rows.map(async x=>{const s=await sb.storage.from("company-documents").createSignedUrl(x.storage_path,900);return {...x,_url:s.data?.signedUrl||null}}));
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Documentos seguros</h3><div class="muted">Documentación vinculada a clientes · Storage privado + RLS</div></div></div><p class="muted">Cada archivo queda asociado a un cliente concreto y el acceso se valida en el backend.</p>'+(cards.length?'<table class="table"><thead><tr><th>Cliente</th><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+cards.map(x=>'<tr><td>'+esc(x.clients?.name||"—")+'</td><td>'+esc(x.title)+'</td><td>'+esc(documentTypeLabel(x.document_type))+'</td><td>'+esc(x.file_name)+' · '+formatFileSize(x.size_bytes)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td><td>'+(x._url?'<a class="btn" href="'+esc(x._url)+'" target="_blank" rel="noopener">Ver / Descargar</a>':"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos cargados.</div>')+'</div>';
+}
 
 async function renderFinance(){const r=demoMode?{data:DEMO_INVOICES,error:null}:{data:null,error:null};const p=demoMode?{data:DEMO_PAYMENTS,error:null}:{data:null,error:null};if(!demoMode){const q=await sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100);const pp=await sb.from("payments").select("amount,method,paid_at").order("paid_at",{ascending:false}).limit(20);r.data=q.data;r.error=q.error;p.data=pp.data;p.error=pp.error}$("content").innerHTML='<div class="grid"><div class="stat"><small>Facturas</small><strong>'+((r.data||[]).length)+'</strong></div><div class="stat"><small>Total facturado</small><strong>'+((r.data||[]).reduce((a,x)=>a+Number(x.total||0),0)).toFixed(2)+' €</strong></div><div class="stat"><small>Pagos registrados</small><strong>'+((p.data||[]).length)+'</strong></div><div class="stat"><small>Pagado</small><strong>'+((p.data||[]).reduce((a,x)=>a+Number(x.amount||0),0)).toFixed(2)+' €</strong></div></div><div class="panel"><div class="panel-head"><h3>Facturación</h3><span class="pill">Servicio → factura → pago → costes → margen</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.status)+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas. Los valores reales de ROMANO PROPERTY CARE se introducirán cuando sean incorporados al sistema.</div>')+'</div>'}
 
