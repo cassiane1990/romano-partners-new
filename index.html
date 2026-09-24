@@ -805,7 +805,23 @@ async function renderServices(){const r=await sb.from("services").select("id,cod
 function statusAction(x){if(!["admin","supervisor","employee"].includes(role()))return"—";const allowed=role()==="employee"?["on_the_way","in_progress","paused","completed"]:["scheduled","on_the_way","in_progress","paused","supervised","completed","approved","rejected"];return'<select class="btn" onchange="changeStatus(\''+x.id+'\',this.value)"><option value="">Cambiar estado</option>'+allowed.map(s=>'<option value="'+s+'">'+statusNames[s]+'</option>').join("")+'</select>'}
 async function changeStatus(id,status){if(!status)return;const r=await sb.from("services").update({status}).eq("id",id);if(r.error)toast(r.error.message);else{toast("Estado actualizado");renderServices()}}
 async function newService(){const p=await sb.from("properties").select("id,name,property_type").order("name");openModal("Nuevo servicio",'<form onsubmit="saveService(event)"><div class="two"><div class="field"><label>Código</label><input id="sCode" required></div><div class="field"><label>Tipo de servicio</label><select id="sType"><option>limpieza_alojamiento</option><option>limpieza_hotel_5_estrellas</option><option>oficina</option><option>clinica</option><option>mantenimiento</option><option>pintura</option><option>fontaneria</option><option>electricidad</option><option>lavanderia</option></select></div></div><div class="two"><div class="field"><label>Propiedad</label><select id="sProp">'+(p.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.property_type||"")+'</option>').join("")+'</select></div><div class="field"><label>Tipología</label><select id="sTyp"><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div><div class="two"><div class="field"><label>Fecha y hora</label><input id="sDate" type="datetime-local"></div><div class="field"><label>Prioridad</label><select id="sPriority"><option>normal</option><option>high</option><option>urgent</option></select></div></div><div class="field"><label>Instrucciones</label><textarea id="sNotes"></textarea></div><button class="primary">Crear servicio</button></form>')}
-async function saveService(e){e.preventDefault();const prop=$("sProp").value;const r=await sb.from("properties").select("client_id").eq("id",prop).single();if(r.error){toast(r.error.message);return}const x=await sb.from("services").insert({company_id:currentProfile.company_id,client_id:r.data.client_id,property_id:prop,code:$("sCode").value.trim(),service_type:$("sType").value,typology:$("sTyp").value,priority:$("sPriority").value,scheduled_at:$("sDate").value?new Date($("sDate").value).toISOString():null,instructions:$("sNotes").value.trim()||null,status:"requested"});if(x.error){toast(x.error.message);return}closeModal();toast("Servicio creado");renderServices()}
+async function saveService(e){
+ e.preventDefault();
+ const prop=$("sProp").value;
+ if(!prop){toast("Seleccione una propiedad.");return}
+ const r=await sb.from("properties").select("id,client_id").eq("id",prop).eq("company_id",currentProfile.company_id).single();
+ if(r.error||!r.data?.client_id){toast(r.error?.message||"La propiedad no tiene un cliente asociado.");return}
+ const typedCode=$("sCode").value.trim();
+ const code=typedCode||("SRV-"+new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14)+"-"+Math.random().toString(36).slice(2,6).toUpperCase());
+ const payload={company_id:currentProfile.company_id,client_id:r.data.client_id,property_id:prop,code,service_type:$("sType").value,typology:$("sTyp").value,priority:$("sPriority").value,scheduled_at:$("sDate").value?new Date($("sDate").value).toISOString():null,instructions:$("sNotes").value.trim()||null,status:"requested",tax_country:"ES",requested_items:[],additional_items:[],laundry:false,pricing:{}};
+ let x=await sb.from("services").insert(payload).select("id").single();
+ if(x.error&&String(x.error.message||"").toLowerCase().includes("duplicate key")&&!/^SRV-/.test(code)){
+   payload.code="SRV-"+new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14)+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+   x=await sb.from("services").insert(payload).select("id").single();
+ }
+ if(x.error){toast("No se pudo guardar el servicio: "+x.error.message);return}
+ closeModal();toast("Servicio creado");await renderServices();
+}
 
 function clientPropertyInlineHtml(p,client,mode){
  const k="cpi_"+p.id+"_";
