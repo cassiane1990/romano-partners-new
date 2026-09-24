@@ -685,13 +685,16 @@ function closeModal(){$("modal").classList.add("hidden")}
 function role(){return currentProfile?.role}
 function canManage(){return ["admin","supervisor"].includes(role())}
 function canSeeFinance(){return ["admin","client"].includes(role())}
-function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
+function greeting(){const h=new Date().getHours();return h>=5&&h<12?"Bom dia":h>=12&&h<19?"Boa tarde":"Boa noite"}
+function greetingFirstName(name){const raw=String(name||currentProfile?.full_name||currentUser?.email||"").trim();return (raw.split("@")[0].trim().split(/\s+/)[0]||"").trim()||"Cliente"}
+function startGreetingClock(){if(window.__romanoGreetingTimer)clearInterval(window.__romanoGreetingTimer);const tick=()=>{document.querySelectorAll("[data-romano-greeting]").forEach(el=>{const name=el.getAttribute("data-name")||currentProfile?.full_name||currentUser?.email||"Cliente";el.textContent=greeting()+", "+greetingFirstName(name)});};tick();window.__romanoGreetingTimer=setInterval(tick,30000)}
 function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
 
 async function profileLoad(){
  const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();
  if(error||!data)throw error||new Error("Perfil no encontrado.");
  currentProfile=data;
+ startGreetingClock();
  currentProfile.avatar_display_url="";
  if(data.avatar_url){
   if(/^https?:\/\//i.test(data.avatar_url)) currentProfile.avatar_display_url=data.avatar_url;
@@ -759,33 +762,7 @@ async function changeStatus(id,status){if(!status)return;const r=await sb.from("
 async function newService(){const p=await sb.from("properties").select("id,name,property_type").order("name");openModal("Nuevo servicio",'<form onsubmit="saveService(event)"><div class="two"><div class="field"><label>Código</label><input id="sCode" required></div><div class="field"><label>Tipo de servicio</label><select id="sType"><option>limpieza_alojamiento</option><option>limpieza_hotel_5_estrellas</option><option>oficina</option><option>clinica</option><option>mantenimiento</option><option>pintura</option><option>fontaneria</option><option>electricidad</option><option>lavanderia</option></select></div></div><div class="two"><div class="field"><label>Propiedad</label><select id="sProp">'+(p.data||[]).map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.property_type||"")+'</option>').join("")+'</select></div><div class="field"><label>Tipología</label><select id="sTyp"><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div><div class="two"><div class="field"><label>Fecha y hora</label><input id="sDate" type="datetime-local"></div><div class="field"><label>Prioridad</label><select id="sPriority"><option>normal</option><option>high</option><option>urgent</option></select></div></div><div class="field"><label>Instrucciones</label><textarea id="sNotes"></textarea></div><button class="primary">Crear servicio</button></form>')}
 async function saveService(e){e.preventDefault();const prop=$("sProp").value;const r=await sb.from("properties").select("client_id").eq("id",prop).single();if(r.error){toast(r.error.message);return}const x=await sb.from("services").insert({company_id:currentProfile.company_id,client_id:r.data.client_id,property_id:prop,code:$("sCode").value.trim(),service_type:$("sType").value,typology:$("sTyp").value,priority:$("sPriority").value,scheduled_at:$("sDate").value?new Date($("sDate").value).toISOString():null,instructions:$("sNotes").value.trim()||null,status:"requested"});if(x.error){toast(x.error.message);return}closeModal();toast("Servicio creado");renderServices()}
 
-async function viewClient(id){
- if(demoMode){
-  const x=demoFindClient(id);
-  if(!x){toast("Cliente demo no encontrado");return}
-  const ps=DEMO_PROPERTIES.filter(p=>p.client_id===id),photo=demoPhotoData(x.id);
-  const propertyRows=ps.length?ps.map((p,i)=>'<div class="line-item" style="align-items:flex-start"><span><strong>'+esc(p.name||"Apartamento")+'</strong><small class="muted" style="display:block;margin-top:3px">Código apartamento: <b>'+esc(p.code||"—")+'</b> · '+esc(p.property_type||"—")+' · '+esc([p.city,p.country].filter(Boolean).join(", ")||"")+'</small></span><button class="btn" onclick="viewProperty(\\''+esc(p.id)+'\\'')">Ver ficha</button></div>').join(""):'<div class="empty">Este cliente todavía no tiene apartamentos vinculados.</div>';
-  openModal("Ficha del cliente · DEMOSTRACIÓN",
-   '<div class="demo-flag">DATOS FICTICIOS · NO PRODUCCIÓN</div>'+
-   '<div style="display:flex;gap:15px;align-items:center;margin:12px 0">'+photoBox(photo,x.name,false)+'<div><h3 style="margin:0">'+esc(x.name)+'</h3><div class="pill" style="display:inline-block;margin-top:5px">Código cliente · '+esc(x.id.replace("demo-","DEMO-").toUpperCase())+'</div></div></div>'+
-   '<div class="two"><div><small class="muted">Código del cliente</small><p><strong>'+esc(x.id.replace("demo-","DEMO-").toUpperCase())+'</strong></p></div><div><small class="muted">Apartamentos vinculados</small><p><strong>'+ps.length+'</strong></p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div>'+
-   '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Mis apartamentos</h3><div class="muted">Todos los apartamentos de este cliente quedan dentro de su ficha.</div></div><span class="pill">'+ps.length+' apartamento'+(ps.length===1?"":"s")+'</span></div>'+propertyRows+'</div>');
-  return;
- }
- const [cr,pr]=await Promise.all([
-  sb.from("clients").select("*").eq("id",id).single(),
-  sb.from("properties").select("id,code,name,property_type,address,city,country,status,photo_url").eq("client_id",id).order("created_at",{ascending:true})
- ]);
- if(cr.error){toast(cr.error.message);return}
- if(pr.error){toast(pr.error.message);return}
- const x=cr.data,ps=pr.data||[],clientCode=x.id.slice(0,8).toUpperCase();
- const propertyRows=ps.length?ps.map(p=>'<div class="line-item" style="align-items:flex-start"><span><strong>'+esc(p.name||"Apartamento")+'</strong><small class="muted" style="display:block;margin-top:3px">Código apartamento: <b>'+esc(p.code||"—")+'</b> · '+esc(p.property_type||"—")+' · '+esc([p.city,p.country].filter(Boolean).join(", ")||p.address||"")+' · '+esc(p.status||"Activo")+'</small></span><button class="btn" onclick="viewProperty(\\''+esc(p.id)+'\\'')">Ver ficha</button></div>').join(""):'<div class="empty">Este cliente todavía no tiene apartamentos vinculados.</div>';
- openModal("Ficha del cliente",
-  '<div class="master-hero" style="margin-bottom:12px"><div style="display:flex;gap:15px;align-items:center"><div class="profile-photo-placeholder">'+esc((x.name||"R").trim().charAt(0).toUpperCase())+'</div><div><h1>'+esc(x.name||"Cliente")+'</h1><p>Código cliente · <strong>'+esc(clientCode)+'</strong></p><div class="master-sign">'+ps.length+' apartamento'+(ps.length===1?"":"s")+' vinculado'+(ps.length===1?"":"s")+'</div></div></div></div>'+
-  '<div class="two"><div><small class="muted">Código del cliente</small><p><strong>'+esc(clientCode)+'</strong></p></div><div><small class="muted">Apartamentos vinculados</small><p><strong>'+ps.length+'</strong></p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div>'+
-  '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Todos los apartamentos del cliente</h3><div class="muted">Cada apartamento aparece dentro de la ficha con su código propio.</div></div><span class="pill">'+ps.length+' apartamento'+(ps.length===1?"":"s")+'</span></div>'+propertyRows+'</div>'+
-  (x.notes?'<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Notas</h3></div><p>'+esc(x.notes)+'</p></div>':""));
-}
+async function viewClient(id){if(demoMode){const x=demoFindClient(id);if(!x){toast("Cliente demo no encontrado");return}const ps=DEMO_PROPERTIES.filter(p=>p.client_id===id),photo=demoPhotoData(x.id);openModal("Ficha del cliente · DEMOSTRACIÓN",'<div class="demo-flag">DATOS FICTICIOS · NO PRODUCCIÓN</div><div style="display:flex;gap:15px;align-items:center;margin:12px 0">'+photoBox(photo,x.name,false)+'<div><h3 style="margin:0">'+esc(x.name)+'</h3><div class="muted">'+esc(x.id.replace("demo-","DEMO-").toUpperCase())+'</div></div></div><div class="two"><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Propiedades vinculadas</small><p>'+ps.map(p=>esc(p.code+" · "+p.name)).join("<br>")||"—"+'</p></div></div>');return}const r=await sb.from("clients").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}const x=r.data;openModal("Ficha del cliente",'<div class="two"><div><small class="muted">Nombre</small><p><strong>'+esc(x.name)+'</strong></p></div><div><small class="muted">Código</small><p>'+esc(x.id.slice(0,8).toUpperCase())+'</p></div><div><small class="muted">Email</small><p>'+esc(x.email||"—")+'</p></div><div><small class="muted">Teléfono</small><p>'+esc(x.phone||"—")+'</p></div></div>')}
 async function viewProperty(id){
  if(demoMode){
   const x=demoFindProperty(id);
