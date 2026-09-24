@@ -1587,37 +1587,67 @@ async function viewInvoice(id){
 function pdfSafe(v){return String(v??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/€/g,"EUR").replace(/[^\x20-\x7E]/g,"");}
 function pdfEsc(v){return pdfSafe(v).replace(/([\\()])/g,"\\$1");}
 function buildRomanoPdf(title,number,client,rows,totalLabel,total){
- const W=595,H=842,ops=[];
- const text=(s,x,y,size,bold=false)=>{ops.push("BT /F"+(bold?"2":"1")+" "+size+" Tf 0.12 0.11 0.09 rg 1 0 0 1 "+x+" "+y+" Tm ("+pdfEsc(s)+") Tj ET");};
- ops.push("q 0.92 0.74 0.36 rg 42 750 72 48 re f Q");
- text("R",67,762,25,true); text("ROMANO PROPERTY CARE",130,774,18,true); text("LIMPIEZA PREMIUM · MANTENIMIENTO · PROPERTY CARE",130,758,7,false);
- text("Tel. +34 607250245",42,725,9); text("romanogestao@gmail.com",42,710,9);
- ops.push("0.92 0.74 0.36 RG 42 694 511 0.8 re S");
- text(title,42,650,22,true); text("Nº "+(number||"—"),42,628,10,true);
- text("Cliente: "+(client?.name||"—"),42,602,11,true); text("E-mail: "+(client?.email||"—"),42,585,9);
- let y=545;
- ops.push("0.96 0.92 0.84 rg 42 "+(y-12)+" 511 28 re f");
- text("DESCRIPCION",54,y,9,true); text("IMPORTE",465,y,9,true); y-=38;
- rows.forEach(r=>{text(String(r.label||"—"),54,y,9,false);text(String(r.value||"—"),465,y,9,true);y-=25;ops.push("0.86 0.82 0.75 RG 42 "+(y+10)+" 511 0.5 re S")});
- y-=10; text(totalLabel,350,y,10,true); text(Number(total||0).toFixed(2)+" EUR",465,y,13,true);
- y-=55; text("ROMANO PROPERTY CARE",42,y,10,true); text("Gracias por confiar en nosotros.",42,y-18,9,false);
- const stream=ops.join("\n");
+ const canvas=document.createElement("canvas");
+ canvas.width=1240; canvas.height=1754;
+ const ctx=canvas.getContext("2d");
+ ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#eabb5b"; ctx.fillRect(90,85,150,100);
+ ctx.fillStyle="#ffffff"; ctx.font="bold 58px Arial"; ctx.textAlign="center"; ctx.fillText("R",165,153);
+ ctx.textAlign="left"; ctx.fillStyle="#211f1b"; ctx.font="bold 42px Arial"; ctx.fillText("ROMANO PROPERTY CARE",285,125);
+ ctx.font="16px Arial"; ctx.fillText("LIMPIEZA PREMIUM · MANTENIMIENTO · PROPERTY CARE",285,153);
+ ctx.font="18px Arial"; ctx.fillText("Tel. +34 607250245",90,225); ctx.fillText("romanogestao@gmail.com",90,255);
+ ctx.fillStyle="#eabb5b"; ctx.fillRect(90,285,1060,3);
+ ctx.fillStyle="#211f1b"; ctx.font="bold 48px Arial"; ctx.fillText(String(title||"DOCUMENTO"),90,360);
+ ctx.font="bold 20px Arial"; ctx.fillText("Nº "+String(number||"—"),90,400);
+ ctx.font="bold 22px Arial"; ctx.fillText("Cliente: "+String(client?.name||"—"),90,440);
+ ctx.font="18px Arial"; ctx.fillText("E-mail: "+String(client?.email||"—"),90,472);
+ ctx.fillStyle="#f5ead3"; ctx.fillRect(90,520,1060,58);
+ ctx.fillStyle="#211f1b"; ctx.font="bold 18px Arial"; ctx.fillText("DESCRIPCIÓN",115,556); ctx.fillText("IMPORTE",970,556);
+ let y=620;
+ (rows||[]).forEach(r=>{
+   ctx.fillStyle="#211f1b"; ctx.font="18px Arial"; ctx.fillText(String(r.label||"—"),115,y);
+   ctx.font="bold 18px Arial"; ctx.textAlign="right"; ctx.fillText(String(r.value||"—"),1125,y); ctx.textAlign="left";
+   ctx.strokeStyle="#d9d1c5"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(90,y+22); ctx.lineTo(1150,y+22); ctx.stroke();
+   y+=58;
+ });
+ y+=30; ctx.font="bold 24px Arial"; ctx.textAlign="right"; ctx.fillText(String(totalLabel||"TOTAL"),950,y);
+ ctx.font="bold 34px Arial"; ctx.fillText(Number(total||0).toFixed(2)+" EUR",1125,y); ctx.textAlign="left";
+ ctx.font="bold 20px Arial"; ctx.fillText("ROMANO PROPERTY CARE",90,1560);
+ ctx.font="18px Arial"; ctx.fillText("Gracias por confiar en nosotros.",90,1595);
+ const data=canvas.toDataURL("image/jpeg",0.94).split(",")[1];
+ const bin=atob(data), img=new Uint8Array(bin.length);
+ for(let i=0;i<bin.length;i++)img[i]=bin.charCodeAt(i);
+ let pos=2,w=0,h=0;
+ while(pos<img.length){
+   const marker=(img[pos]<<8)|img[pos+1],len=(img[pos+2]<<8)|img[pos+3];
+   if(marker>=0xC0&&marker<=0xC3){h=(img[pos+5]<<8)|img[pos+6];w=(img[pos+7]<<8)|img[pos+8];break}
+   pos+=2+len;
+ }
  const NL=String.fromCharCode(10);
+ const content="q"+NL+"595 0 0 842 0 0 cm"+NL+"/Im1 Do"+NL+"Q"+NL;
  const objs=[
   "<< /Type /Catalog /Pages 2 0 R >>",
   "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+W+" "+H+"] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
+  "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im1 5 0 R >> >> /Contents 6 0 R >>",
   "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-  "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
-  "<< /Length "+stream.length+" >>"+NL+"stream"+NL+stream+NL+"endstream"
+  "<< /Type /XObject /Subtype /Image /Width "+w+" /Height "+h+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+img.length+" >>"+NL+"stream"+NL,
+  "<< /Length "+content.length+" >>"+NL+"stream"+NL+content+"endstream"
  ];
- let pdf="%PDF-1.4"+NL,offs=[0];
- objs.forEach((o,i)=>{offs[i+1]=pdf.length;pdf+=(i+1)+" 0 obj"+NL+o+NL+"endobj"+NL});
- const xref=pdf.length;
- pdf+="xref"+NL+"0 "+(objs.length+1)+NL+"0000000000 65535 f "+NL;
- for(let i=1;i<=objs.length;i++)pdf+=String(offs[i]).padStart(10,"0")+" 00000 n "+NL;
- pdf+="trailer"+NL+"<< /Size "+(objs.length+1)+" /Root 1 0 R >>"+NL+"startxref"+NL+xref+NL+"%%EOF";
- return new Blob([pdf],{type:"application/pdf"});
+ const chunks=[]; let totalLen=0,offsets=[0];
+ const enc=new TextEncoder();
+ const push=x=>{const b=typeof x==="string"?enc.encode(x):x;chunks.push(b);totalLen+=b.length};
+ push("%PDF-1.4"+NL);
+ for(let i=0;i<objs.length;i++){
+   offsets[i+1]=totalLen; push((i+1)+" 0 obj"+NL+objs[i]);
+   if(i===4){push("");push(img);push(NL+"endstream"+NL+"endobj"+NL)}
+   else if(i===5){push("endobj"+NL)}
+   else push(NL+"endobj"+NL);
+ }
+ const xref=totalLen; push("xref"+NL+"0 "+(objs.length+1)+NL+"0000000000 65535 f "+NL);
+ for(let i=1;i<=objs.length;i++)push(String(offsets[i]).padStart(10,"0")+" 00000 n "+NL);
+ push("trailer"+NL+"<< /Size "+(objs.length+1)+" /Root 1 0 R >>"+NL+"startxref"+NL+xref+NL+"%%EOF");
+ const out=new Uint8Array(totalLen); let at=0; for(const b of chunks){out.set(b,at);at+=b.length}
+ return new Blob([out],{type:"application/pdf"});
 }
 async function sendFinancialPdfEmail(kind,id){
  try{
