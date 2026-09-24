@@ -814,13 +814,19 @@ async function viewService(id){
  }
  const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
  const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
- const [media,dispatch,clientQ,propQ]=await Promise.all([
+ const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
   sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
-  sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle()
+  sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle(),
+  sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30)
  ]);
  const client=clientQ.data,prop=propQ.data;
+ const auditRows=auditQ?.data||[];
+ const actorIds=[...new Set(auditRows.map(a=>a.actor_id).filter(Boolean))];
+ let actorNames={};
+ if(actorIds.length){const aq=await sb.from("profiles").select("id,full_name,email").in("id",actorIds);(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usuario");}
+ const auditHtml=auditRows.length?auditRows.map(a=>'<div class="line"><span><strong>'+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.action||"modificación")+' · '+esc(a.metadata?.status||"")+'</small></span><span>'+esc(new Date(a.created_at).toLocaleString("es-ES"))+'</span></div>').join(""):'<div class="empty">Sin registros de auditoría.</div>';
  const canUpdate=["admin","supervisor","employee"].includes(role());
  const isPendingAdmin=["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
@@ -833,7 +839,7 @@ async function viewService(id){
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])])+'</div></div>'+
   (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
  (canUpdate&&role()!=="employee"?'<div class="actions">'+["on_the_way","in_progress","paused","supervised","approved"].map(s=>'<button class="btn service-status-btn '+(x.status===s?"active":"")+'" onclick="setServiceStatusPremium(&#39;'+x.id+'&#39;,&#39;'+s+'&#39;)">'+esc(statusNames[s])+'</button>').join("")+'</div>':"")+
-  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div><input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)">'+((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(&#39;'+m.storage_path+'&#39;)">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+'</div>');
+  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia não disponível")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sem tentativas.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+auditHtml+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Evidencias</h3></div><input type="file" id="serviceMediaFile" accept="image/*,video/*,audio/*" capture="environment" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)">'+((media.data||[]).map(m=>'<div class="line"><span>'+esc(m.file_name)+'<br><small>'+esc(m.media_type)+'</small></span><button class="btn" onclick="downloadServiceMedia(&#39;'+m.storage_path+'&#39;)">Abrir</button></div>').join("")||'<div class="empty">Sem fotos, vídeos ou áudios.</div>')+'</div>');
 }
 async function setServiceStatusPremium(id,status){
  const now=new Date().toISOString();
