@@ -1515,7 +1515,10 @@ async function refreshChatMessages(){
  const r=await sb.from("chat_messages").select("id,sender_id,body,media_type,media_path,media_name,media_mime,created_at").eq("thread_id",__activeChatId).order("created_at",{ascending:true});
  const box=$("romanoChatMessages");if(!box||r.error)return;
  const rows=r.data||[];
- const rendered=await Promise.all(rows.map(async x=>{
+ const signature=rows.map(x=>[x.id,x.sender_id,x.body||"",x.media_path||"",x.created_at].join("|")).join("||");
+  if(window.__chatLastSignature===signature && box.dataset.chatReady==="1")return;
+  window.__chatLastSignature=signature;
+  const rendered=await Promise.all(rows.map(async x=>{
    let media="";
    if(x.media_path){
      const s=await sb.storage.from("chat-media").createSignedUrl(x.media_path,600);
@@ -1531,6 +1534,7 @@ async function refreshChatMessages(){
    return '<div class="romano-bubble-row '+(x.sender_id===currentUser.id?"mine":"")+'"><div class="romano-bubble '+(x.sender_id===currentUser.id?"mine":"theirs")+'">'+textBody+media+'<div class="romano-bubble-time">'+esc(new Date(x.created_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</div></div></div>';
  }));
  box.innerHTML=rendered.join("")||'<div class="romano-chat-empty"><div>Aún no hay mensajes.<br>Escriba el primero.</div></div>';
+ box.dataset.chatReady="1";
  box.scrollTop=box.scrollHeight;
 }
 function chatMediaSelected(){
@@ -1553,6 +1557,8 @@ async function uploadChatMediaFile(file){
  return {media_type:mediaType,media_path:data.media_path,media_name:file.name,media_mime:type||null,media_size:file.size};
 }
 async function openChatPremium(id,title){
+ window.__chatLastSignature=null;
+ const oldChatBox=$("romanoChatMessages");if(oldChatBox)oldChatBox.dataset.chatReady="0";
  __activeChatId=id;__activeChatTitle=title||"Conversación";
  const page=$("romanoChatPage"),head=$("romanoChatHead"),compose=$("romanoChatCompose");
  if(!head||!compose)return;
