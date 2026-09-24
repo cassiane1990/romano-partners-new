@@ -480,12 +480,6 @@ const SERVICE_CLEANING_CATALOG={
 };
 
 function buildMasterNav(){
- const allowed={
-  admin:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
-  supervisor:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
-  employee:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
-  client:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]
- };
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
   ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de cambio de horario"],["emergency","⚠","Emergencia 24H"],["maintenance_catalog","€","Catálogo de Mantenimiento"],["cleaning_catalog","🧹","Catálogo de Limpieza"],["quality","✓","Checklists / Calidad"]]],
@@ -497,7 +491,7 @@ function buildMasterNav(){
   ["DOCUMENTOS · COMUNICACIÓN",[["documents","▤","Documentos / Contratos"],["service_history","◷","Histórico de servicios"],["chat","◌","Chat"],["notifications","!","Alertas"],["search","⌕","Pesquisa global"]]],
   ["GESTIÓN",[["reports","▥","Relatórios"],["sync","⇄","Sincronización offline"],["backup","◫","Backup / Recuperación"],["ai","✦","ROMANO IA"],["audit","◫","Auditoría"],["privacy","◇","Privacidad / RGPD"],["security","⌘","Seguridad / MFA"],["profile","◎","Mi perfil"]]]
  ];
- const ok=allowed[role()]||allowed.client;
+ const ok=romanoProfileMaster().allowed;
  let h="";
  groups.forEach(g=>{
   h+='<div class="master-group">'+g[0]+'</div>';
@@ -774,6 +768,15 @@ const SUPABASE_KEY="sb_publishable_OwekejMFUr_3hdujnJzxOw_SI-5vEJj";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id); let currentUser=null,currentProfile=null,demoMode=false;
 const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"};
+/* ROMANO PROFILE MASTER · one interface model per role, shared by every user of that role. */
+const ROMANO_PROFILE_MASTER=Object.freeze({
+ admin:Object.freeze({key:"admin",label:"Administrador",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
+ supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
+ employee:Object.freeze({key:"employee",label:"Funcionario",allowed:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"]}),
+ client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]})
+});
+function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
+function romanoProfileCan(page,roleKey=role()){return romanoProfileMaster(roleKey).allowed.includes(page)}
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 const DEMO_CLIENTS=[{id:"demo-c1",name:"Alehost",email:"operaciones@alehost.demo",phone:"+34 600 100 201",created_at:"2026-09-20T09:00:00Z"},{id:"demo-c2",name:"Booking Premium Madrid",email:"madrid@booking.demo",phone:"+34 600 100 202",created_at:"2026-09-19T10:00:00Z"},{id:"demo-c3",name:"Málaga Luxury Stays",email:"malaga@luxury.demo",phone:"+34 600 100 203",created_at:"2026-09-18T11:00:00Z"},{id:"demo-c4",name:"Clínica Retiro",email:"contacto@clinica.demo",phone:"+34 600 100 204",created_at:"2026-09-17T12:00:00Z"},{id:"demo-c5",name:"Hotel Boutique Salamanca",email:"hotel@boutique.demo",phone:"+34 600 100 205",created_at:"2026-09-16T13:00:00Z"}];
 const DEMO_PROPERTIES=[{id:"demo-p1",code:"ALE-T2-001",name:"Apartamento Alehost · Serrano",property_type:"T2",beds_single:0,beds_double:0,address:"Calle de Serrano 42",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p2",code:"ALE-T1-002",name:"Apartamento Alehost · Retiro",property_type:"T1",beds_single:0,beds_double:0,address:"Calle de Alcalá 118",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p3",code:"BKG-T4-003",name:"Villa Premium · Marbella",property_type:"T4",beds_single:0,beds_double:0,address:"Nueva Andalucía",city:"Marbella",country:"España",client_id:"demo-c2",status:"En servicio"},{id:"demo-p4",code:"MLS-T3-004",name:"Luxury Stay · Málaga Centro",property_type:"T3",beds_single:0,beds_double:0,address:"Calle Larios 18",city:"Málaga",country:"España",client_id:"demo-c3",status:"Activo"},{id:"demo-p5",code:"CLI-T2-005",name:"Clínica Retiro",property_type:"T2",beds_single:0,beds_double:0,address:"Calle Ibiza 11",city:"Madrid",country:"España",client_id:"demo-c4",status:"Mantenimiento"}];
