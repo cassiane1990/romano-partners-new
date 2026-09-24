@@ -1704,10 +1704,10 @@ function romanoCatalogModal(category,x){
 async function romanoCatalogSave(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
  const name=$("rcName").value.trim(); if(!name){toast("Indique el nombre.");return}
- const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+Date.now(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true",updated_at:new Date().toISOString()};
+ const payload={category,code:$("rcCode").value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription").value.trim()||null,unit:$("rcUnit").value.trim()||"unidad",price:Math.max(0,Number($("rcPrice").value||0)),tax_included:$("rcTax").value==="true",active:$("rcActive").value==="true",updated_at:new Date().toISOString()};
  const q=id?await sb.from("service_catalog").update(payload).eq("id",id).eq("company_id",currentProfile.company_id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
  if(q.error){toast(q.error.message);return}
- closeModal();toast("Catálogo guardado");romanoCatalogManager(category);
+ closeModal();toast(id?"Artículo actualizado":"Artículo creado");await romanoCatalogManager(category);
 }
 async function romanoCatalogDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
@@ -1717,7 +1717,7 @@ async function romanoCatalogDelete(id){
  const r=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
  if(r.error){toast(r.error.message);return}
  toast("Artículo eliminado");
- if(before.data?.category)romanoCatalogManager(before.data.category);
+ if(before.data?.category)await romanoCatalogManager(before.data.category);
 }
 async function romanoStockManager(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
@@ -1744,9 +1744,9 @@ async function romanoStockSave(id){
  if(!payload.name){toast("Indique el material.");return}
  const r=id?await sb.from("stock_items").update(payload).eq("id",id).eq("company_id",currentProfile.company_id):await sb.from("stock_items").insert({...payload,company_id:currentProfile.company_id});
  if(r.error){toast(r.error.message);return}
- closeModal();toast("Stock guardado");romanoStockManager();
+ closeModal();toast(id?"Material actualizado":"Material creado");await romanoStockManager();
 }
-async function romanoStockDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}if(!confirm("¿Eliminar este material del stock?"))return;const r=await sb.from("stock_items").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast(r.error.message);return}toast("Material eliminado");romanoStockManager()}
+async function romanoStockDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar materiales.");return}if(!confirm("¿Eliminar este material del stock?"))return;const r=await sb.from("stock_items").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast(r.error.message);return}toast("Material eliminado");await romanoStockManager()}
 async function romanoRecurringManager(){
  const r=await sb.from("recurring_services").select("id,client_id,property_id,frequency,typology,priority,active,next_run_at,instructions").order("next_run_at",{ascending:true});
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
