@@ -173,6 +173,7 @@
 .romano-chat-messages{min-height:0}
 .romano-chat-compose{flex:0 0 auto;min-height:66px;position:sticky;bottom:0;z-index:8;box-shadow:0 -4px 14px #523b1d0a}
 .romano-chat-compose button[type="submit"]{min-width:78px;height:42px;white-space:nowrap}
+.romano-bubble-wrap{position:relative}.romano-bubble-actions{display:none;position:absolute;right:8px;top:-28px;background:#fffdf9;border:1px solid #e5dac8;border-radius:10px;box-shadow:0 8px 20px #0002;padding:3px;z-index:5}.romano-bubble-wrap:hover .romano-bubble-actions,.romano-bubble-wrap:focus-within .romano-bubble-actions{display:flex}.romano-bubble-actions button{border:0;background:transparent;padding:6px 8px;font-size:11px;color:#4d453b}.romano-bubble-actions button:hover{background:#f4ecdf;border-radius:7px}.romano-deleted{font-style:italic;opacity:.72}
 @media (max-width:1100px){.romano-chat-page{height:calc(100dvh - 170px);min-height:520px;grid-template-columns:260px minmax(0,1fr)}.romano-chat-compose{padding:10px}}
 @media (max-width:760px){.romano-chat-page{height:calc(100dvh - 105px);min-height:0}.romano-chat-compose{min-height:62px}.romano-chat-compose button[type="submit"]{min-width:70px;padding:0 14px}}
 </style>
@@ -1529,30 +1530,45 @@ async function startRoleChat(targetRole){return selectRoleChat(targetRole)}
 async function newChatPremium(){return selectRoleChat("admin")}
 async function refreshChatMessages(){
  if(!__activeChatId)return;
- const r=await sb.from("chat_messages").select("id,sender_id,body,media_type,media_path,media_name,media_mime,created_at").eq("thread_id",__activeChatId).order("created_at",{ascending:true});
+ const r=await sb.from("chat_messages").select("id,sender_id,body,media_type,media_path,media_name,media_mime,created_at,deleted_for_everyone_at").eq("thread_id",__activeChatId).order("created_at",{ascending:true});
  const box=$("romanoChatMessages");if(!box||r.error)return;
  const rows=r.data||[];
- const signature=rows.map(x=>[x.id,x.sender_id,x.body||"",x.media_path||"",x.created_at].join("|")).join("||");
-  if(window.__chatLastSignature===signature && box.dataset.chatReady==="1")return;
-  window.__chatLastSignature=signature;
-  const rendered=await Promise.all(rows.map(async x=>{
+ const dels=await sb.from("chat_message_deletions").select("message_id").eq("profile_id",currentUser.id);
+ const deletedForMe=new Set((dels.data||[]).map(x=>x.message_id));
+ const visibleRows=rows.filter(x=>!deletedForMe.has(x.id));
+ const signature=visibleRows.map(x=>[x.id,x.sender_id,x.body||"",x.media_path||"",x.deleted_for_everyone_at||"",x.created_at].join("|")).join("||");
+ if(window.__chatLastSignature===signature && box.dataset.chatReady==="1")return;
+ window.__chatLastSignature=signature;
+ const rendered=await Promise.all(visibleRows.map(async x=>{
+   const mine=x.sender_id===currentUser.id;
    let media="";
-   if(x.media_path){
+   if(!x.deleted_for_everyone_at && x.media_path){
      const s=await sb.storage.from("chat-media").createSignedUrl(x.media_path,600);
      if(s.data?.signedUrl){
        if(x.media_type==="video") media='<div class="romano-chat-media"><video controls playsinline preload="metadata" src="'+esc(s.data.signedUrl)+'"></video></div>';
        else if(x.media_type==="image") media='<div class="romano-chat-media"><img src="'+esc(s.data.signedUrl)+'" alt="'+esc(x.media_name||"Foto")+'"></div>';
        else media='<a class="romano-chat-file" href="'+esc(s.data.signedUrl)+'" target="_blank" rel="noopener" download="'+esc(x.media_name||"Documento")+'">📄 '+esc(x.media_name||"Documento")+' <span>· Abrir</span></a>';
-     } else {
-       media='<div class="romano-chat-file romano-chat-file-error">📄 '+esc(x.media_name||"Documento")+'<small>Archivo no disponible para visualización</small></div>';
-     }
+     } else media='<div class="romano-chat-file romano-chat-file-error">📄 '+esc(x.media_name||"Documento")+'<small>Archivo no disponible</small></div>';
    }
-   const textBody=x.body?'<div class="romano-bubble-text">'+esc(x.body)+'</div>':"";
-   return '<div class="romano-bubble-row '+(x.sender_id===currentUser.id?"mine":"")+'"><div class="romano-bubble '+(x.sender_id===currentUser.id?"mine":"theirs")+'">'+textBody+media+'<div class="romano-bubble-time">'+esc(new Date(x.created_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</div></div></div>';
+   const content=x.deleted_for_everyone_at
+     ? '<div class="romano-deleted">🚫 Mensagem apagada</div>'
+     : ((x.body?'<div class="romano-bubble-text">'+esc(x.body)+'</div>':"")+media);
+   const actions=mine&&!x.deleted_for_everyone_at
+     ? '<div class="romano-bubble-actions"><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'me\')">Apagar para mim</button><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'everyone\')">Apagar para todos</button></div>'
+     : '<div class="romano-bubble-actions"><button type="button" onclick="deleteChatMessage(\''+x.id+'\',\'me\')">Apagar para mim</button></div>';
+   return '<div class="romano-bubble-row '+(mine?"mine":"")+'"><div class="romano-bubble-wrap"><div class="romano-bubble '+(mine?"mine":"theirs")+'">'+content+'<div class="romano-bubble-time">'+esc(new Date(x.created_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</div></div>'+actions+'</div></div>';
  }));
  box.innerHTML=rendered.join("")||'<div class="romano-chat-empty"><div>Aún no hay mensajes.<br>Escriba el primero.</div></div>';
  box.dataset.chatReady="1";
  box.scrollTop=box.scrollHeight;
+}
+async function deleteChatMessage(id,mode){
+ const label=mode==="everyone"?"para todos":"solo para ti";
+ if(!confirm("¿Apagar esta mensagem "+label+"?"))return;
+ const r=await sb.rpc("delete_chat_message",{p_message_id:id,p_mode:mode});
+ if(r.error){toast(r.error.message||"No se pudo apagar la mensagem.");return}
+ window.__chatLastSignature=null;
+ await refreshChatMessages();
 }
 function chatMediaSelected(){
  const files=Array.from($("romanoChatMedia")?.files||[]);
