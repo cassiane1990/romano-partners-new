@@ -1328,7 +1328,14 @@ async function deleteService(id){
  toast("Servicio eliminado.");await renderServicesMaster();
 }
 function newClient(){
- openModal("Nuevo cliente",'<form onsubmit="saveClient(event)"><div class="demo-flag">MODO DEMOSTRACIÓN · CLIENTE FICTICIO</div><div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="cPhotoPreview">'+photoBox("","Cliente",false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de perfil</label><input id="cPhoto" type="file" accept="image/*" onchange="photoPreview(\'cPhoto\',\'cPhotoPreview\',\'Cliente\')"><small class="muted">JPG/PNG · se redimensiona para la prueba</small></div></div><div class="two"><div class="field"><label>Nombre</label><input id="cName" required></div><div class="field"><label>Email</label><input id="cEmail" type="email"></div></div><div class="field"><label>Teléfono</label><input id="cPhone"></div><div class="field"><label>Notas</label><textarea id="cNotes"></textarea></div><div class="panel" style="margin:14px 0"><div class="panel-head"><div><h3>Acceso a ROMANO PARTNERS</h3><div class="muted">Envíe una invitación para que el cliente cree su propia contraseña.</div></div></div><label><input id="cSendInvite" type="checkbox" checked> Enviar convite por e-mail ao criar</label></div><button class="primary">Guardar cliente</button></form>')
+ openModal("Nuevo cliente",'<form onsubmit="saveClient(event)"><div class="demo-flag">MODO DEMOSTRACIÓN · CLIENTE FICTICIO</div><div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="cPhotoPreview">'+photoBox("","Cliente",false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de perfil</label><input id="cPhoto" type="file" accept="image/*" onchange="photoPreview(\'cPhoto\',\'cPhotoPreview\',\'Cliente\')"><small class="muted">JPG/PNG · se redimensiona para la prueba</small></div></div><div class="two"><div class="field"><label>Nombre</label><input id="cName" required></div><div class="field"><label>Email</label><input id="cEmail" type="email"></div></div><div class="field"><label>Teléfono</label><input id="cPhone"></div><div class="field"><label>Notas</label><textarea id="cNotes"></textarea></div><div class="panel" style="margin:14px 0"><div class="panel-head"><div><h3>Acceso a ROMANO PARTNERS</h3><div class="muted">Envíe una invitación para que el cliente cree su propia contraseña.</div></div></div><label><input id="cSendInvite" type="checkbox" checked> Enviar acceso por e-mail al crear</label></div><button class="primary">Guardar cliente</button></form>')
+}
+async function resendExistingAccessEmail(email){
+ const e=String(email||"").trim().toLowerCase();if(!e){toast("Falta el e-mail.");return false}
+ const rr=await sb.auth.resetPasswordForEmail(e,{redirectTo:window.location.origin});
+ if(rr.error){toast("No se pudo enviar el correo de acceso: "+rr.error.message);return false}
+ toast("Usuario ya existente: se ha solicitado un correo para recuperar/establecer la contraseña.");
+ return true;
 }
 async function saveClient(e){
  e.preventDefault();
@@ -1343,11 +1350,12 @@ async function saveClient(e){
  if(r.error){toast(r.error.message);return}
  const clientId=r.data.id;
  if($("cSendInvite")?.checked===true){
-   if(!email) toast("Cliente criado, mas falta o e-mail para enviar o convite.");
+   if(!email) toast("Cliente creado, pero falta el e-mail para enviar el acceso.");
    else{
      const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"client",entity_id:clientId,email,full_name:name,role:"client",redirect_to:window.location.origin}});
-     if(inv.error||inv.data?.error) toast("Cliente criado. O convite no fue enviado: "+(inv.data?.error||inv.error?.message||"erro desconhecido"));
-     else toast("Cliente criado e convite de acesso enviado.");
+     if(inv.error||inv.data?.error) toast("Cliente creado. No se pudo enviar el acceso: "+(inv.data?.error||inv.error?.message||"error desconocido"));
+     else if(inv.data?.existing) await resendExistingAccessEmail(email);
+     else toast("Cliente creado y correo de invitación enviado.");
    }
  }else toast("Cliente creado");
  closeModal();renderClients()
@@ -1777,11 +1785,12 @@ async function saveEmployee(e){
  if(photo){const f=$("ePhoto")?.files?.[0];if(f){const path=currentProfile.company_id+"/employees/"+id+"/profile-"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]+/g,"_");const up=await sb.storage.from("company-documents").upload(path,f,{upsert:false,contentType:f.type||undefined});if(!up.error)await sb.from("employee_profiles").update({photo_url:path}).eq("id",id)}}
  if(contractFile)await uploadEmployeeDocument(id,contractFile,"contrato","Contrato de trabajo");
  if(sendInvite){
-   if(!data.email) toast("Funcionario criado, mas falta o e-mail para enviar o convite.");
+   if(!data.email) toast("Funcionario creado, pero falta el e-mail para enviar el acceso.");
    else{
      const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:data.email,full_name:data.full_name,role:accessRole,redirect_to:window.location.origin}});
-     if(inv.error||inv.data?.error) toast("Funcionario criado. O convite no fue enviado: "+(inv.data?.error||inv.error?.message||"erro desconhecido"));
-     else toast("Funcionario criado e convite de acesso enviado.");
+     if(inv.error||inv.data?.error) toast("Funcionario creado. No se pudo enviar el acceso: "+(inv.data?.error||inv.error?.message||"error desconocido"));
+     else if(inv.data?.existing) await resendExistingAccessEmail(data.email);
+     else toast("Funcionario creado y correo de invitación enviado.");
    }
  }else toast("Funcionario criado correctamente");
  closeModal();renderEmployees();
