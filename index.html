@@ -1037,9 +1037,9 @@ async function viewPreposto(id){
 }
 async function deletePreposto(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar prepostos.");return}
- const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("name").eq("id",id).single();
+ const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:{data:{name:"este preposto"},error:null};
  if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
- if(!confirm("¿Eliminar el preposto "+(q.data.name||"")+"? Esta acción no se puede deshacer."))return;
+ if(!confirm("¿Eliminar "+(q.data.name||"este preposto")+"? Esta acción no se puede deshacer."))return;
  if(demoMode){window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS||[];window.__DEMO_PREPOSTOS=window.__DEMO_PREPOSTOS.filter(x=>x.id!==id);toast("Preposto eliminado");return renderPrepostosPremium()}
  const r=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"prepostos",action:"delete",id}});
  if(r.error||r.data?.error){toast("No se puede eliminar el preposto: "+(r.data?.error||r.error?.message||"error desconocido"));return}
@@ -1785,11 +1785,10 @@ async function romanoCatalogSave(id,category){
 async function romanoCatalogDelete(id){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
- const before=await sb.from("service_catalog").select("category").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
- if(before.error){toast(before.error.message);return}
+ const category=$("pageTitle")?.textContent?.includes("Lavandería")?"laundry":$("pageTitle")?.textContent?.includes("Ropa")?"linen":"amenities";
  const inv=await sb.functions.invoke("romano-catalog-stock",{body:{kind:"catalog",action:"delete",id}});
  if(inv.error||inv.data?.error){toast("No se pudo eliminar: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- toast("Artículo eliminado");if(before.data?.category)await romanoCatalogManager(before.data.category);
+ toast("Artículo eliminado");await romanoCatalogManager(category);
 }
 async function romanoStockManager(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
