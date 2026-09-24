@@ -1808,6 +1808,7 @@ async function findOrCreateRoleThread(targetRole){
 }
 function stopChatPolling(){if(window.__chatPoll){clearInterval(window.__chatPoll);window.__chatPoll=null}}
 function stopChatRealtime(){if(window.__chatRealtime){try{sb.removeChannel(window.__chatRealtime)}catch(e){}window.__chatRealtime=null}}
+function stopChatDirectoryRealtime(){if(window.__chatDirectoryRealtime){try{sb.removeChannel(window.__chatDirectoryRealtime)}catch(e){}window.__chatDirectoryRealtime=null}}
 function startChatRealtime(){
  stopChatRealtime();
  if(!__activeChatId||!sb?.channel)return;
@@ -1815,9 +1816,24 @@ function startChatRealtime(){
    .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages",filter:"thread_id=eq."+__activeChatId},()=>refreshChatMessages())
    .subscribe();
 }
-function startChatPolling(){stopChatPolling();window.__chatPoll=setInterval(()=>{if(__activeChatId)refreshChatMessages()},3000)}
+function startChatDirectoryRealtime(){
+ stopChatDirectoryRealtime();
+ if(!sb?.channel)return;
+ window.__chatDirectoryRealtime=sb.channel("romano-chat-directory-"+currentUser.id)
+   .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},async payload=>{
+     if(payload.new?.sender_id===currentUser.id)return;
+     await renderChatContacts();
+     if(payload.new?.thread_id!==__activeChatId){
+       const p=await sb.from("profiles").select("full_name,role").eq("id",payload.new.sender_id).maybeSingle();
+       const who=p.data?.full_name||((p.data?.role==="supervisor")?"Supervisor":"Novo contato");
+       toast("💬 Nova mensagem de "+who);
+     }
+   })
+   .subscribe();
+}
+function startChatPolling(){stopChatPolling();window.__chatPoll=setInterval(()=>{if(__activeChatId)refreshChatMessages();else renderChatContacts()},3000)}
 async function renderChatPremium(){
- stopChatPolling();stopChatRealtime();__activeChatId=null;__activeChatTitle="";
+ stopChatPolling();stopChatRealtime();startChatDirectoryRealtime();__activeChatId=null;__activeChatTitle="";
  const isClient=role()==="client";
  const contact=isClient?'<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">Supervisor y Administrador · chat interno</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>':"";
  $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escreva uma mensagem..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto ou vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
@@ -1843,9 +1859,18 @@ async function renderChatContacts(){
  }
 }
 async function selectRoleChat(targetRole){
- let thread=__chatRoleThreads[targetRole]||await findOrCreateRoleThread(targetRole);
- if(!thread)return;
- __chatRoleThreads[targetRole]=thread;
+ let thread=null;
+ if(role()==="client"){
+   thread=__chatRoleThreads[targetRole]||await findOrCreateRoleThread(targetRole);
+   if(!thread)return;
+   __chatRoleThreads[targetRole]=thread;
+ }else if(role()==="admin"||role()==="supervisor"){
+   const target=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name").limit(1).maybeSingle();
+   if(target.error||!target.data){toast("Destinatário não disponível.");return}
+   const c=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
+   if(c.error){toast(c.error.message||"Não foi possível abrir a conversa.");return}
+   thread={id:c.data,title:(currentProfile.full_name||"")+" ↔ "+(target.data.full_name|| (targetRole==="supervisor"?"Supervisor":"Administrador"))};
+ }else return;
  await openChatPremium(thread.id,targetRole==="supervisor"?"Supervisor":"Administrador");
 }
 async function startRoleChat(targetRole){return selectRoleChat(targetRole)}
