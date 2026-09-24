@@ -1496,7 +1496,7 @@ async function findOrCreateRoleThread(targetRole){
  const have=new Set((members.data||[]).map(x=>x.profile_id));
  const missing=[currentUser.id,target.id].filter(id=>!have.has(id)).map(profile_id=>({thread_id:thread.id,profile_id}));
  if(missing.length){
-   const add=await sb.from("chat_members").insert(missing);
+   const add=await sb.from("chat_members").upsert(missing,{onConflict:"thread_id,profile_id",ignoreDuplicates:true});
    if(add.error){toast(add.error.message);return null}
  }
  return thread;
