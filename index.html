@@ -1872,11 +1872,43 @@ async function renderPrivacyPremium(){return privacy()}
 async function renderProfilePremium(){return profile()}
 async function renderNotificationsPremium(){return renderNotifications()}
 async function maintenance(){
- const q=demoMode?{data:window.__DEMO_MAINTENANCE||[],error:null}:await sb.from("maintenance_projects").select("id,client_id,property_id,title,category,description,priority,status,scheduled_at,assigned_employee_id,estimated_cost,actual_cost,notes,created_at").order("created_at",{ascending:false});
- const rows=q.data||[],props=demoMode?(DEMO_PROPERTIES||[]):((await sb.from("properties").select("id,name,code")).data||[]),clients=demoMode?(DEMO_CLIENTS||[]):((await sb.from("clients").select("id,name")).data||[]),emps=demoMode?(DEMO_EMPLOYEES||[]):((await sb.from("employee_profiles").select("id,full_name,employee_code,function_title")).data||[]),pm=new Map(props.map(x=>[x.id,x])),cm=new Map(clients.map(x=>[x.id,x])),em=new Map(emps.map(x=>[x.id,x]));
- let h='<div class="panel"><div class="panel-head"><div><h3>Mantenimiento / Proyectos</h3><div class="muted">Preventivo, correctivo, pintura, electricidad, fontanería, silicona, montaje e instalaciones.</div></div><button class="btn gold" onclick="newMaintenance()">＋ Nuevo mantenimiento</button></div>';
- if(q.error)h+='<div class="msg">'+esc(q.error.message)+'</div>';else if(rows.length)h+='<table class="table"><thead><tr><th>Trabajo</th><th>Cliente / propiedad</th><th>Tipo</th><th>Prioridad</th><th>Estado</th><th>Responsable</th><th>Coste</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.title)+'</b><small class="muted" style="display:block">'+esc(x.description||"")+'</small></td><td>'+esc(cm.get(x.client_id)?.name||"—")+'<small class="muted" style="display:block">'+esc(pm.get(x.property_id)?.name||pm.get(x.property_id)?.code||"—")+'</small></td><td>'+esc(x.category)+'</td><td>'+esc(x.priority)+'</td><td><span class="status '+(x.status==="completed"?"approved":x.status==="cancelled"?"urgent":"in_progress")+'">'+esc(x.status)+'</span></td><td>'+esc(em.get(x.assigned_employee_id)?.full_name||em.get(x.assigned_employee_id)?.employee_code||"Sin asignar")+'</td><td>'+Number(x.actual_cost||x.estimated_cost||0).toFixed(2)+' €</td><td><button class="btn" onclick="editMaintenance(\''+x.id+'\')">Editar</button></td></tr>').join("")+'</tbody></table>';else h+='<div class="empty">No hay mantenimientos registrados.</div>';
+ const q=demoMode?{data:window.__DEMO_SERVICE_CATALOG||[],error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category","maintenance").order("name");
+ const rows=q.data||[];
+ let h='<div class="panel"><div class="panel-head"><div><h3>Catálogo de servicios de mantenimiento</h3><div class="muted">Aquí puedes editar los servicios, valores e IVA. Estos datos son del catálogo y no crean un pedido.</div></div><button class="btn gold" onclick="newMaintenanceCatalogItem()">＋ Añadir línea</button></div>';
+ if(q.error)h+='<div class="msg">'+esc(q.error.message)+'</div>';
+ else if(rows.length)h+='<table class="table"><thead><tr><th>Servicio</th><th>Valor (€)</th><th>IVA</th><th>Activo</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+Number(x.price||0).toFixed(2)+' €</td><td>'+(x.tax_included?'Incluido':'No incluido')+'</td><td>'+(x.active?'Sí':'No')+'</td><td><button class="btn" onclick="editMaintenanceCatalogItem(\''+x.id+'\')">Editar</button></td></tr>').join("")+'</tbody></table>';
+ else h+='<div class="empty">No hay servicios en el catálogo.</div>';
  h+='</div>';$("content").innerHTML=h;
+}
+async function newMaintenanceCatalogItem(){openMaintenanceCatalogModal(null)}
+async function editMaintenanceCatalogItem(id){
+ const q=demoMode?{data:(window.__DEMO_SERVICE_CATALOG||[]).find(x=>x.id===id),error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active").eq("id",id).single();
+ if(q.error||!q.data){toast(q.error?.message||"Servicio no encontrado.");return}
+ openMaintenanceCatalogModal(q.data);
+}
+function openMaintenanceCatalogModal(x){
+ const isEdit=!!x;
+ const name=esc(x?.name||"");
+ const price=Number(x?.price||0);
+ const included=x?.tax_included!==false;
+ const active=x?.active!==false;
+ openModal(isEdit?"Editar servicio":"Añadir servicio",'<form onsubmit="saveMaintenanceCatalogItem(event,'+(isEdit?"\''+x.id+'\'":"null")+')"><div class="field"><label>Servicio</label><input id="mcName" value="'+name+'" placeholder="Ej. Mantenimiento · 1ª hora" required></div><div class="two"><div class="field"><label>Valor (€)</label><input id="mcPrice" type="number" min="0" step="0.01" value="'+price+'"></div><div class="field"><label>IVA</label><select id="mcTax"><option value="true" '+(included?'selected':'')+'>Incluido</option><option value="false" '+(!included?'selected':'')+'>No incluido</option></select></div></div><div class="field"><label>Activo</label><select id="mcActive"><option value="true" '+(active?'selected':'')+'>Sí</option><option value="false" '+(!active?'selected':'')+'>No</option></select></div><button class="primary">Guardar</button></form>');
+}
+async function saveMaintenanceCatalogItem(e,id=null){
+ e.preventDefault();
+ const name=$("mcName").value.trim(),price=Math.max(0,Number($("mcPrice").value||0)),taxIncluded=$("mcTax").value==="true",active=$("mcActive").value==="true";
+ if(!name){toast("Indique el servicio.");return}
+ if(demoMode){
+  window.__DEMO_SERVICE_CATALOG=window.__DEMO_SERVICE_CATALOG||[];
+  const arr=window.__DEMO_SERVICE_CATALOG,idx=id?arr.findIndex(x=>x.id===id):-1;
+  const row={id:id||"demo-mc-"+Date.now(),category:"maintenance",code:id?(arr[idx]?.code||"M-"+Date.now()):"M-"+Date.now(),name,unit:"service",price,tax_included:taxIncluded,active};
+  if(idx>=0)arr[idx]={...arr[idx],...row};else arr.unshift(row);
+  closeModal();toast("Catálogo actualizado");maintenance();return;
+ }
+ const payload={category:"maintenance",code:id?undefined:"M-"+Date.now(),name,unit:"service",price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()};
+ const q=id?await sb.from("service_catalog").update({name,price,tax_included:taxIncluded,active,updated_at:new Date().toISOString()}).eq("id",id):await sb.from("service_catalog").insert({...payload,company_id:currentProfile.company_id});
+ if(q.error){toast(q.error.message);return}
+ closeModal();toast("Catálogo actualizado");maintenance();
 }
 async function newMaintenance(){
  const [clients,props,emps]=await Promise.all([sb.from("clients").select("id,name").order("name"),sb.from("properties").select("id,name,code,client_id").order("name"),sb.from("employee_profiles").select("id,full_name,employee_code,function_title").eq("active",true).order("full_name")]);
