@@ -1490,15 +1490,6 @@ async function findOrCreateRoleThread(targetRole){
    if(c.error){toast(c.error.message);return null}
    thread={id:c.data,title,thread_type:"direct",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
  }
- // Garantir que o cliente e o contacto continuam participantes da conversa existente.
- const members=await sb.from("chat_members").select("profile_id").eq("thread_id",thread.id);
- if(members.error){toast(members.error.message);return null}
- const have=new Set((members.data||[]).map(x=>x.profile_id));
- const missing=[currentUser.id,target.id].filter(id=>!have.has(id)).map(profile_id=>({thread_id:thread.id,profile_id}));
- if(missing.length){
-   const add=await sb.from("chat_members").upsert(missing,{onConflict:"thread_id,profile_id",ignoreDuplicates:true});
-   if(add.error){toast(add.error.message);return null}
- }
  return thread;
 }
 function stopChatPolling(){if(window.__chatPoll){clearInterval(window.__chatPoll);window.__chatPoll=null}}
