@@ -1569,11 +1569,12 @@ async function romanoCatalogSave(id,category){
 }
 async function romanoCatalogDelete(id){
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
+ const before=await sb.from("service_catalog").select("category").eq("id",id).maybeSingle();
+ if(before.error){toast(before.error.message);return}
  const r=await sb.from("service_catalog").delete().eq("id",id);
  if(r.error){toast(r.error.message);return}
  toast("Artículo eliminado");
- const current=document.querySelector('[onclick*="romanoCatalogNew"]');
- if(current){const m=current.getAttribute("onclick").match(/romanoCatalogNew\\('([^']+)'/);if(m)romanoCatalogManager(m[1]);}
+ if(before.data?.category)romanoCatalogManager(before.data.category);
 }
 async function romanoStockManager(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").order("name");
