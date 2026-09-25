@@ -2734,7 +2734,32 @@ async function renderDocumentsPremium(){
  }
  const canDeleteDocs=role()==="admin"||role()==="supervisor"||isClient;
  h+='<div style="margin-top:12px">'+(rows.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.title)+'</b></td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="downloadClientDocument(\''+esc(x.storage_path)+'\',\''+esc(x.file_name)+'\')">↓ Abrir / descargar</button>'+(canDeleteDocs?'<button class="btn" style="margin-left:6px" onclick="deleteOwnClientDocument(\''+esc(x.id)+'\',\''+esc(x.storage_path)+'\')">Eliminar</button>':"")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos guardados.</div>')+'</div></div>';
+ if(role()==="admin"||role()==="supervisor"){
+   const tq=await sb.from("document_templates").select("id,name,template_type,content,updated_at").eq("company_id",currentProfile.company_id).order("template_type").order("name");
+   h+='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Plantillas de contratos</h3><div class="muted">Modelos editables para contratos de empleados, supervisores y otros documentos internos.</div></div><button class="btn gold" onclick="documentTemplateModal()">＋ Nueva plantilla</button></div>'+(tq.data?.length?'<table class="table"><thead><tr><th>Plantilla</th><th>Tipo</th><th>Actualizada</th><th></th></tr></thead><tbody>'+tq.data.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.template_type)+'</td><td>'+esc(new Date(x.updated_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="documentTemplateModal(\''+x.id+'\')">Editar</button> <button class="btn" onclick="deleteDocumentTemplate(\''+x.id+'\')">Eliminar</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay plantillas. Cree el primer modelo editable.</div>')+'</div>';
+ }
  $("content").innerHTML=h;
+}
+async function documentTemplateModal(id=null){
+ if(!["admin","supervisor"].includes(role())){toast("Solo Administración/Supervisión puede gestionar plantillas.");return}
+ let x=null;
+ if(id){const q=await sb.from("document_templates").select("id,name,template_type,content").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}x=q.data}
+ openModal(x?"Editar plantilla":"Nueva plantilla",'<form onsubmit="saveDocumentTemplate(event,'+(x?JSON.stringify(x.id):"null")+')"><div class="two"><div class="field"><label>Nombre</label><input id="dtName" required value="'+esc(x?.name||"")+'" placeholder="Contrato de trabajo"></div><div class="field"><label>Tipo</label><select id="dtType"><option value="employee_contract" '+(x?.template_type==="employee_contract"?"selected":"")+'>Contrato empleado</option><option value="supervisor_contract" '+(x?.template_type==="supervisor_contract"?"selected":"")+' >Contrato supervisor</option><option value="other" '+(x?.template_type==="other"?"selected":"")+'>Otro documento</option></select></div></div><div class="field"><label>Contenido editable</label><textarea id="dtContent" style="min-height:280px" required>'+esc(x?.content||"")+'</textarea></div><div class="muted">Puede usar marcadores como {{NOMBRE}}, {{NIF}}, {{FECHA_ENTRADA}}, {{FUNCION}} y {{SALARIO}} para completar posteriormente.</div><button class="primary" type="submit">Guardar plantilla</button></form>');
+}
+async function saveDocumentTemplate(e,id=null){
+ e.preventDefault();
+ if(!["admin","supervisor"].includes(role()))return;
+ const payload={name:$("dtName").value.trim(),template_type:$("dtType").value,content:$("dtContent").value,updated_by:currentUser.id,updated_at:new Date().toISOString()};
+ const q=id?await sb.from("document_templates").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single():await sb.from("document_templates").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
+ if(q.error){toast(q.error.message);return}
+ closeModal();toast("Plantilla guardada");renderDocumentsPremium();
+}
+async function deleteDocumentTemplate(id){
+ if(!["admin","supervisor"].includes(role()))return;
+ if(!confirm("¿Eliminar esta plantilla?"))return;
+ const q=await sb.from("document_templates").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(q.error){toast(q.error.message);return}
+ toast("Plantilla eliminada");renderDocumentsPremium();
 }
 async function getCurrentClientRecord(){
  const q=await sb.from("clients").select("id,name,email").eq("profile_id",currentUser.id).single();
