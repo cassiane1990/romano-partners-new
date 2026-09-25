@@ -535,7 +535,38 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .side-footer .sf-name,.side-footer .sf-role,.side-footer .sf-logout{display:block!important}
 }
 </style>
-<!-- ROMANO-DEPLOY-VERIFY-2026-09-24 --></head>
+<!-- ROMANO-DEPLOY-VERIFY-2026-09-24 -->
+<!-- ROMANO RESPONSIVE GLOBAL STANDARD · 2026-09-25 -->
+<style id="romano-responsive-global-2026-09-25">
+*{min-width:0}
+html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
+.content{width:100%;max-width:1600px;margin:0 auto}
+.panel{max-width:100%}
+.table-wrap,.table-responsive{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(min-width:768px) and (max-width:1199px){
+ .side{width:220px}.main{margin-left:220px}.top{padding:0 22px}.content{padding:22px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:767px){
+ body{font-size:14px}.app{display:block;width:100%}.main{margin-left:0;width:100%;max-width:100%}
+ .top{width:100%;max-width:100%;overflow:hidden}.top h2{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .content{padding:12px 10px 28px!important}.grid{grid-template-columns:1fr;gap:10px}
+ .panel{padding:13px!important;border-radius:16px}.panel-head{gap:9px}.panel-head>div:first-child{min-width:0}.panel-head h3{line-height:1.25}
+ .actions{width:100%;flex-wrap:wrap}.actions .btn{min-height:42px;white-space:normal}
+ .table{min-width:0;font-size:11px}.table th,.table td{padding:9px 6px;white-space:normal;word-break:break-word}
+ .table td .actions{width:auto}.table td .actions .btn{min-height:36px;padding:7px 8px}
+ /* Property/service tables remain readable on narrow phones without forcing page-wide horizontal scrolling. */
+ .panel .table{display:table;width:100%;table-layout:fixed}
+ .panel .table th:nth-child(1),.panel .table td:nth-child(1){width:13%}
+ .panel .table th:nth-child(2),.panel .table td:nth-child(2){width:14%}
+ .panel .table th:nth-child(3),.panel .table td:nth-child(3){width:19%}
+ .panel .table th:nth-child(4),.panel .table td:nth-child(4){width:14%}
+ .panel .table th:nth-child(5),.panel .table td:nth-child(5){width:19%}
+ .panel .table th:nth-child(6),.panel .table td:nth-child(6){width:12%}
+ .panel .table th:nth-child(7),.panel .table td:nth-child(7){width:9%}
+}
+@media(min-width:1200px){.content{padding:28px 30px}}
+</style>
+</head>
 <body>
 <div id="login" class="login"><div class="card login-card">
 <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
@@ -606,12 +637,12 @@ function buildMasterNav(){
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
   ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de cambio de horario"],["emergency","⚠","Emergencia 24H"],["maintenance_catalog","€","Catálogo de Mantenimiento"],["cleaning_catalog","🧹","Catálogo de Limpieza"],["quality","✓","Checklists / Calidad"]]],
-  ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"],["prepostos","♙","Prepostos / Representantes"]]],
-  ["EQUIPO · JORNADAS",[["employees","♧","Funcionarios"],["teams","♙","Equipos / Plan mensual"],["journey","◷","Mi Jornada"],["service_journey","◷","Jornada de servicios"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"]]],
+  ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"],["prepostos","♙","Representantes"]]],
+  ["EQUIPO · JORNADAS",[["employees","♧","Empleados"],["teams","♙","Equipos / Plan mensual"],["journey","◷","Mi Jornada"],["service_journey","◷","Jornada de servicios"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"]]],
   ["SERVICIOS · PRECIOS",[["recurring","↻","Servicios recurrentes"],["catalog","€","Tipologías y Precios"],["quotes","◇","Presupuestos"]]],
   ["FINANZAS",[["finance","€","Finanzas"],["receipts","▧","Recibos / Comprobantes"],["invoices","▤","Facturas"]]],
-  ["DOCUMENTOS · COMUNICACIÓN",[["documents","▤","Documentos / Contratos"],["service_history","◷","Histórico de servicios"],["chat","◌","Chat"],["notifications","!","Alertas"],["search","⌕","Pesquisa global"]]],
-  ["GESTIÓN",[["reports","▥","Relatórios"],["sync","⇄","Sincronización offline"],["backup","◫","Backup / Recuperación"],["ai","✦","ROMANO IA"],["audit","◫","Auditoría"],["privacy","◇","Privacidad / RGPD"],["security","⌘","Seguridad / MFA"],["profile","◎","Mi perfil"]]]
+  ["DOCUMENTOS · COMUNICACIÓN",[["documents","▤","Documentos / Contratos"],["service_history","◷","Histórico de servicios"],["chat","◌","Chat"],["notifications","!","Notificaciones"],["search","⌕","Búsqueda global"]]],
+  ["GESTIÓN",[["reports","▥","Informes"],["sync","⇄","Sincronización offline"],["backup","◫","Backup / Recuperación"],["ai","✦","ROMANO IA"],["audit","◫","Auditoría"],["privacy","◇","Privacidad / RGPD"],["security","⌘","Seguridad / MFA"],["profile","◎","Mi perfil"]]]
  ];
  const ok=romanoProfileMaster().allowed;
  let h="";
@@ -1147,7 +1178,7 @@ async function deletePreposto(id){
  }catch(err){toast("No se puede eliminar el preposto: "+(err?.message||String(err)))}
 }
 
-const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance_catalog:["Catálogo de Mantenimiento",maintenance],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],prepostos:["Prepostos / Representantes",renderPrepostosPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],service_journey:["Jornada de servicios",renderServiceJourneyBoard],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock_catalog:["Catálogo de Materiales",()=>romanoCatalogManager("material")],linen_catalog:["Catálogo de Ropa",()=>romanoCatalogManager("linen")],laundry_catalog:["Catálogo de Lavandería",()=>romanoCatalogManager("laundry")],amenities_catalog:["Catálogo de Amenities",()=>romanoCatalogManager("amenities")],recurring:["Servicios recurrentes",renderRecurringPremium],cleaning_catalog:["Catálogo de Limpieza",renderCleaningCatalog],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderReceiptsPremium],invoices:["Facturas",renderInvoicesPremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
+const pages={dashboard:["Dashboard 360",renderPremiumDashboard],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance_catalog:["Catálogo de Mantenimiento",maintenance],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],clients:["Clientes",renderClientsPremium],prepostos:["Prepostos / Representantes",renderPrepostosPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],service_journey:["Jornada de servicios",renderServiceJourneyBoard],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock_catalog:["Catálogo de Materiales",()=>romanoCatalogManager("material")],linen_catalog:["Catálogo de Ropa",()=>romanoCatalogManager("linen")],laundry_catalog:["Catálogo de Lavandería",()=>romanoCatalogManager("laundry")],amenities_catalog:["Catálogo de Amenities",()=>romanoCatalogManager("amenities")],recurring:["Servicios recurrentes",renderRecurringPremium],cleaning_catalog:["Catálogo de Limpieza",renderCleaningCatalog],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderReceiptsPremium],invoices:["Facturas",renderInvoicesPremium],documents:["Documentos / Contratos",renderDocumentsPremium],service_history:["Histórico de servicios",renderClientServiceHistoryPremium],chat:["Chat",renderChatPremium],notifications:["Notificaciones",renderNotificationsPremium],search:["Búsqueda global",renderSearchPremium],reports:["Informes",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
