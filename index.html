@@ -3522,7 +3522,7 @@ async function renderChatContacts(){
  }
 }
 async function selectDirectChat(targetId,targetRole){
- if(!["admin","supervisor"].includes(role()))return;
+ if(!["admin","supervisor","employee"].includes(role()))return;
  const target=await sb.from("profiles").select("id,full_name,role").eq("id",targetId).eq("company_id",currentProfile.company_id).eq("active",true).maybeSingle();
  if(target.error||!target.data){toast("Destinatario no disponible.");return}
  const q=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
