@@ -835,8 +835,20 @@ async function saveCleaningCatalogItem(id=null){
 }
 
 async function renderCatalogMaster(){
- const all=[...MASTER_PRICES.cleaning,...MASTER_PRICES.maintenance,...MASTER_PRICES.linen,...MASTER_PRICES.amenities,...MASTER_PRICES.laundry];
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Tipologías y Precios</h3><div class="muted">Valores da proposta formal ROMANO PROPERTY CARE.</div></div></div><table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Precio</th><th>IVA</th></tr></thead><tbody>'+all.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.price==null?"Consultar":masterMoney(x.price))+'</td><td>'+esc(x.price==null?"Consultar":x.tax?"Incluido":"No incluido")+'</td></tr>').join("")+'</tbody></table><div class="notice">España 21% · Portugal 23%. El tipo de IVA es configurable. T5 y kits Premium permanecen “Consultar” conforme a la propuesta.</div></div>';
+ const fallback=[...MASTER_PRICES.cleaning,...MASTER_PRICES.maintenance,...MASTER_PRICES.linen,...MASTER_PRICES.amenities,...MASTER_PRICES.laundry];
+ let all=fallback;
+ try{
+  const q=await sb.from("service_catalog").select("id,code,name,price,tax_included,active,category").eq("company_id",currentProfile.company_id).eq("active",true).order("category").order("name");
+  if(!q.error&&q.data?.length){
+   const dynamic=q.data.map(x=>({id:x.id,code:x.code,name:x.name,price:x.price,tax:x.tax_included,category:x.category}));
+   const hasCleaning=dynamic.some(x=>x.category==="cleaning");
+   all=hasCleaning?dynamic.filter(x=>["cleaning","maintenance","linen","amenities","laundry"].includes(x.category)):fallback;
+  }
+ }catch(e){}
+ const t1t5=all.filter(x=>/^T[1-5](?:-|$)/.test(String(x.code||"")));
+ const others=all.filter(x=>!/^T[1-5](?:-|$)/.test(String(x.code||"")));
+ const ordered=[...t1t5,...others];
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Tipologías y Precios</h3><div class="muted">Tarifas de ROMANO PROPERTY CARE · T1 a T5 y servicios complementarios.</div></div></div><div class="notice">Las tipologías T1, T2, T3, T4 y T5 están disponibles aquí. T5 puede quedar como “Consultar” cuando la propiedad requiera valoración.</div><table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Precio</th><th>IVA</th></tr></thead><tbody>'+ordered.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+esc(x.name)+'</td><td>'+esc(x.price==null?"Consultar":masterMoney(x.price))+'</td><td>'+esc(x.price==null?"Consultar":x.tax?"Incluido":"No incluido")+'</td></tr>').join("")+'</tbody></table><div class="muted" style="margin-top:12px">España 21% · Portugal 23%. El IVA se muestra según la tarifa configurada.</div></div>';
 }
 async function renderServiceJourneyBoard(){
  const day=window.__sjDay||new Date().toLocaleDateString("sv-SE");
@@ -1989,14 +2001,19 @@ async function privacy(){
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Privacidad / RGPD</h3><div class="muted">Centro de información y control de privacidad de ROMANO PARTNERS.</div></div></div><div class="master-cols"><div class="panel"><h3>Datos y acceso</h3><p>Los datos están separados por empresa y el acceso depende del perfil y las políticas del backend.</p><p>Clientes y funcionarios deben ver únicamente la información que corresponde a sus permisos.</p></div><div class="panel"><h3>Buenas prácticas</h3><p>Evita compartir contraseñas. Los documentos y comunicaciones deben permanecer dentro de los espacios autorizados.</p></div></div></div>';
 }
 async function quotes(){
- const r=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at").order("created_at",{ascending:false});
- if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
+ if(!canManage()){ $("content").innerHTML='<div class="panel"><div class="msg">Los presupuestos están disponibles para Administrador y Supervisor.</div></div>'; return; }
+ const r=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false});
+ if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">No se pudieron cargar los presupuestos: '+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[];
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Presupuestos</h3><div class="muted">Crea, edita, guarda y elimina presupuestos.</div></div><button class="btn gold" onclick="romanoQuoteModal(null)">＋ Nuevo presupuesto</button></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Título</th><th>Estado</th><th>Total</th><th>Válido hasta</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.status)+'</td><td>'+masterMoney(x.total)+'</td><td>'+esc(x.valid_until||"—")+'</td><td><button class="btn" onclick="romanoQuoteModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoQuoteDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay presupuestos.</div>')+'</div>';
 }
 async function romanoQuoteModal(id){
- let x=null;if(id){const r=await sb.from("quotes").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}x=r.data}
- const clients=await sb.from("clients").select("id,name").order("name");const props=await sb.from("properties").select("id,name,code").order("name");
+ if(!canManage()){toast("Solo Admin/Supervisor puede gestionar presupuestos.");return}
+ let x=null;if(id){const r=await sb.from("quotes").select("*").eq("id",id).eq("company_id",currentProfile.company_id).single();if(r.error){toast(r.error.message);return}x=r.data}
+ const clients=await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name");
+ const props=await sb.from("properties").select("id,name,code").eq("company_id",currentProfile.company_id).order("name");
+ if(clients.error){toast("No se pudieron cargar los clientes: "+clients.error.message);return}
+ if(props.error){toast("No se pudieron cargar las propiedades: "+props.error.message);return}
  openModal(x?"Editar presupuesto":"Nuevo presupuesto",
  '<div class="two"><div class="field"><label>Número</label><input id="qNumber" value="'+esc(x?.number||("P-"+Date.now()))+'"></div><div class="field"><label>Estado</label><select id="qStatus"><option value="draft">Borrador</option><option value="sent">Enviado</option><option value="accepted">Aceptado</option><option value="rejected">Rechazado</option><option value="expired">Vencido</option></select></div></div>'+
  '<div class="field"><label>Título</label><input id="qTitle" value="'+esc(x?.title||"")+'" required></div>'+
@@ -2007,14 +2024,15 @@ async function romanoQuoteModal(id){
  if(x)$("qStatus").value=x.status||"draft";
 }
 async function romanoQuoteSave(id){
+ if(!canManage()){toast("Solo Admin/Supervisor puede guardar presupuestos.");return}
  const subtotal=Math.max(0,Number($("qSubtotal").value||0)),tax=Math.max(0,Number($("qTax").value||0));
  const payload={number:$("qNumber").value.trim()||("P-"+Date.now()),title:$("qTitle").value.trim(),status:$("qStatus").value,client_id:$("qClient").value||null,property_id:$("qProperty").value||null,subtotal,tax_amount:tax,total:subtotal+tax,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,updated_at:new Date().toISOString()};
  if(!payload.title){toast("Indique el título.");return}
- const r=id?await sb.from("quotes").update(payload).eq("id",id).select("id").single():await sb.from("quotes").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
- if(r.error){toast(r.error.message);return}
- closeModal();toast("Presupuesto guardado");quotes();
+ const r=id?await sb.from("quotes").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single():await sb.from("quotes").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
+ if(r.error){toast("No se pudo guardar el presupuesto: "+r.error.message);return}
+ closeModal();toast("Presupuesto guardado correctamente");await quotes();
 }
-async function romanoQuoteDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar presupuestos.");return}if(!confirm("¿Eliminar este presupuesto?"))return;const r=await sb.from("quotes").delete().eq("id",id);if(r.error){toast(r.error.message);return}toast("Presupuesto eliminado");quotes()}
+async function romanoQuoteDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar presupuestos.");return}if(!confirm("¿Eliminar este presupuesto?"))return;const r=await sb.from("quotes").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se pudo eliminar el presupuesto: "+r.error.message);return}toast("Presupuesto eliminado correctamente");await quotes()}
 
 async function renderStock(){const r=await sb.from("stock_items").select("name,sku,unit,quantity,min_quantity").order("name");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Materiales y stock</h3><span class="pill">Control operativo</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Material</th><th>SKU</th><th>Unidad</th><th>Cantidad</th><th>Mínimo</th><th>Estado</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.sku||"—")+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.quantity)+'</td><td>'+esc(x.min_quantity)+'</td><td>'+((Number(x.quantity)<=Number(x.min_quantity))?'<span class="status urgent">Reponer</span>':'<span class="status approved">OK</span>')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay materiales registrados.</div>')+'</div>'}
 
