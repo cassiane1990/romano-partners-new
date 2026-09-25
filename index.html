@@ -972,8 +972,9 @@ async function renderServicesMaster(){
      if(pq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pq.error.message)+'</div></div>';return}
      propertiesMap=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
    }
-   if(clientIds.length){
-     const cq=await sb.from("clients").select("id,name").in("id",clientIds).eq("company_id",currentProfile.company_id);
+   if(clientIds.length||Object.values(propertiesMap).some(p=>p.client_id)){
+     const allClientIds=[...new Set(clientIds.concat(Object.values(propertiesMap).map(p=>p.client_id).filter(Boolean)))];
+     const cq=await sb.from("clients").select("id,name").in("id",allClientIds).eq("company_id",currentProfile.company_id);
      if(cq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(cq.error.message)+'</div></div>';return}
      clientsMap=Object.fromEntries((cq.data||[]).map(c=>[c.id,c]));
    }
@@ -982,7 +983,8 @@ async function renderServicesMaster(){
  const cards=rows.length?rows.map(x=>{
    const p=propertiesMap[x.property_id]||null;
    const c=clientsMap[x.client_id]||null;
-   const visibleClient=role()==="client"?clientName:(c?.name||p?.client_name||"—");
+   const fallbackClient=p?.client_id?clientsMap[p.client_id]:null;
+   const visibleClient=role()==="client"?clientName:(c?.name||fallbackClient?.name||"—");
    const visibleProperty=p?.name||p?.code||"—";
    const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
    const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
