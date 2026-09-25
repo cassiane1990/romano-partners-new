@@ -783,6 +783,8 @@ async function renderServicesMaster(){
      if(own.error){r.data=[];r.error=own.error}
      else if(own.data?.id)q=q.eq("client_id",own.data.id);
      else{r.data=[];r.error=null}
+   }else if(role()==="employee"){
+     q=q.eq("assigned_employee_id",currentUser.id);
    }
    if(!r.error){const qr=await q;r.data=qr.data;r.error=qr.error}
  }
@@ -837,7 +839,7 @@ async function renderServicesMaster(){
      '<div class="service-card-actions">'+actions+'</div>'+
    '</article>';
  }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
- $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div><button class="btn gold" onclick="openPage(\'newservice\')">＋ Nuevo servicio</button></div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
+ $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div>'+(role()==="employee"?"":"<button class=\"btn gold\" onclick=\"openPage('newservice')\">＋ Nuevo servicio</button>")+'</div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
 }
 async function renderCleaningCatalog(){
  const q=demoMode?{data:window.__DEMO_CLEANING_CATALOG||[],error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category","cleaning").order("name");
@@ -2252,7 +2254,7 @@ async function renderNotifications(){
    const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
    const action=(isMessage||isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
    const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ VER Y ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
-   return '<div class="panel" style="margin-top:10px;cursor:pointer;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
+   return '<div class="panel" style="margin-top:10px;cursor:pointer;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
  }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';
 }
 
@@ -3206,10 +3208,12 @@ async function renderChatContacts(){
    const contacts=[["supervisor",sup,"Supervisor"],["admin",adm,"Administrador"]];
    el.innerHTML=contacts.map(([key,t,label])=>'<button class="romano-chat-contact '+(t?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+label+'</b><small>Conversación privada</small></span></button>').join("");
  }else{
-   if(role()==="admin"||role()==="supervisor"){
-     const targetRole=role()==="admin"?"supervisor":"admin";
-     const target=(await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name").limit(1)).data?.[0];
-     if(target){const c=await sb.rpc("create_staff_chat",{target_profile_id:target.id});if(c.error)toast(c.error.message);}
+   if(role()==="admin"||role()==="supervisor"||role()==="employee"){
+     const targetRoles=role()==="admin"?["supervisor"]:role()==="supervisor"?["admin"]:["supervisor","admin"];
+     for(const targetRole of targetRoles){
+       const target=(await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name").limit(1)).data?.[0];
+       if(target){const c=await sb.rpc("create_staff_chat",{target_profile_id:target.id});if(c.error)toast(c.error.message);}
+     }
    }
    const q=await sb.from("chat_threads").select("id,title,thread_type,created_at,updated_at").eq("company_id",currentProfile.company_id).eq("thread_type","direct").order("updated_at",{ascending:false});
    const rows=q.data||[];
