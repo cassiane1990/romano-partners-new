@@ -2595,6 +2595,12 @@ async function deleteReadNotifications(){
  toast("Notificaciones leídas eliminadas.");
  await renderNotifications();
 }
+async function deleteSingleReadNotification(id){
+ if(!id)return;
+ const r=await sb.from("notifications").delete().eq("id",id).eq("recipient_id",currentUser.id).not("read_at","is",null);
+ if(r.error){toast(r.error.message||"No se pudo eliminar la notificación.");return}
+ await renderNotifications();
+}
 async function openChatFromNotification(title,body){
  const text=String(body||"");
  const senderName=text.split(":")[0].trim();
@@ -2649,19 +2655,27 @@ async function openNotification(id,title,body){
  }
  await markNotificationRead(id,true);
 }
+function enableNotificationSwipe(){
+ document.querySelectorAll("[data-notification-swipe]").forEach(el=>{
+  let sx=0,sy=0,moving=false;
+  el.addEventListener("touchstart",e=>{if(el.dataset.read!=="1")return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;moving=true},{passive:true});
+  el.addEventListener("touchmove",e=>{if(!moving)return;const dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(Math.abs(dy)>Math.abs(dx)){moving=false;return}if(dx<0){el.style.transform="translateX("+Math.max(dx,-110)+"px)";el.style.opacity=String(Math.max(.45,1+dx/220))}},{passive:true});
+  el.addEventListener("touchend",async()=>{if(!moving)return;moving=false;const m=el.style.transform.match(/-?[0-9.]+/);const x=m?parseFloat(m[0]):0;if(x<=-70&&el.dataset.id){await deleteSingleReadNotification(el.dataset.id)}else{el.style.transform="";el.style.opacity=""}});
+ });
+}
 async function renderNotifications(){
  const r=await sb.from("notifications").select("id,title,body,severity,read_at,created_at").eq("recipient_id",currentUser.id).order("created_at",{ascending:false}).limit(50);
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],unread=rows.filter(x=>!x.read_at).length;
  rows.forEach(x=>{if(x.title&&/novo serviço/i.test(x.title))x.title=String(x.title).replace(/\s*[·•-]?\s*5 minutos para aceitar/ig,"");if(x.body)x.body=String(x.body).replace(/\s*·?\s*resposta antes de\s*\d{1,2}:\d{2}/ig,"");});
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn" onclick="deleteReadNotifications()" '+(rows.some(x=>x.read_at)?'':'disabled')+'>🗑️ Eliminar leídas</button><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn" onclick="deleteReadNotifications()">🗑️ Eliminar leídas</button><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
    const t=String(x.title||"").toLowerCase();
    const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
    const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
    const action=(isMessage||isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
    const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ VER Y ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
-   return '<div class="panel" style="margin-top:10px;cursor:pointer;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
- }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';
+   return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
+ }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';enableNotificationSwipe();
 }
 
 async function renderSecurity(){const f=await sb.auth.mfa.listFactors();const enabled=f.data?.totp?.some(x=>x.status==="verified");$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Seguridad y MFA</h3><span class="pill">'+(enabled?"MFA activo":"MFA no configurado")+'</span></div><p class="muted">El sistema utiliza Supabase Auth, sesiones reales y políticas RLS server-side. MFA TOTP se puede configurar para cuentas administrativas.</p><div class="actions"><button class="btn gold" onclick="enrollMFA()">Configurar MFA</button></div><div id="mfaSetup"></div></div>'}
