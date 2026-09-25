@@ -2587,6 +2587,14 @@ async function markNotificationRead(id,refresh=true){
  if(refresh)await renderNotifications();
  return true;
 }
+async function deleteReadNotifications(){
+ const ok=window.confirm("¿Eliminar todas las notificaciones ya leídas? Las no leídas no se eliminarán.");
+ if(!ok)return;
+ const r=await sb.from("notifications").delete().eq("recipient_id",currentUser.id).not("read_at","is",null);
+ if(r.error){toast(r.error.message||"No se pudieron eliminar las notificaciones leídas.");return}
+ toast("Notificaciones leídas eliminadas.");
+ await renderNotifications();
+}
 async function openChatFromNotification(title,body){
  const text=String(body||"");
  const senderName=text.split(":")[0].trim();
@@ -2646,7 +2654,7 @@ async function renderNotifications(){
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],unread=rows.filter(x=>!x.read_at).length;
  rows.forEach(x=>{if(x.title&&/novo serviço/i.test(x.title))x.title=String(x.title).replace(/\s*[·•-]?\s*5 minutos para aceitar/ig,"");if(x.body)x.body=String(x.body).replace(/\s*·?\s*resposta antes de\s*\d{1,2}:\d{2}/ig,"");});
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn" onclick="deleteReadNotifications()" '+(rows.some(x=>x.read_at)?'':'disabled')+'>🗑️ Eliminar leídas</button><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div></div>'+(rows.length?rows.map(x=>{
    const t=String(x.title||"").toLowerCase();
    const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
    const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
