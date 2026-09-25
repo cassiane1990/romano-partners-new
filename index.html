@@ -2031,7 +2031,7 @@ async function audit(){
 async function privacy(){
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Privacidad / RGPD</h3><div class="muted">Centro de información y control de privacidad de ROMANO PARTNERS.</div></div></div><div class="master-cols"><div class="panel"><h3>Datos y acceso</h3><p>Los datos están separados por empresa y el acceso depende del perfil y las políticas del backend.</p><p>Clientes y funcionarios deben ver únicamente la información que corresponde a sus permisos.</p></div><div class="panel"><h3>Buenas prácticas</h3><p>Evita compartir contraseñas. Los documentos y comunicaciones deben permanecer dentro de los espacios autorizados.</p></div></div></div>';
 }
-async async function quotes(){
+async function quotes(){
  if(!canManage()){ $("content").innerHTML='<div class="panel"><div class="msg">Los presupuestos están disponibles para Administrador y Supervisor.</div></div>'; return; }
  const r=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false});
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">No se pudieron cargar los presupuestos: '+esc(r.error.message)+'</div></div>';return}
