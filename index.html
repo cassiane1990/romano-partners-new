@@ -1937,7 +1937,16 @@ function saveDemoCalendarService(e,id){
 async function renderCalendar(){
  if(demoMode){renderDemoCalendar(0);return}
  const isEmployee=role()==="employee";
- const r=await sb.from("services").select("id,code,service_type,typology,status,scheduled_at,property_id,client_id,assigned_employee_id").not("scheduled_at","is",null).eq(isEmployee?"assigned_employee_id":"company_id",isEmployee?currentUser.id:currentProfile.company_id).order("scheduled_at",{ascending:true}).limit(300);
+ const monthRef=window.__employeeCalendarMonth ? new Date(window.__employeeCalendarMonth+"-01T12:00:00") : new Date();
+ const year=monthRef.getFullYear(),month=monthRef.getMonth();
+ const first=new Date(year,month,1,12,0,0),last=new Date(year,month+1,0,12,0,0);
+ const gridStart=new Date(first);gridStart.setDate(first.getDate()-((first.getDay()+6)%7));
+ const gridDays=Array.from({length:42},(_,i)=>{const d=new Date(gridStart);d.setDate(gridStart.getDate()+i);return d});
+ const rangeStart=new Date(gridStart);rangeStart.setHours(0,0,0,0);
+ const rangeEnd=new Date(gridDays[41]);rangeEnd.setHours(23,59,59,999);
+ let q=sb.from("services").select("id,code,service_type,typology,status,scheduled_at,property_id,client_id,assigned_employee_id").not("scheduled_at","is",null).gte("scheduled_at",rangeStart.toISOString()).lte("scheduled_at",rangeEnd.toISOString()).order("scheduled_at",{ascending:true}).limit(500);
+ if(isEmployee)q=q.eq("assigned_employee_id",currentUser.id);else q=q.eq("company_id",currentProfile.company_id);
+ const r=await q;
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],clientIds=[...new Set(rows.map(x=>x.client_id).filter(Boolean))],employeeIds=[...new Set(rows.map(x=>x.assigned_employee_id).filter(Boolean))];
  const [pr,cr,er]=await Promise.all([
@@ -1946,14 +1955,21 @@ async function renderCalendar(){
    employeeIds.length?sb.from("profiles").select("id,full_name,email").in("id",employeeIds):Promise.resolve({data:[]})
  ]);
  const props=Object.fromEntries((pr.data||[]).map(x=>[x.id,x])),clients=Object.fromEntries((cr.data||[]).map(x=>[x.id,x])),employees=Object.fromEntries((er.data||[]).map(x=>[x.id,x]));
- const now=new Date(),monday=demoCalendarWeekStart(now),days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d});
- const selectedKey=window.__employeeCalendarDay||now.toLocaleDateString("sv-SE");
+ const now=new Date(),todayKey=now.toLocaleDateString("sv-SE"),selectedKey=window.__employeeCalendarDay||todayKey;
  const selectedDate=new Date(selectedKey+"T12:00:00");
- const byDay=days.map(d=>{const key=d.toLocaleDateString("sv-SE");return rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===key).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at))});
  const selectedRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===selectedKey).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
- const weekLabel=days[0].toLocaleDateString("es-ES",{day:"2-digit",month:"long"})+" — "+days[6].toLocaleDateString("es-ES",{day:"2-digit",month:"long",year:"numeric"});
- let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Seleccione un día para ver sus servicios asignados.":"Visualiza, gestiona y haz seguimiento de todos tus servicios")+'</p></div></div><div class="rpc-calendar-actions"><span class="rpc-week-label">'+esc(weekLabel)+'</span><button class="btn gold" onclick="window.__employeeCalendarDay=null;renderCalendar()">Hoy</button></div></div><div class="rpc-week-grid">';
- days.forEach((d,i)=>{const key=d.toLocaleDateString("sv-SE"),isToday=d.toDateString()===now.toDateString(),selected=key===selectedKey;h+='<div class="rpc-day '+(isToday?"is-today ":"")+(selected?"rpc-calendar-day-selected":"")+'" style="'+(isEmployee?"cursor:pointer":"")+'" onclick="'+(isEmployee?"window.__employeeCalendarDay='"+key+"';renderCalendar();":"")+'"><div class="rpc-day-head"><div class="rpc-day-name">'+esc(d.toLocaleDateString("es-ES",{weekday:"long"}))+'</div><div class="rpc-day-date">'+esc(d.toLocaleDateString("es-ES",{day:"2-digit",month:"short"}))+'</div><span class="rpc-day-count '+(byDay[i].length?"active":"")+'">'+byDay[i].length+'</span></div>';if(!byDay[i].length)h+='<div class="empty" style="padding:30px 6px">Sin servicios</div>';else if(!isEmployee)byDay[i].forEach(s=>{const p=props[s.property_id],cl=clients[s.client_id],em=employees[s.assigned_employee_id];h+=rpcCalendarServiceCard(s,p,cl,em,false)});h+='</div>'});
+ const monthLabel=first.toLocaleDateString("es-ES",{month:"long",year:"numeric"});
+ let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" onclick="window.__employeeCalendarMonth=new Date(year,month-1,1).toISOString().slice(0,7);renderCalendar()">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" onclick="window.__employeeCalendarMonth=new Date(year,month+1,1).toISOString().slice(0,7);renderCalendar()">›</button><button class="btn gold" onclick="window.__employeeCalendarMonth=new Date().toISOString().slice(0,7);window.__employeeCalendarDay=new Date().toLocaleDateString('sv-SE');renderCalendar()">Hoy</button></div></div><div class="rpc-month-grid">';
+ const weekday=["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
+ weekday.forEach(d=>h+='<div class="rpc-month-weekday">'+d+'</div>');
+ gridDays.forEach(d=>{
+   const key=d.toLocaleDateString("sv-SE"),inMonth=d.getMonth()===month,isToday=key===todayKey,selected=key===selectedKey;
+   const dayRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===key).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+   h+='<div class="rpc-month-day '+(!inMonth?"outside-month ":"")+(isToday?"is-today ":"")+(selected?"rpc-calendar-day-selected":"")+'" onclick="window.__employeeCalendarDay=\''+key+'\';renderCalendar()"><div class="rpc-month-day-head"><b>'+d.getDate()+'</b><span class="rpc-day-count '+(dayRows.length?"active":"")+'">'+(dayRows.length||"")+'</span></div>';
+   if(dayRows.length)dayRows.slice(0,3).forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||{};h+='<div class="rpc-month-service"><b>'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</b><span>'+esc(cl.name||"Cliente")+'</span><small>'+esc(p.name||p.code||"Apartamento")+'</small></div>'});
+   if(dayRows.length>3)h+='<small class="muted">+'+(dayRows.length-3)+' más</small>';
+   h+='</div>';
+ });
  h+='</div>';
  if(isEmployee){
    h+='<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios del '+esc(selectedDate.toLocaleDateString("es-ES",{weekday:"long",day:"2-digit",month:"long"}))+'</h3><div class="muted">'+selectedRows.length+' servicio(s) asignado(s)</div></div></div>';
@@ -1964,7 +1980,6 @@ async function renderCalendar(){
  h+='<div class="rpc-calendar-legend"><span>● Programado</span><span>● A camino</span><span>● Iniciado</span><span>● Pausado</span><span>● Finalizado</span></div></div>';
  $("content").innerHTML=h;
 }
-
 async function renderEmployees(){
  const r=demoMode?{data:DEMO_EMPLOYEES,error:null}:{data:null,error:null};
  if(!demoMode){const q=await sb.from("employee_profiles").select("id,employee_code,full_name,phone,email,nif_nie,address,hire_date,function_title,salary,active,photo_url,birth_date,nationality,city,postal_code,country,emergency_contact_name,emergency_contact_phone,bank_iban,social_security_number,contract_type,weekly_hours,notes").order("created_at",{ascending:false});r.data=q.data;r.error=q.error}
