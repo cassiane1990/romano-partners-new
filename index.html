@@ -1850,7 +1850,7 @@ async function romanoCatalogManager(category){
 }
 async function romanoCatalogNew(category){romanoCatalogModal(category,null)}
 async function romanoCatalogEdit(id){
- const r=await sb.from("service_catalog").select("id,category,code,name,description,unit,price,tax_included,active").eq("id",id).single();
+ const r=await sb.from("service_catalog").select("id,category,code,name,description,unit,price,tax_included,active").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(r.error||!r.data){toast(r.error?.message||"Artículo no encontrado.");return}
  romanoCatalogModal(r.data.category,r.data);
 }
@@ -1866,16 +1866,30 @@ function romanoCatalogModal(category,x){
 }
 async function romanoCatalogSave(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede guardar artículos.");return}
- const name=$("rcName")?.value.trim(); if(!name){toast("Indique el nombre.");return}
- const payload={company_id:currentProfile.company_id,category,code:$("rcCode")?.value.trim()||category.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase(),name,description:$("rcDescription")?.value.trim()||null,unit:$("rcUnit")?.value.trim()||"unidad",price:Math.max(0,Number($("rcPrice")?.value||0)),tax_included:$("rcTax")?.value==="true",active:$("rcActive")?.value==="true",updated_at:new Date().toISOString()};
+ const companyId=currentProfile?.company_id, cleanCategory=String(category||"").trim();
+ const name=$("rcName")?.value.trim();
+ if(!companyId){toast("No se pudo identificar la empresa de la sesión.");return}
+ if(!cleanCategory){toast("No se pudo identificar el catálogo.");return}
+ if(!name){toast("Indique el nombre.");return}
+ const code=$("rcCode")?.value.trim()||cleanCategory.slice(0,3).toUpperCase()+"-"+crypto.randomUUID().slice(0,8).toUpperCase();
+ const payload={company_id:companyId,category:cleanCategory,code,name,description:$("rcDescription")?.value.trim()||null,unit:$("rcUnit")?.value.trim()||"unidad",price:Math.max(0,Number($("rcPrice")?.value||0)),tax_included:$("rcTax")?.value==="true",active:$("rcActive")?.value==="true",updated_at:new Date().toISOString()};
  try{
   let q;
-  if(id) q=await sb.from("service_catalog").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
-  else q=await sb.from("service_catalog").insert({id:crypto.randomUUID(),...payload}).select("id").single();
+  if(id){
+   q=await sb.from("service_catalog").update(payload).eq("id",id).eq("company_id",companyId).select("id,category").single();
+  }else{
+   q=await sb.from("service_catalog").insert({id:crypto.randomUUID(),...payload}).select("id,category").single();
+  }
   if(q.error)throw q.error;
-  if(id&&!q.data)throw new Error("Artículo no encontrado o no pertenece a esta empresa.");
-  closeModal();toast(id?"Artículo actualizado correctamente":"Artículo creado correctamente");await romanoCatalogManager(category);
- }catch(e){toast("No se pudo guardar: "+(e?.message||String(e)))}
+  if(!q.data?.id)throw new Error("Supabase no confirmó el registro guardado.");
+  closeModal();
+  toast(id?"Artículo actualizado correctamente":"Artículo creado correctamente");
+  await romanoCatalogManager(q.data.category||cleanCategory);
+ }catch(e){
+  const detail=e?.message||e?.details||e?.hint||String(e);
+  toast("No se pudo guardar: "+detail);
+  console.error("ROMANO catalog save",e);
+ }
 }
 async function romanoCatalogDelete(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
