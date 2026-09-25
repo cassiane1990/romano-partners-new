@@ -61,7 +61,12 @@
 }
 <style id="sj-quick-fix">
 .sj-employee{margin-top:7px;font-size:11px;font-weight:700;color:#6e542a}.sj-client{margin-top:4px;font-size:10px;color:#81786d}.sj-priority{display:inline-block;margin-top:5px;padding:4px 7px;border-radius:999px;background:#f4ead8;color:#80602d;font-size:9px;text-transform:capitalize}.sj-quick{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.sj-quick .btn{padding:6px 7px;font-size:9px}.sj-status{min-width:190px}.sj-card{display:grid;grid-template-columns:150px minmax(220px,1.2fr) minmax(190px,1fr) minmax(190px,.8fr);gap:14px;align-items:stretch}.sj-photo{min-height:150px}.sj-main,.sj-location,.sj-status{padding-top:6px}.sj-time{font:700 20px Georgia,serif}@media(max-width:1050px){.sj-card{grid-template-columns:120px 1fr 1fr}.sj-status{grid-column:2/-1}}@media(max-width:650px){.sj-card{display:block}.sj-photo{height:150px;margin-bottom:10px}.sj-main,.sj-location,.sj-status{padding-top:0;margin-top:10px}.sj-status{min-width:0}.sj-quick .btn{flex:1}}
-</style></style></style>
+<style id="romano-universal-responsive">
+#app{width:100%;min-height:100vh}.master-main,.master-content,.services-shell,.dashboard-shell,.panel,.romano-chat-page{max-width:100%;min-width:0}.panel,.service-card,.dash-card,.rpc-standard-panel{overflow-wrap:anywhere}.two,.grid,.master-cols,.services-grid,.dash-grid{min-width:0}.table{width:100%;border-collapse:collapse}.table td,.table th{vertical-align:middle;word-break:break-word}input,select,textarea,button{max-width:100%}
+@media(max-width:1100px){.master-shell{grid-template-columns:240px minmax(0,1fr)!important}.master-content{padding:18px!important}.master-cols,.dash-grid{grid-template-columns:1fr!important}.services-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:760px){.master-shell{display:block!important}.master-sidebar{position:fixed!important;z-index:1000;left:0;top:0;bottom:0;width:min(86vw,320px)!important;transform:translateX(-105%);transition:transform .2s ease}.mobile-menu-open .master-sidebar{transform:translateX(0)}.master-main{width:100%!important;min-width:0!important}.master-content,.content{padding:12px!important}.services-grid{grid-template-columns:1fr!important}.two,.grid{grid-template-columns:1fr!important}.panel-head,.services-head,.service-card-head,.dashboard-header{gap:10px;flex-wrap:wrap}.table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}.table th,.table td{white-space:normal;min-width:110px}.modal{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important}.actions{flex-wrap:wrap}.actions .btn,button.btn{min-height:42px}.romano-chat-page{grid-template-columns:1fr!important}.romano-chat-sidebar{max-height:34vh;overflow:auto}}
+@media(max-width:480px){.master-content,.content{padding:9px!important}.panel{border-radius:18px!important;padding:12px!important}.services-shell{padding:0!important}.service-card{padding:12px!important}.dash-kpis{grid-template-columns:1fr 1fr!important}.dash-search{width:100%!important}.romano-chat-sidebar{max-height:30vh}}
+</style></style></style></style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
 /* ROMANO PREMIUM RESPONSIVE SYSTEM — client validation pass */
@@ -676,9 +681,11 @@ async function renderDashboardReference(){
    properties=DEMO_PROPERTIES.slice(0,12);
    alerts=[];
   }else{
-   const [sr,pr,nr]=await Promise.all([
-    sb.from("services").select("id,code,service_type,typology,status,scheduled_at,priority").order("scheduled_at",{ascending:true}).limit(5),
-    sb.from("properties").select("id,name,address,city").order("created_at",{ascending:false}).limit(12),
+   const ownClientQ=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  const ownClientId=ownClientQ.data?.id||null;
+  const [sr,pr,nr]=await Promise.all([
+    ownClientId?sb.from("services").select("id,code,service_type,typology,status,scheduled_at,priority").eq("client_id",ownClientId).order("scheduled_at",{ascending:true}).limit(5):Promise.resolve({data:[],error:null}),
+    ownClientId?sb.from("properties").select("id,name,address,city").eq("client_id",ownClientId).order("created_at",{ascending:false}).limit(12):Promise.resolve({data:[],error:null}),
     sb.from("notifications").select("id").order("created_at",{ascending:false}).limit(20)
    ]);
    services=sr.data||[];properties=pr.data||[];alerts=nr.data||[];
@@ -721,8 +728,9 @@ async function acceptServiceRequest(id){
  if(!confirm("Aceptar esta solicitud de servicio?"))return;
  const q=await sb.rpc("admin_accept_service_request",{p_service_id:id});
  if(q.error){toast("No se pudo aceptar: "+q.error.message);return}
- toast("✓ Solicitud aceptada. Ahora queda pendiente de designación.");
+ toast("✓ Solicitud aceptada. Ahora puede designar el funcionario.");
  await renderServicesMaster();
+ if(["admin","supervisor"].includes(role()))await openServiceAssignment(id);
 }
 async function acceptAssignedService(serviceId){
  if(role()!=="employee"){toast("Solo el funcionario puede aceptar.");return}
@@ -1624,7 +1632,13 @@ async function viewService(id){
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sem observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
- const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
+ if(role()==="client"){
+  const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(own.error||!own.data?.id){toast(own.error?.message||"No se encontró el cliente asociado.");return}
+  const allowed=await sb.from("services").select("id").eq("id",id).eq("client_id",own.data.id).maybeSingle();
+  if(allowed.error||!allowed.data){toast("Este servicio no pertenece a su cuenta.");return}
+ }
+ const r=await sb.from("services").select("*").eq("id",id).maybeSingle();if(r.error||!r.data){toast(r.error?.message||"Servicio no disponible para este perfil.");return}
  const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false}),
@@ -2130,16 +2144,19 @@ function unlockNotificationAudio(){
 }
 function playNotificationSound(){
  try{
-  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-  if(!__notificationAudioContext)__notificationAudioContext=new C();
-  const ac=__notificationAudioContext;
-  const run=()=>{
-   const o=ac.createOscillator(),g=ac.createGain();
-   o.type="sine";o.frequency.setValueAtTime(880,ac.currentTime);o.frequency.exponentialRampToValueAtTime(660,ac.currentTime+.18);
-   g.gain.setValueAtTime(.001,ac.currentTime);g.gain.exponentialRampToValueAtTime(.13,ac.currentTime+.03);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.65);
-   o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.68);
-  };
-  if(ac.state==="suspended")ac.resume().then(run).catch(()=>{});else run();
+  const C=window.AudioContext||window.webkitAudioContext;
+  if(C){
+   if(!__notificationAudioContext)__notificationAudioContext=new C();
+   const ac=__notificationAudioContext;
+   const run=()=>{
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.type="sine";o.frequency.setValueAtTime(980,ac.currentTime);o.frequency.exponentialRampToValueAtTime(720,ac.currentTime+.16);o.frequency.exponentialRampToValueAtTime(980,ac.currentTime+.32);
+    g.gain.setValueAtTime(.001,ac.currentTime);g.gain.exponentialRampToValueAtTime(.28,ac.currentTime+.025);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.58);
+    o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.6);
+   };
+   if(ac.state==="suspended")ac.resume().then(run).catch(()=>{});else run();
+  }
+  if(navigator.vibrate)navigator.vibrate([120,70,120]);
  }catch(e){}
 }
 function romanoIsIOS(){
@@ -2289,7 +2306,15 @@ async function startRealtime(){
    if("Notification" in window&&Notification.permission==="granted"){try{const n=new Notification(payload.new.title||"ROMANO PROPERTY CARE",{body:payload.new.body||"Nueva alerta",tag:"romano-"+payload.new.id});n.onclick=()=>{window.focus();n.close();openNotification(payload.new.id,payload.new.title,payload.new.body)}}catch(e){}}
    if(active==="notifications"||active==="dashboard")openPage(active);
  })
- .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshChatMessages();})
+ .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},async(payload)=>{
+   if(!payload.new||payload.new.sender_id===currentUser?.id)return;
+   playNotificationSound();
+   const sp=await sb.from("profiles").select("full_name,role").eq("id",payload.new.sender_id).maybeSingle();
+   const who=sp.data?.full_name||({admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"}[sp.data?.role]||"Contacto");
+   toast("💬 "+who+": "+String(payload.new.body||"Nuevo mensaje").slice(0,120));
+   if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState!=="visible"){try{const n=new Notification("ROMANO · "+who,{body:payload.new.body||"Nuevo mensaje",tag:"romano-chat-"+payload.new.id});n.onclick=()=>{window.focus();n.close();openPage("chat")}}catch(e){}}
+   if(window.__activeChatId)refreshChatMessages();
+ })
  .subscribe();
 }
 async function registerRomanoServiceWorker(){
@@ -2735,8 +2760,10 @@ async function renderDocumentsPremium(){
  if(isClient){
    h+='<div class="panel" style="margin-top:12px;background:#faf4ea"><div class="panel-head"><div><h3>Enviar documento a ROMANO</h3><div class="muted">Adjunta contrato, DNI/NIE, seguro, datos de empresa, certificado u otro documento.</div></div><span class="pill">Privado</span></div><form onsubmit="uploadClientDocument(event)"><div class="two"><div class="field"><label>Tipo de documento</label><select id="clientDocType"><option value="identidad">DNI / NIE / Identificación</option><option value="empresa">Documento de empresa</option><option value="contrato">Contrato</option><option value="seguro">Seguro</option><option value="fiscal">Documento fiscal</option><option value="otro">Otro</option></select></div><div class="field"><label>Nombre / título</label><input id="clientDocTitle" required placeholder="Ej.: Seguro de responsabilidad civil"></div></div><div class="field"><label>Archivo</label><input id="clientDocFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"></div><div class="actions"><button class="btn gold" type="submit">↑ Guardar y enviar a ROMANO</button><a class="btn" href="mailto:romanogestao@gmail.com?subject=Documento%20de%20cliente%20-%20ROMANO%20PROPERTY%20CARE">✉ Abrir e-mail de ROMANO</a></div><div class="muted" style="margin-top:8px;font-size:10px">El documento queda guardado dentro de la cuenta. El botón de e-mail abre el mensaje directamente dirigido a romanogestao@gmail.com.</div></form></div>';
  }
- const canDeleteDocs=role()==="admin"||role()==="supervisor"||isClient;
- h+='<div style="margin-top:12px">'+(rows.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.title)+'</b></td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="downloadClientDocument(\''+esc(x.storage_path)+'\',\''+esc(x.file_name)+'\')">↓ Abrir / descargar</button>'+(canDeleteDocs?'<button class="btn" style="margin-left:6px" onclick="deleteOwnClientDocument(\''+esc(x.id)+'\',\''+esc(x.storage_path)+'\')">Eliminar</button>':"")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos guardados.</div>')+'</div></div>';
+ const canDeleteDocs=["admin","supervisor","employee","client"].includes(role());
+ const docTypeOptions='<option value="identidad">DNI / NIE / Identificación</option><option value="empresa">Documento de empresa</option><option value="contrato">Contrato</option><option value="seguro">Seguro</option><option value="fiscal">Documento fiscal</option><option value="otro">Otro</option>';
+ h+='<div class="panel" style="margin-top:12px;background:#faf4ea"><div class="panel-head"><div><h3>Adjuntar documento</h3><div class="muted">Mismo formato de documentos en todos los perfiles. El acceso sigue limitado por rol y propietario.</div></div><span class="pill">Storage + RLS</span></div><form onsubmit="uploadCompanyDocument(event)"><div class="two"><div class="field"><label>Tipo de documento</label><select id="companyDocType">'+docTypeOptions+'</select></div><div class="field"><label>Nombre / título</label><input id="companyDocTitle" required placeholder="Ej.: Contrato, DNI/NIE, seguro..."></div></div><div class="field"><label>Archivo</label><input id="companyDocFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"></div><div class="actions"><button class="btn gold" type="submit">↑ Guardar documento</button></div></form></div>';
+ h+='<div style="margin-top:12px">'+(rows.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.title)+'</b></td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="downloadClientDocument(\\''+esc(x.storage_path)+'\\',\\''+esc(x.file_name)+'\\')">↓ Abrir / descargar</button>'+(canDeleteDocs?'<button class="btn" style="margin-left:6px" onclick="deleteOwnClientDocument(\\''+esc(x.id)+'\\',\\''+esc(x.storage_path)+'\\')">Eliminar</button>':"")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos guardados.</div>')+'</div></div>';
  if(role()==="admin"||role()==="supervisor"){
    const tq=await sb.from("document_templates").select("id,name,template_type,content,updated_at").eq("company_id",currentProfile.company_id).order("template_type").order("name");
    h+='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Plantillas de contratos</h3><div class="muted">Modelos editables para contratos de empleados, supervisores y otros documentos internos.</div></div><button class="btn gold" onclick="documentTemplateModal()">＋ Nueva plantilla</button></div>'+(tq.data?.length?'<table class="table"><thead><tr><th>Plantilla</th><th>Tipo</th><th>Actualizada</th><th></th></tr></thead><tbody>'+tq.data.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.template_type)+'</td><td>'+esc(new Date(x.updated_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="documentTemplateModal(\''+x.id+'\')">Editar</button> <button class="btn" onclick="deleteDocumentTemplate(\''+x.id+'\')">Eliminar</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay plantillas. Cree el primer modelo editable.</div>')+'</div>';
@@ -2769,30 +2796,38 @@ async function getCurrentClientRecord(){
  return q;
 }
 function demoDocumentUploadNotice(){toast("DEMONSTRACIÓN · En producción aquí se adjunta y guarda el documento de forma privada.");}
-async function uploadClientDocument(e){
+async function uploadCompanyDocument(e){
  e.preventDefault();
  if(demoMode){demoDocumentUploadNotice();return}
- if(role()!=="client"){toast("Solo el cliente puede enviar documentos desde esta área.");return}
- const file=$("clientDocFile")?.files?.[0];
+ const currentRole=role();
+ if(!["admin","supervisor","employee","client"].includes(currentRole)){toast("Este perfil no puede adjuntar documentos.");return}
+ const file=$("companyDocFile")?.files?.[0];
  if(!file){toast("Seleccione un archivo.");return}
  if(file.size>15*1024*1024){toast("El archivo no puede superar 15 MB.");return}
- const cr=await getCurrentClientRecord();
- if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
+ let clientId=null,folderId=currentUser.id;
+ if(currentRole==="client"){
+   const cr=await getCurrentClientRecord();
+   if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
+   clientId=cr.data.id;folderId=cr.data.id;
+ }
  const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"_");
- const path=currentProfile.company_id+"/"+cr.data.id+"/"+crypto.randomUUID()+"-"+safe;
+ const path=currentProfile.company_id+"/"+folderId+"/"+crypto.randomUUID()+"-"+safe;
  const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream"});
- if(up.error){toast(up.error.message);return}
- const ins=await sb.from("documents").insert({company_id:currentProfile.company_id,client_id:cr.data.id,title:$("clientDocTitle").value.trim()||file.name,document_type:$("clientDocType").value,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id});
- if(ins.error){await sb.storage.from("company-documents").remove([path]);toast(ins.error.message);return}
- toast("Documento guardado y enviado a ROMANO");renderDocumentsPremium();
+ if(up.error){toast("No se pudo guardar el archivo: "+up.error.message);return}
+ const ins=await sb.from("documents").insert({company_id:currentProfile.company_id,client_id:clientId,title:$("companyDocTitle").value.trim()||file.name,document_type:$("companyDocType").value,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id});
+ if(ins.error){await sb.storage.from("company-documents").remove([path]);toast("No se pudo registrar el documento: "+ins.error.message);return}
+ toast("Documento guardado correctamente");await renderDocumentsPremium();
 }
+async function uploadClientDocument(e){return uploadCompanyDocument(e)}
 async function deleteOwnClientDocument(id,path){
- if(!(role()==="admin"||role()==="supervisor"||role()==="client")){toast("No tiene permisos para eliminar este documento.");return}
+ if(!["admin","supervisor","employee","client"].includes(role())){toast("No tiene permisos para eliminar este documento.");return}
  if(!confirm("¿Eliminar este documento PDF?"))return;
  let query=sb.from("documents").delete().eq("id",id).eq("company_id",currentProfile.company_id);
  if(role()==="client"){
   const cr=await getCurrentClientRecord();if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
   query=query.eq("client_id",cr.data.id);
+ }else if(role()==="employee"){
+  query=query.eq("uploaded_by",currentUser.id);
  }
  const d=await query;if(d.error){toast(d.error.message);return}
  const st=await sb.storage.from("company-documents").remove([path]);
@@ -2925,8 +2960,24 @@ async function emergency(){
  h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':rows.length?rows.map(x=>{const p=pm.get(x.property_id),s=sm.get(x.service_id),cl=cm.get(p?.client_id||s?.client_id);return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+'</strong><div class="muted">'+esc(p?.address||"Dirección no registrada")+(p?.city?" · "+esc(p.city):"")+'</div></div><span class="status '+(x.status==="open"?"urgent":"approved")+'">'+esc(x.status==="open"?"Pendiente de aceptación":x.status==="accepted"?"Recibido":"Resuelta")+'</span></div><div class="two"><div><small class="muted">Contacto cliente</small><div>'+esc(cl?.phone||"—")+' · '+esc(cl?.email||"—")+'</div></div><div><small class="muted">Referencia</small><div>'+esc(s?.code||"Sin servicio")+' · '+esc(x.category||"General")+' · '+esc(x.priority||"normal")+'</div></div></div><div style="margin-top:10px"><b>Problema</b><div>'+esc(x.description)+'</div></div><div class="muted" style="margin-top:8px">Creada: '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.resolution?" · Resolución: "+esc(x.resolution):"")+'</div>'+(canManage()&&x.status==="open"?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="acceptOccurrence(\''+x.id+'\')">✓ Aceptar como recibido</button></div>':"")+'</div>'}).join(""):'<div class="empty">No hay incidencias.</div>');h+='</div>';$("content").innerHTML=h;
 }
 async function newEmergency(){
- const props=(await sb.from("properties").select("id,name,code,address,city,client_id").order("name")).data||[],clients=(await sb.from("clients").select("id,name,email,phone,client_code").order("name")).data||[],services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at").order("scheduled_at",{ascending:false}).limit(100)).data||[];
- openModal("Registrar incidencia / emergencia",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+ (role()==="client"?'<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>':'<select id="eClient"><option value="">Seleccione el cliente</option>'+clients.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.client_code||"")+'</option>').join("")+'</select>')+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+props.map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(p.code||"")+' · '+esc(p.address||"Sin dirección")+(p.city?" · "+esc(p.city):"")+'</option>').join("")+'</select></div></div><div class="notice">La incidencia guardará automáticamente cliente, apartamento, dirección, contacto y servicio relacionado.</div><div class="two"><div class="field"><label>Servicio relacionado</label><select id="eService"><option value="">Sin servicio</option>'+services.map(x=>{const p=props.find(v=>v.id===x.property_id);return '<option value="'+x.id+'">'+esc(x.code||"Servicio")+' · '+esc(serviceTypeLabel(x.service_type))+' · '+esc(p?.name||p?.code||"Apartamento")+' · '+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"Sin dirección")+' · '+esc(x.scheduled_at?romanoMadridShortDateTime(x.scheduled_at):"Sin fecha/hora")+'</option>'}).join("")+'</select></div><div class="field"><label>Categoría</label><select id="eCat"><option value="general">General</option><option value="damage">Daño</option><option value="client_request">Solicitud cliente</option><option value="safety">Seguridad</option><option value="maintenance">Mantenimiento</option><option value="quality">Calidad</option></select></div></div><div class="two"><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Tipo de necesidad</label><select id="eServiceType"><option value="cleaning">Limpieza</option><option value="maintenance">Mantenimiento</option><option value="checkin">Check-in</option><option value="keys">Llaves</option><option value="other">Otros</option></select></div></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Registrar incidencia</button></form>');
+ const currentRole=role();
+ let props=[],clients=[],services=[];
+ if(demoMode){props=DEMO_PROPERTIES||[];clients=DEMO_CLIENTS||[];services=DEMO_SERVICES||[]}
+ else if(currentRole==="client"){
+  const cr=await sb.from("clients").select("id,name,email,phone,client_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(cr.data){clients=[cr.data];props=(await sb.from("properties").select("id,name,code,address,city,client_id").eq("client_id",cr.data.id).order("name")).data||[];services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at").eq("client_id",cr.data.id).order("scheduled_at",{ascending:false}).limit(100)).data||[]}
+ }else if(currentRole==="employee"){
+  services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(100)).data||[];
+  const pids=[...new Set(services.map(x=>x.property_id).filter(Boolean))],cids=[...new Set(services.map(x=>x.client_id).filter(Boolean))];
+  if(pids.length)props=(await sb.from("properties").select("id,name,code,address,city,client_id").in("id",pids).order("name")).data||[];
+  if(cids.length)clients=(await sb.from("clients").select("id,name,email,phone,client_code").in("id",cids).order("name")).data||[];
+ }else{
+  props=(await sb.from("properties").select("id,name,code,address,city,client_id").order("name")).data||[];
+  clients=(await sb.from("clients").select("id,name,email,phone,client_code").order("name")).data||[];
+  services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at").order("scheduled_at",{ascending:false}).limit(100)).data||[];
+ }
+ const clientSelect=currentRole==="client"?'<input id="eClient" value="'+esc(clients[0]?.name||currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>':'<select id="eClient"><option value="">Seleccione el cliente</option>'+clients.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.client_code||"")+'</option>').join("")+'</select>';
+ openModal("Registrar incidencia / emergencia",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientSelect+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+props.map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(p.code||"")+' · '+esc(p.address||"Sin dirección")+(p.city?" · "+esc(p.city):"")+'</option>').join("")+'</select></div></div><div class="notice">La incidencia guardará automáticamente cliente, apartamento, dirección, contacto y servicio relacionado.</div><div class="two"><div class="field"><label>Servicio relacionado</label><select id="eService"><option value="">Sin servicio</option>'+services.map(x=>{const p=props.find(v=>v.id===x.property_id);return '<option value="'+x.id+'">'+esc(x.code||"Servicio")+' · '+esc(serviceTypeLabel(x.service_type))+' · '+esc(p?.name||p?.code||"Apartamento")+' · '+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"Sin dirección")+' · '+esc(x.scheduled_at?romanoMadridShortDateTime(x.scheduled_at):"Sin fecha/hora")+'</option>'}).join("")+'</select></div><div class="field"><label>Categoría</label><select id="eCat"><option value="general">General</option><option value="damage">Daño</option><option value="client_request">Solicitud cliente</option><option value="safety">Seguridad</option><option value="maintenance">Mantenimiento</option><option value="quality">Calidad</option></select></div></div><div class="two"><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Tipo de necesidad</label><select id="eServiceType"><option value="cleaning">Limpieza</option><option value="maintenance">Mantenimiento</option><option value="checkin">Check-in</option><option value="keys">Llaves</option><option value="other">Otros</option></select></div></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Registrar incidencia</button></form>');
 }
 async function saveEmergency(e){
  e.preventDefault();const propertyId=$("eProperty").value||null,serviceId=$("eService").value||null,category=$("eCat")?.value||$("eServiceType")?.value||"general",priority=$("ePriority").value,description=$("eDesc").value.trim();if(!propertyId||!description){toast("Seleccione el apartamento y describa la incidencia.");return}
@@ -3227,45 +3278,45 @@ async function renderChatPremium(){
  $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escriba un mensaje..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto o vídeo">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="submit">Enviar</button></form></section></div>';
  await renderChatContacts();
 }
+function chatTargetRoles(){
+ const r=role();
+ return r==="admin"?["supervisor","employee","client"]:r==="supervisor"?["admin","employee"]:r==="employee"?["supervisor","admin"]:r==="client"?["admin","supervisor"]:[];
+}
 async function renderChatContacts(){
  const el=$("romanoChatContacts");if(!el)return;
  if(role()==="client"){
-   const sup=await findOrCreateRoleThread("supervisor");
-   const adm=await findOrCreateRoleThread("admin");
-   __chatRoleThreads={supervisor:sup,admin:adm};
-   const contacts=[["supervisor",sup,"Supervisor"],["admin",adm,"Administrador"]];
-   el.innerHTML=contacts.map(([key,t,label])=>'<button class="romano-chat-contact '+(t?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+label+'</b><small>Conversación privada</small></span></button>').join("");
- }else{
-   if(role()==="admin"||role()==="supervisor"||role()==="employee"){
-     const targetRoles=role()==="admin"?["supervisor"]:role()==="supervisor"?["admin"]:["supervisor","admin"];
-     for(const targetRole of targetRoles){
-       const target=(await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).order("full_name").limit(1)).data?.[0];
-       if(target){const c=await sb.rpc("create_staff_chat",{target_profile_id:target.id});if(c.error)toast(c.error.message);}
-     }
-   }
-   const targetRoles=role()==="admin"?["supervisor"]:role()==="supervisor"?["admin"]:["supervisor","admin"];
-   const contacts=[];
-   for(const targetRole of targetRoles){
-     const target=(await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name").limit(1).maybeSingle()).data;
-     if(target)contacts.push([targetRole,target.full_name|| (targetRole==="supervisor"?"Supervisor":"Administrador")]);
-   }
-   el.innerHTML=contacts.map(([key,label])=>'<button class="romano-chat-contact" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+esc(label)+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">No hay contactos disponibles.</div>';
+   const adm=await findOrCreateRoleThread("admin"),sup=await findOrCreateRoleThread("supervisor");
+   __chatRoleThreads={admin:adm,supervisor:sup};
+   const contacts=[["admin",adm,"Administrador"],["supervisor",sup,"Supervisor"]];
+   el.innerHTML=contacts.map(([key,t,label])=>'<button class="romano-chat-contact '+(t?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+esc(label)+'</b><small>Conversación privada</small></span></button>').join("");
+   return;
  }
+ const targets=chatTargetRoles(),contacts=[];
+ for(const targetRole of targets){
+   const qs=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name");
+   for(const target of (qs.data||[])){
+     const cc=await sb.rpc("create_staff_chat",{target_profile_id:target.id});
+     if(cc.error){toast(cc.error.message||"No se pudo abrir el chat.");continue}
+     contacts.push([targetRole,target.id,target.full_name||({admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"}[targetRole]||"Contacto"),cc.data]);
+   }
+ }
+ el.innerHTML=contacts.map(([key,id,label,threadId])=>'<button class="romano-chat-contact '+(threadId===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\',\''+id+'\')"><span class="rc-avatar">'+esc((label||"R").charAt(0).toUpperCase())+'</span><span class="rc-info"><b>'+esc(label)+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">No hay contactos disponibles.</div>';
 }
-async function selectRoleChat(targetRole){
+async function selectRoleChat(targetRole,targetId=null){
  let thread=null;
  if(role()==="client"){
    thread=__chatRoleThreads[targetRole]||await findOrCreateRoleThread(targetRole);
    if(!thread)return;
    __chatRoleThreads[targetRole]=thread;
- }else if(role()==="admin"||role()==="supervisor"||role()==="employee"){
-   const target=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name").limit(1).maybeSingle();
+ }else if(["admin","supervisor","employee"].includes(role())){
+   if(!chatTargetRoles().includes(targetRole)){toast("Destinatario no disponible.");return}
+   const target=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).eq("id",targetId||"00000000-0000-0000-0000-000000000000").maybeSingle();
    if(target.error||!target.data){toast("Destinatario no disponible.");return}
-   const c=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
-   if(c.error){toast(c.error.message||"No se pudo abrir la conversación.");return}
-   thread={id:c.data,title:(currentProfile.full_name||"")+" ↔ "+(target.data.full_name|| (targetRole==="supervisor"?"Supervisor":"Administrador"))};
+   const cc=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
+   if(cc.error){toast(cc.error.message||"No se pudo abrir la conversación.");return}
+   thread={id:cc.data,title:(currentProfile.full_name||"")+" ↔ "+(target.data.full_name||"Contacto")};
  }else return;
- await openChatPremium(thread.id,targetRole==="supervisor"?"Supervisor":"Administrador");
+ await openChatPremium(thread.id,targetRole==="supervisor"?"Supervisor":targetRole==="admin"?"Administrador":targetRole==="employee"?"Funcionario":"Cliente");
 }
 async function startRoleChat(targetRole){return selectRoleChat(targetRole)}
 async function newChatPremium(){return selectRoleChat("admin")}
