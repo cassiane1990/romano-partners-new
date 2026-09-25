@@ -777,7 +777,7 @@ function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta"
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
-   const q=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id").order("scheduled_at",{ascending:true}).limit(100);
+   const q=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").order("scheduled_at",{ascending:true}).limit(100);
    r.data=q.data;r.error=q.error;
  }
  let fin={};
@@ -790,29 +790,37 @@ async function renderServicesMaster(){
    return;
  }
  const rows=r.data||[];
- let clientProperties={};
- if(role()==="client"&&rows.length){
-   const ids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
-   if(ids.length){
-     const pq=await sb.from("properties").select("id,name,code,address,city,client_id").in("id",ids).eq("company_id",currentProfile.company_id);
+ let propertiesMap={},clientsMap={};
+ if(rows.length&&!demoMode){
+   const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
+   const clientIds=[...new Set(rows.map(x=>x.client_id).filter(Boolean))];
+   if(propertyIds.length){
+     const pq=await sb.from("properties").select("id,name,code,address,city,client_id").in("id",propertyIds).eq("company_id",currentProfile.company_id);
      if(pq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pq.error.message)+'</div></div>';return}
-     clientProperties=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
+     propertiesMap=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
+   }
+   if(clientIds.length){
+     const cq=await sb.from("clients").select("id,name").in("id",clientIds).eq("company_id",currentProfile.company_id);
+     if(cq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(cq.error.message)+'</div></div>';return}
+     clientsMap=Object.fromEntries((cq.data||[]).map(c=>[c.id,c]));
    }
  }
  const clientName=role()==="client"?(currentProfile?.full_name||"Cliente"):"";
  const cards=rows.length?rows.map(x=>{
-   const p=clientProperties[x.property_id];
+   const p=propertiesMap[x.property_id]||null;
+   const c=clientsMap[x.client_id]||null;
+   const visibleClient=role()==="client"?clientName:(c?.name||p?.client_name||"—");
+   const visibleProperty=p?.name||p?.code||"—";
+   const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
    const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       x.status==="scheduled"&&x.accepted_at&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
-   const clientContext=role()==="client"
-     ? '<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(clientName)+'</strong></div><div><small>Apartamento</small><strong>'+esc(p?.name||p?.code||"—")+'</strong></div><div><small>Dirección</small><strong>'+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"—")+'</strong></div></div>'
-     : "";
+   const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card">'+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
-     clientContext+
+     serviceContext+
      '<div class="service-card-meta">'+
        '<div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div>'+
        '<div><small>Fecha</small><strong>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar")+'</strong></div>'+
