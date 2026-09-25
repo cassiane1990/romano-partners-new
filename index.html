@@ -2293,42 +2293,63 @@ function romanoIsIOS(){
 function romanoIsStandalone(){
  return window.matchMedia?.("(display-mode: standalone)")?.matches||window.navigator.standalone===true;
 }
+function romanoBase64ToUint8Array(base64String){
+ const padding="=".repeat((4-base64String.length%4)%4);
+ const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+ const raw=atob(base64);const output=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)output[i]=raw.charCodeAt(i);
+ return output;
+}
+async function romanoGetPushPublicKey(){
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session?.access_token)throw new Error("Sesión no válida.");
+ const r=await fetch(SUPABASE_URL+"/functions/v1/romano-push",{
+   method:"POST",
+   headers:{Authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"Content-Type":"application/json"},
+   body:JSON.stringify({action:"public-key"})
+ });
+ const raw=await r.text();let data={};try{data=JSON.parse(raw)}catch(e){}
+ if(!r.ok||!data.publicKey)throw new Error(data.error||"No se pudo preparar Push.");
+ return data.publicKey;
+}
+async function saveRomanoPushSubscription(sub){
+ const json=sub.toJSON();
+ const keys=json.keys||{};
+ if(!json.endpoint||!keys.p256dh||!keys.auth)throw new Error("Suscripción Push incompleta.");
+ const r=await sb.from("push_subscriptions").upsert({
+   company_id:currentProfile.company_id,
+   user_id:currentUser.id,
+   endpoint:json.endpoint,
+   p256dh:keys.p256dh,
+   auth:keys.auth,
+   user_agent:navigator.userAgent,
+   app_origin:window.location.origin,
+   updated_at:new Date().toISOString()
+ },{onConflict:"user_id,endpoint"});
+ if(r.error)throw r.error;
+ return true;
+}
 async function enableBrowserNotifications(){
- const ios=romanoIsIOS();
- const standalone=romanoIsStandalone();
- if(!("serviceWorker" in navigator)){
-  toast("Este dispositivo no permite Service Worker para notificaciones.");
-  return;
+ const ios=romanoIsIOS(),standalone=romanoIsStandalone();
+ try{
+  if(!("serviceWorker" in navigator)){toast("Este dispositivo no permite notificaciones en segundo plano.");return}
+  const reg=window.__romanoSW||await registerRomanoServiceWorker();
+  if(!reg){toast("No se pudo iniciar el sistema de notificaciones.");return}
+  if(ios&&!standalone){toast("En iPhone/iPad: añada ROMANO a la pantalla de inicio y ábralo desde el icono.");return}
+  if(!("Notification" in window)||!("PushManager" in window)||!reg.pushManager){toast("Push no está disponible en este dispositivo.");return}
+  const p=await Notification.requestPermission();
+  unlockNotificationAudio();
+  if(p!=="granted"){toast(p==="denied"?"Notificaciones bloqueadas. Revise Ajustes > Notificaciones > ROMANO PROPERTY CARE.":"Permiso de notificaciones no concedido.");return}
+  const publicKey=await romanoGetPushPublicKey();
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:romanoBase64ToUint8Array(publicKey)});
+  await saveRomanoPushSubscription(sub);
+  await reg.showNotification("ROMANO PROPERTY CARE · Notificaciones activadas",{body:"Este dispositivo ya puede recibir alertas aunque el app no esté abierto.",icon:"/icon.svg",badge:"/icon.svg",tag:"romano-push-enabled",renotify:true,data:{url:"/"}});
+  toast("Notificaciones visuales y en segundo plano activadas.");
+ }catch(e){
+  console.error("ROMANO Push:",e);
+  toast("No se pudieron activar las notificaciones: "+(e?.message||"error"));
  }
- const reg=window.__romanoSW||await registerRomanoServiceWorker();
- if(!reg){
-  toast("No se pudo iniciar el sistema de notificaciones.");
-  return;
- }
- if(ios&&!standalone){
-  toast("En iPhone: añada ROMANO a la pantalla de inicio y abra el app desde el icono para activar las notificaciones.");
-  return;
- }
- if(!("Notification" in window)){
-  toast("Las notificaciones del sistema no están disponibles en este contexto.");
-  return;
- }
- if(!("PushManager" in window)||!reg.pushManager){
-  toast("Push no está disponible neste contexto. En iPhone, abra ROMANO desde la pantalla de inicio.");
-  return;
- }
- const p=await Notification.requestPermission();
- unlockNotificationAudio();
- if(p!=="granted"){
-  toast(p==="denied"?"Notificaciones bloqueadas. Revise Ajustes > Notificaciones > ROMANO PROPERTY CARE.":"Permiso de notificaciones no concedido.");
-  return;
- }
- const sub=await reg.pushManager.getSubscription();
- if(sub){
-  toast("Notificaciones activadas neste dispositivo.");
-  return;
- }
- toast("Notificaciones autorizadas. Falta configurar la suscripción Push del servidor.");
 }
 async function markNotificationRead(id,refresh=true){
  if(!id)return false;
