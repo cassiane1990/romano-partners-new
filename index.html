@@ -1983,7 +1983,7 @@ function romanoCalendarToday(){
  window.__employeeCalendarDay=now.toLocaleDateString("sv-SE");
  renderCalendar();
 }
-async function renderCalendar(){
+async function renderCalendar(){/* production deploy trigger: calendar only */
  if(demoMode){renderDemoCalendar(0);return}
  const currentRole=role();
  const isEmployee=currentRole==="employee";
