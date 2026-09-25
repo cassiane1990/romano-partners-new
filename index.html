@@ -1962,6 +1962,18 @@ function saveDemoCalendarService(e,id){
  s.scheduled_at=new Date(dateValue).toISOString();s.property_id=$("dcsProperty").value;s.service_type=type;s.typology=$("dcsTypology").value;s.priority=$("dcsPriority").value;s.assigned_employee_id=$("dcsEmployee").value||null;s.status=$("dcsStatus").value;
  closeModal();toast("Servicio ficticio actualizado");renderDemoCalendar(0);
 }
+function romanoCalendarMonthOffset(delta){
+ const base=window.__employeeCalendarMonth?new Date(window.__employeeCalendarMonth+"-01T12:00:00"):new Date();
+ base.setMonth(base.getMonth()+Number(delta||0));
+ window.__employeeCalendarMonth=base.toISOString().slice(0,7);
+ renderCalendar();
+}
+function romanoCalendarToday(){
+ const now=new Date();
+ window.__employeeCalendarMonth=now.toISOString().slice(0,7);
+ window.__employeeCalendarDay=now.toLocaleDateString("sv-SE");
+ renderCalendar();
+}
 async function renderCalendar(){
  if(demoMode){renderDemoCalendar(0);return}
  const isEmployee=role()==="employee";
@@ -1990,7 +2002,7 @@ async function renderCalendar(){
  const selectedDate=new Date(selectedKey+"T12:00:00");
  const selectedRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===selectedKey).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
  const monthLabel=first.toLocaleDateString("es-ES",{month:"long",year:"numeric"});
- let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" onclick="window.__employeeCalendarMonth=new Date(year,month-1,1).toISOString().slice(0,7);renderCalendar()">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" onclick="window.__employeeCalendarMonth=new Date(year,month+1,1).toISOString().slice(0,7);renderCalendar()">›</button><button class="btn gold" onclick="window.__employeeCalendarMonth=new Date().toISOString().slice(0,7);window.__employeeCalendarDay=new Date().toLocaleDateString('sv-SE');renderCalendar()">Hoy</button></div></div><div class="rpc-month-grid">';
+ let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" onclick="romanoCalendarMonthOffset(-1)">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" onclick="romanoCalendarMonthOffset(1)">›</button><button class="btn gold" onclick="romanoCalendarToday()">Hoy</button></div></div><div class="rpc-month-grid">';
  const weekday=["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
  weekday.forEach(d=>h+='<div class="rpc-month-weekday">'+d+'</div>');
  gridDays.forEach(d=>{
