@@ -1835,7 +1835,7 @@ async function renderFinance(){const r=demoMode?{data:DEMO_INVOICES,error:null}:
 
 
 function romanoCatalogCategoryLabel(category){
- const m={linen_catalog:"Ropa / Linen",laundry_catalog:"Lavandería",amenities_catalog:"Amenities opcionales"};
+ const m={material:"Materiales",linen:"Ropa",laundry:"Lavandería",amenities:"Amenities"};
  return m[category]||category;
 }
 async function romanoCatalogManager(category){
