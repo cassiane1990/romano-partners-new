@@ -840,7 +840,7 @@ function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta"
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
-   let q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").order("scheduled_at",{ascending:true}).limit(100);
+   let q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").order("created_at",{ascending:false}).limit(100);
    if(role()==="client"){
      const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
      if(own.error){r.data=[];r.error=own.error}
