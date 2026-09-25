@@ -3257,32 +3257,72 @@ async function emergency(){
  h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':rows.length?rows.map(x=>{const p=pm.get(x.property_id),s=sm.get(x.service_id),cl=cm.get(p?.client_id||s?.client_id);return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+'</strong><div class="muted">'+esc(p?.address||"Dirección no registrada")+(p?.city?" · "+esc(p.city):"")+'</div></div><span class="status '+(x.status==="open"?"urgent":"approved")+'">'+esc(x.status==="open"?"Pendiente de aceptación":x.status==="accepted"?"Recibido":"Resuelta")+'</span></div><div class="two"><div><small class="muted">Contacto cliente</small><div>'+esc(cl?.phone||"—")+' · '+esc(cl?.email||"—")+'</div></div><div><small class="muted">Referencia</small><div>'+esc(s?.code||"Sin servicio")+' · '+esc(x.category||"General")+' · '+esc(x.priority||"normal")+'</div></div></div><div style="margin-top:10px"><b>Problema</b><div>'+esc(x.description)+'</div></div><div class="muted" style="margin-top:8px">Creada: '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.resolution?" · Resolución: "+esc(x.resolution):"")+'</div>'+(canManage()&&x.status==="open"?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="acceptOccurrence(\''+x.id+'\')">✓ Aceptar como recibido</button></div>':"")+'</div>'}).join(""):'<div class="empty">No hay incidencias.</div>');h+='</div>';$("content").innerHTML=h;
 }
 async function newEmergency(){
- let props=[],clients=[],services=[];
- if(role()==="employee"){
-   const sr=await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300);
+ const currentRole=role();
+ let props=[],clients=[],services=[],maintenanceEmployees=[];
+ if(demoMode){
+   props=DEMO_PROPERTIES||[]; clients=DEMO_CLIENTS||[]; services=(DEMO_SERVICES||[]).filter(x=>String(x.service_type||"").toLowerCase().includes("manten"));
+ }else if(currentRole==="employee"){
+   const sr=await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300);
    if(sr.error){toast(sr.error.message);return}
-   services=sr.data||[];
+   services=(sr.data||[]).filter(x=>String(x.service_type||"").toLowerCase().includes("manten")||String(x.service_type||"").toLowerCase().includes("pint")||String(x.service_type||"").toLowerCase().includes("electric")||String(x.service_type||"").toLowerCase().includes("fontan")||String(x.service_type||"").toLowerCase().includes("hydraulic"));
    const pids=[...new Set(services.map(x=>x.property_id).filter(Boolean))],cids=[...new Set(services.map(x=>x.client_id).filter(Boolean))];
-   const [pr,cr]=await Promise.all([
+   const [pr0,cr0]=await Promise.all([
      pids.length?sb.from("properties").select("id,name,code,address,city,client_id").in("id",pids).order("name"):Promise.resolve({data:[]}),
      cids.length?sb.from("clients").select("id,name,email,phone,client_code").in("id",cids).order("name"):Promise.resolve({data:[]})
    ]);
-   props=pr.data||[];clients=cr.data||[];
+   props=pr0.data||[]; clients=cr0.data||[];
+   const extraIds=[...new Set(props.map(x=>x.client_id).filter(Boolean))].filter(id=>!clients.some(c=>c.id===id));
+   if(extraIds.length){const ec=await sb.from("clients").select("id,name,email,phone,client_code").in("id",extraIds);clients=clients.concat(ec.data||[])}
  }else{
-   props=(await sb.from("properties").select("id,name,code,address,city,client_id").order("name")).data||[];
-   clients=(await sb.from("clients").select("id,name,email,phone,client_code").order("name")).data||[];
-   services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at").order("scheduled_at",{ascending:false}).limit(100)).data||[];
+   props=(await sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name")).data||[];
+   clients=(await sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name")).data||[];
+   services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("company_id",currentProfile.company_id).order("scheduled_at",{ascending:false}).limit(300)).data||[];
+   const ep=(await sb.from("employee_profiles").select("profile_id,full_name,function_title").eq("company_id",currentProfile.company_id)).data||[];
+   const pp=(await sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name")).data||[];
+   maintenanceEmployees=pp.map(p=>{const e=ep.find(x=>x.profile_id===p.id);return {...p,function_title:e?.function_title||""}}).filter(x=>{const t=String(x.function_title||"").toLowerCase();return /manten|maintenance|pint|electric|fontan|hidraul|hydraulic|silicone|montaje|instal/.test(t)});
+   if(!maintenanceEmployees.length)maintenanceEmployees=pp.map(p=>({...p,function_title:"Mantenimiento"}));
  }
- const clientOptions=clients.map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+esc(x.client_code||"")+'</option>').join("");
- const propertyOptions=props.map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(p.code||"")+' · '+esc(p.address||"Sin dirección")+(p.city?" · "+esc(p.city):"")+'</option>').join("");
- const serviceOptions=services.map(x=>{const p=props.find(v=>v.id===x.property_id);return '<option value="'+x.id+'">'+esc(x.code||"Servicio")+' · '+esc(serviceTypeLabel(x.service_type))+' · '+esc(p?.name||p?.code||"Apartamento")+' · '+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"Sin dirección")+' · '+esc(x.scheduled_at?romanoMadridShortDateTime(x.scheduled_at):"Sin fecha/hora")+'</option>'}).join("");
- openModal("Registrar incidencia / emergencia",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+ (role()==="client"?'<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>':'<select id="eClient"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>')+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="notice">Los datos disponibles se cargan automáticamente según los servicios que tiene asignados. La incidencia guardará cliente, apartamento, dirección, contacto y servicio relacionado.</div><div class="two"><div class="field"><label>Servicio relacionado</label><select id="eService"><option value="">Sin servicio</option>'+serviceOptions+'</select></div><div class="field"><label>Categoría</label><select id="eCat"><option value="general">General</option><option value="damage">Daño</option><option value="client_request">Solicitud cliente</option><option value="safety">Seguridad</option><option value="maintenance">Mantenimiento</option><option value="quality">Calidad</option></select></div></div><div class="two"><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Tipo de necesidad</label><select id="eServiceType"><option value="cleaning">Limpieza</option><option value="maintenance">Mantenimiento</option><option value="checkin">Check-in</option><option value="keys">Llaves</option><option value="other">Otros</option></select></div></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Registrar incidencia</button></form>');
+ const clientOptions=clients.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+' · '+esc(x.client_code||"")+'</option>').join("");
+ const propertyOptions=props.map(p=>'<option value="'+p.id+'" data-client="'+esc(p.client_id||"")+'">'+esc(p.name||"Apartamento")+' · '+esc(p.code||"")+' · '+esc(p.address||"Sin dirección")+(p.city?" · "+esc(p.city):"")+'</option>').join("");
+ const maintenanceServices=services.filter(x=>String(x.service_type||"").toLowerCase().includes("manten")||String(x.service_type||"").toLowerCase().includes("pint")||String(x.service_type||"").toLowerCase().includes("electric")||String(x.service_type||"").toLowerCase().includes("fontan")||String(x.service_type||"").toLowerCase().includes("hydraulic"));
+ const serviceOptions=maintenanceServices.map(x=>{const p=props.find(v=>v.id===x.property_id),cl=clients.find(v=>v.id===x.client_id)||clients.find(v=>v.id===p?.client_id);return '<option value="'+x.id+'" data-property="'+esc(x.property_id||"")+'" data-client="'+esc((x.client_id||p?.client_id)||"")+'">'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+' · '+esc(p?.address||"Sin dirección")+' · '+esc(x.code||"Servicio")+'</option>'}).join("");
+ const employeeOptions=currentRole==="employee"
+   ? '<option value="'+esc(currentUser.id)+'">'+esc(currentProfile?.full_name||"Yo mismo")+' · Mantenimiento</option>'
+   : '<option value="">Seleccione el funcionario de mantenimiento</option>'+maintenanceEmployees.map(x=>'<option value="'+x.id+'">'+esc(x.full_name||x.email||"Funcionario")+' · '+esc(x.function_title||"Mantenimiento")+'</option>').join("");
+ const clientField=currentRole==="client"
+   ? '<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>'
+   : '<select id="eClient"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>';
+ openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="notice">Emergencia 24H está reservada para mantenimiento. Cliente, apartamento y dirección se identifican automáticamente a partir del servicio. El funcionario de mantenimiento se asigna aquí para recibir la incidencia.</div><div class="two"><div class="field"><label>Servicio de mantenimiento relacionado</label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div><div class="field"><label>Funcionario de mantenimiento</label><select id="eEmployee" required>'+employeeOptions+'</select></div></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Enviar emergencia 24H de mantenimiento</button></form>');
+}
+function syncEmergencyFromService(serviceId){
+ const sel=$("eService"),opt=sel?.options[sel.selectedIndex];if(!opt)return;
+ const pid=opt.dataset.property||"",cid=opt.dataset.client||"";
+ if(pid&&$("eProperty")){$("eProperty").value=pid}
+ if(cid&&$("eClient")&&$("eClient").tagName==="SELECT"){$("eClient").value=cid}
 }
 async function saveEmergency(e){
- e.preventDefault();const propertyId=$("eProperty").value||null,serviceId=$("eService").value||null,category=$("eCat")?.value||$("eServiceType")?.value||"general",priority=$("ePriority").value,description=$("eDesc").value.trim();if(!propertyId||!description){toast("Seleccione el apartamento y describa la incidencia.");return}
- if(serviceId){const s=await sb.from("services").select("id,property_id,client_id").eq("id",serviceId).maybeSingle();if(s.error){toast(s.error.message);return}if(s.data&&s.data.property_id!==propertyId){toast("El servicio seleccionado no pertenece a ese apartamento.");return}}
- const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,category,priority,description,status:"open"};if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · incidencia guardada para sincronizar");return}
- const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · incidencia puesta en cola")}else toast(r.error.message);return}closeModal();toast("Incidencia registrada y enviada a supervisión");emergency();updateOfflineIndicator();
+ e.preventDefault();
+ const propertyId=$("eProperty")?.value||null,serviceId=$("eService")?.value||null,employeeId=$("eEmployee")?.value||null,priority=$("ePriority")?.value||"urgent",description=$("eDesc")?.value.trim()||"";
+ if(!propertyId||!employeeId||!description){toast("Seleccione apartamento, funcionario de mantenimiento y describa la emergencia.");return}
+ if(serviceId){
+   const s=await sb.from("services").select("id,property_id,client_id,assigned_employee_id,service_type").eq("id",serviceId).maybeSingle();
+   if(s.error){toast(s.error.message);return}
+   if(!s.data){toast("Servicio de mantenimiento no encontrado.");return}
+   const type=String(s.data.service_type||"").toLowerCase();
+   if(!(type.includes("manten")||type.includes("pint")||type.includes("electric")||type.includes("fontan")||type.includes("hydraulic"))){toast("La emergencia 24H solo admite servicios de mantenimiento.");return}
+   if(s.data.property_id!==propertyId){toast("El servicio seleccionado no pertenece a ese apartamento.");return}
+   if(role()==="employee"&&s.data.assigned_employee_id!==currentUser.id){toast("Solo puede registrar la emergencia del mantenimiento que tiene asignado.");return}
+ }
+ const pr=await sb.from("properties").select("id,client_id").eq("id",propertyId).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(pr.error||!pr.data){toast(pr.error?.message||"Apartamento no encontrado.");return}
+ const clientId=pr.data.client_id||null;
+ if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
+ const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,category:"maintenance",priority,description,status:"open"};
+ if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · emergencia guardada para sincronizar");return}
+ const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
+ if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · emergencia puesta en cola")}else toast(r.error.message);return}
+ await sb.from("notifications").insert({company_id:currentProfile.company_id,recipient_id:employeeId,title:"🚨 Emergencia 24H de mantenimiento",body:"Cliente y apartamento identificados. Revise y atienda la emergencia.",severity:"urgent"});
+ closeModal();toast("Emergencia 24H enviada al funcionario de mantenimiento");emergency();updateOfflineIndicator();
 }
 async function decideServiceAdvance(id,approved){
  const resolution=approved?"Adelanto aprobado por supervisión/admin":"Adelanto rechazado por supervisión/admin";
