@@ -3661,6 +3661,71 @@ async function savePremiumService(){
  }catch(err){toast("No se pudo crear el servicio: "+(err?.message||String(err)))}
 }
 let __activeChatId=null,__activeChatTitle="",__chatRoleThreads={};
+function romanoBytesToBase64Url(bytes){
+ let s="";for(const b of bytes)s+=String.fromCharCode(b);
+ return btoa(s).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+}
+function romanoBase64UrlToUint8Array(base64String){
+ const padding="=".repeat((4-base64String.length%4)%4);
+ const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+ const raw=atob(base64);const out=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+ return out;
+}
+async function enableRomanoPush(){
+ const btn=$("romanoPushBtn");
+ if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+   toast("Las notificaciones push no están disponibles en este dispositivo.");
+   return false;
+ }
+ try{
+   if(Notification.permission==="denied"){
+     toast("Las notificaciones están bloqueadas en el dispositivo. Actívelas en Ajustes del navegador/app.");
+     return false;
+   }
+   if(Notification.permission!=="granted"){
+     const permission=await Notification.requestPermission();
+     if(permission!=="granted"){toast("Debe permitir las notificaciones para recibir mensajes fuera del app.");return false}
+   }
+   if(btn){btn.disabled=true;btn.textContent="⏳ Activando…";}
+   const reg=await navigator.serviceWorker.ready;
+   const {data:{session}}=await sb.auth.getSession();
+   if(!session?.access_token)throw new Error("Sesión no válida.");
+   const keyRes=await fetch(SUPABASE_URL+"/functions/v1/romano-push",{
+     method:"POST",
+     headers:{Authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"Content-Type":"application/json"},
+     body:JSON.stringify({action:"public-key"})
+   });
+   const keyRaw=await keyRes.text();let keyData={};try{keyData=JSON.parse(keyRaw)}catch{}
+   if(!keyRes.ok||!keyData.publicKey)throw new Error(keyData.error||"No se pudo configurar el servicio de notificaciones.");
+   let sub=await reg.pushManager.getSubscription();
+   if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:romanoBase64UrlToUint8Array(keyData.publicKey)});
+   const json=sub.toJSON();
+   const p256dh=romanoBytesToBase64Url(new Uint8Array(await sub.getKey("p256dh")));
+   const auth=romanoBytesToBase64Url(new Uint8Array(await sub.getKey("auth")));
+   const up=await sb.from("push_subscriptions").upsert({
+     company_id:currentProfile.company_id,user_id:currentUser.id,endpoint:json.endpoint,p256dh,auth,
+     user_agent:navigator.userAgent,app_origin:location.origin,updated_at:new Date().toISOString()
+   },{onConflict:"user_id,endpoint"});
+   if(up.error)throw up.error;
+   if(btn){btn.disabled=false;btn.textContent="🔔 Notificaciones activadas";btn.classList.add("gold");}
+   toast("Notificaciones activadas. Recibirá mensajes aunque el app esté cerrado.");
+   return true;
+ }catch(err){
+   if(btn){btn.disabled=false;btn.textContent="🔔 Activar notificaciones";}
+   toast(err?.message||String(err));return false;
+ }
+}
+async function syncRomanoPushState(){
+ const btn=$("romanoPushBtn");if(!btn)return;
+ if("Notification" in window&&Notification.permission==="granted"){
+   try{
+     const reg=await navigator.serviceWorker.ready;
+     const sub=await reg.pushManager.getSubscription();
+     if(sub){btn.textContent="🔔 Notificaciones activadas";btn.classList.add("gold");return}
+   }catch(e){}
+ }
+}
 function chatTitleFor(roleName){return "Cliente ↔ "+(roleName==="supervisor"?"Supervisor":"Administrador")}
 async function findOrCreateRoleThread(targetRole){
  const title=chatTitleFor(targetRole);
@@ -3706,9 +3771,10 @@ function startChatPolling(){stopChatPolling();window.__chatPoll=setInterval(()=>
 async function renderChatPremium(){
  stopChatPolling();stopChatRealtime();startChatDirectoryRealtime();__activeChatId=null;__activeChatTitle="";
  const chatRole=role();
- const contact='<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">WhatsApp · E-mail · Chat interno · disponible para todos los perfiles</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a></div></div>';
+ const contact='<div class="panel" style="margin-bottom:12px"><div class="panel-head"><div><h3>Contacto ROMANO PROPERTY CARE</h3><div class="muted">WhatsApp · E-mail · Chat interno · disponible para todos los perfiles</div></div><div class="pill">🔔 Mensajes en tiempo real</div></div><div class="actions"><a class="btn gold" href="https://wa.me/34607250245" target="_blank" rel="noopener">WhatsApp directo</a><a class="btn" href="mailto:romanogestao@gmail.com">E-mail de la empresa</a><button type="button" class="btn" id="romanoPushBtn" onclick="enableRomanoPush()">🔔 Activar notificaciones</button></div></div>';
  $("content").innerHTML=contact+'<div class="romano-chat-page" id="romanoChatPage"><aside class="romano-chat-sidebar"><div class="romano-chat-sidebar-head"><h3>Chat ROMANO</h3><div class="muted">Conversaciones privadas</div></div><div id="romanoChatContacts"></div></aside><section class="romano-chat-main"><div id="romanoChatHead" class="romano-chat-head"><div class="romano-chat-empty">Seleccione una conversación</div></div><div id="romanoChatMessages" class="romano-chat-messages"><div class="romano-chat-empty"><div><strong>💬 Chat ROMANO</strong><br>Seleccione Supervisor o Administrador.</div></div></div><form id="romanoChatCompose" class="romano-chat-compose" onsubmit="sendChatPremium(event)" style="display:none"><button type="button" class="romano-chat-mobile-back" onclick="closeMobileChat()">‹</button><input id="romanoChatBody" placeholder="Escriba un mensaje..." autocomplete="off"><label class="romano-chat-attach" title="Enviar foto, vídeo o documento">📎<input id="romanoChatMedia" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple hidden onchange="chatMediaSelected()"></label><button type="button" id="romanoChatVoiceBtn" class="romano-chat-attach" title="Gravar mensagem de voz" onclick="toggleChatVoice()">🎙️</button><button type="submit">Enviar</button></form></section></div>';
  await renderChatContacts();
+ syncRomanoPushState();
  startChatPolling();
 }
 async function renderChatContacts(){
