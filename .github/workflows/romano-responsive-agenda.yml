@@ -52,8 +52,8 @@ jobs:
 .rpc-calendar-detail-item{padding:7px 8px}
 .rpc-calendar-detail-item small{font-size:8px}
 .rpc-calendar-detail-item strong{font-size:10px}
-.rpc-month-calendar{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.rpc-weekdays,.rpc-month-grid{min-width:0;grid-template-columns:repeat(7,minmax(105px,1fr))}
+.rpc-month-calendar{overflow:hidden;-webkit-overflow-scrolling:touch}
+.rpc-weekdays,.rpc-month-grid{min-width:0;grid-template-columns:repeat(7,minmax(0,1fr))}
 .rpc-month-day,.rpc-empty-day{min-height:135px;padding:6px}
 .rpc-date{font-size:11px}
 .rpc-person-day{padding:5px;margin-bottom:4px}
@@ -77,7 +77,7 @@ jobs:
   .rpc-service-client,.rpc-service-property,.rpc-service-meta{font-size:7px}
   .rpc-service-actions .btn{font-size:7px;padding:4px 3px}
   .rpc-month-calendar{border-radius:13px}
-  .rpc-weekdays,.rpc-month-grid{grid-template-columns:repeat(7,minmax(94px,1fr));min-width:658px}
+  .rpc-weekdays,.rpc-month-grid{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0}
   .rpc-month-day,.rpc-empty-day{min-height:120px}
 }
 @media (max-width:600px){
@@ -86,7 +86,7 @@ jobs:
   .rpc-calendar-title p{font-size:8px}
   .rpc-calendar-actions{justify-content:stretch}
   .rpc-calendar-actions .btn{flex:1;min-width:0;padding:7px 5px;font-size:9px}
-  .rpc-week-grid{grid-template-columns:repeat(7,minmax(92px,1fr));gap:4px}
+  .rpc-week-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
   .rpc-day{min-width:92px;min-height:195px;border-radius:9px}
   .rpc-day-head{padding:4px;margin-bottom:4px}
   .rpc-day-name{font-size:8px}.rpc-day-date{font-size:8px}
