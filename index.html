@@ -2173,6 +2173,25 @@ async function startRealtime(){
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshChatMessages();})
  .subscribe();
 }
+async function registerRomanoServiceWorker(){
+ try{
+  if(!("serviceWorker" in navigator))return null;
+  const reg=await navigator.serviceWorker.register("/sw.js",{scope:"/"});
+  await navigator.serviceWorker.ready;
+  window.__romanoSW=reg;
+  return reg;
+ }catch(e){console.warn("ROMANO Service Worker:",e);return null}
+}
+async function testBackgroundNotification(){
+ const reg=window.__romanoSW||await registerRomanoServiceWorker();
+ if(!reg){toast("Service Worker no disponible.");return}
+ const title="ROMANO PROPERTY CARE · Prueba";
+ const body="Notificación visual de prueba. Si la ves con el app cerrado, el dispositivo está preparado para recepción en segundo plano.";
+ if(reg.showNotification){
+  await reg.showNotification(title,{body,icon:"/icon.svg",badge:"/icon.svg",tag:"romano-test-"+Date.now(),renotify:true,data:{url:"/"},requireInteraction:true});
+  toast("Notificación de prueba enviada al dispositivo.");
+ }
+}
 document.addEventListener("pointerdown",unlockNotificationAudio,{once:true,passive:true});document.addEventListener("keydown",unlockNotificationAudio,{once:true,passive:true});
 function doLogout(){sb.auth.signOut()}
 function showApp(){closeMobileMenu();
