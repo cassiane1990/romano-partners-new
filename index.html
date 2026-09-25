@@ -3663,7 +3663,7 @@ async function savePremiumService(){
 let __activeChatId=null,__activeChatTitle="",__chatRoleThreads={};
 function romanoBytesToBase64Url(bytes){
  let s="";for(const b of bytes)s+=String.fromCharCode(b);
- return btoa(s).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+ return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
 function romanoBase64UrlToUint8Array(base64String){
  const padding="=".repeat((4-base64String.length%4)%4);
