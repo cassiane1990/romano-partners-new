@@ -767,10 +767,12 @@ async function assignServiceEmployee(serviceId,employeeId,force=false){
  }
  closeModal();toast(r.data?.extra?"✓ Designação EXTRA enviada. O funcionário verá o conflito e decidirá se pode aceitar.":"✓ Funcionário designado. Aguardando aceitação dele.");await renderServicesMaster();
 }
-async function serviceTypeLabel(v){
+function serviceTypeLabel(v){
  const m={limpieza_alojamiento:"Limpieza alojamiento",limpieza_hotel_5_estrellas:"Limpieza hotel 5★",oficina:"Limpieza oficina",clinica:"Limpieza clínica",mantenimiento:"Mantenimiento",pintura:"Pintura",fontaneria:"Fontanería",electricidad:"Electricidad",lavanderia:"Lavandería",airbnb:"Limpieza Airbnb",hotel:"Limpieza hotel 5★"};
  return m[v]||String(v||"Servicio").replaceAll("_"," ");
 }
+function romanoMadridDateLabel(date=new Date()){return new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,dateStyle:"long"}).format(date)}
+function romanoMadridTimeLabel(date=new Date()){return new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,hour:"2-digit",minute:"2-digit"}).format(date)}
 function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta",urgent:"Urgente"})[v]||v||"—"}
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
@@ -788,17 +790,32 @@ async function renderServicesMaster(){
    return;
  }
  const rows=r.data||[];
+ let clientProperties={};
+ if(role()==="client"&&rows.length){
+   const ids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
+   if(ids.length){
+     const pq=await sb.from("properties").select("id,name,code,address,city,client_id").in("id",ids).eq("company_id",currentProfile.company_id);
+     if(pq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pq.error.message)+'</div></div>';return}
+     clientProperties=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
+   }
+ }
+ const clientName=role()==="client"?(currentProfile?.full_name||"Cliente"):"";
  const cards=rows.length?rows.map(x=>{
+   const p=clientProperties[x.property_id];
    const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       x.status==="scheduled"&&x.accepted_at&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
+   const clientContext=role()==="client"
+     ? '<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(clientName)+'</strong></div><div><small>Apartamento</small><strong>'+esc(p?.name||p?.code||"—")+'</strong></div><div><small>Dirección</small><strong>'+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"—")+'</strong></div></div>'
+     : "";
    return '<article class="service-card">'+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
+     clientContext+
      '<div class="service-card-meta">'+
        '<div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div>'+
-       '<div><small>Fecha</small><strong>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Sin programar")+'</strong></div>'+
+       '<div><small>Fecha</small><strong>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar")+'</strong></div>'+
        '<div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div>'+
      '</div>'+
      (canSeeFinance()?'<div class="service-card-finance"><div><small>Sin IVA</small><b>'+masterMoney(f?.subtotal||0)+'</b></div><div><small>IVA</small><b>'+masterMoney(f?.tax_amount||0)+'</b></div><div><small>Total</small><b>'+masterMoney(f?.total||0)+'</b></div></div>':'')+
@@ -1072,7 +1089,7 @@ async function renderPremiumDashboard(){
   ["＋","Nuevo servicio","newservice"],["▦","Calendario","calendar"],["⚡","Adelantar check-in","change_requests"],["⌂","Mis propiedades","properties"],["◌","Chat","chat"],["▤","Documentos","documents"]
  ];
  let h='<div class="rpc-home">'+
- '<div class="rpc-home-top"><div class="rpc-home-welcome"><h1>'+esc(greeting())+', '+esc((d.name||"Usuario").split("@")[0])+' 😊</h1><p>Excelencia en cada detalle · ROMANO PROPERTY CARE</p></div><div class="rpc-home-meta"><div class="rpc-home-location">📍 '+esc(locationText)+'</div><div class="rpc-home-date">📅 '+esc(new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"}))+'<strong>'+esc(new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</strong></div><div class="rpc-notice-count">🔔 '+d.unread+'</div></div></div>'+
+ '<div class="rpc-home-top"><div class="rpc-home-welcome"><h1>'+esc(greeting())+', '+esc((d.name||"Usuario").split("@")[0])+' 😊</h1><p>Excelencia en cada detalle · ROMANO PROPERTY CARE</p></div><div class="rpc-home-meta"><div class="rpc-home-location">📍 '+esc(locationText)+'</div><div class="rpc-home-date">📅 '+esc(romanoMadridDateLabel())+'<strong>'+esc(romanoMadridTimeLabel())+'</strong></div><div class="rpc-notice-count">🔔 '+d.unread+'</div></div></div>'+
  '<div class="rpc-home-hero"><div class="rpc-home-hero-photo" style="background-image:url("'+esc(heroPhoto)+'")"></div><div class="rpc-home-hero-copy"><div class="rpc-home-brand">ROMANO<small>PROPERTY CARE · PARTNERS</small></div><div class="rpc-home-eyebrow">GESTIÓN PREMIUM · '+esc(roleLabel.toUpperCase())+'</div><h2>PROPIEDADES IMPECABLES<br>CLIENTE SATISFECHO</h2><p>Todo bajo control para que cada propiedad y cada servicio estén impecables.</p></div><div class="rpc-home-current"><small>Servicio actual</small><strong>'+esc(firstLabel)+'</strong><span>'+esc(first?.code||"—")+' · '+esc(statusNames[first?.status]||first?.status||"Programado")+'</span></div></div>'+
  '<div class="rpc-home-actions">'+actions.map(a=>'<button class="rpc-home-action" onclick="openPage(\''+a[2]+'\')"><div class="ico">'+a[0]+'</div><b>'+a[1]+'</b></button>').join("")+'<button class="rpc-home-action" onclick="openPage(\'notifications\')"><div class="ico">🔔</div><b>Alertas <span class="rpc-notice-count">'+d.unread+'</span></b></button></div>'+
  '<div class="rpc-home-grid"><div class="rpc-home-card"><div class="rpc-home-card-head"><h3>▣ Servicios en tiempo real</h3><span onclick="openPage(\'services\')">Ver todos →</span></div>'+serviceRows+'</div><div class="rpc-home-card"><div class="rpc-home-card-head"><h3>⌂ Mis propiedades</h3><span onclick="openPage(\'properties\')">Ver todas →</span></div>'+propRows+'</div><div><div class="rpc-home-card"><div class="rpc-home-card-head"><h3>◉ Mi perfil</h3><span onclick="openPage(\'profile\')">Ver perfil →</span></div><div class="rpc-profile-card"><div class="rpc-profile-photo">'+(d.avatar?'<img src="'+esc(d.avatar)+'" alt="Foto de perfil">':esc((d.name||"R").charAt(0)))+'</div><div><b>'+esc(d.name)+'</b><small>'+esc(roleLabel)+'</small><small>'+esc(currentUser?.email||"")+'</small></div></div><div style="padding:0 14px 14px"><div class="rpc-home-kpi"><small>Notificaciones pendientes</small><strong>'+d.unread+'</strong></div></div></div><div class="rpc-home-card" style="margin-top:13px"><div class="rpc-home-card-head"><h3>◷ Resumen</h3></div><div style="padding:12px 14px"><div class="rpc-home-kpi"><small>Servicios</small><strong>'+d.services.length+'</strong></div><div class="rpc-home-kpi" style="margin-top:8px"><small>Propiedades</small><strong>'+d.properties.length+'</strong></div></div></div></div></div>'+
@@ -2720,23 +2737,25 @@ function clientMonthBounds(value){
 }
 async function renderClientServiceHistoryPremium(){
  if(role()!=="client"){toast("Esta área es exclusiva del cliente.");openPage("dashboard");return}
- const now=new Date(),pad=n=>String(n).padStart(2,"0"),defaultDate=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+ const p=romanoMadridParts(),defaultDate=p.year+"-"+p.month+"-"+p.day;
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Histórico de servicios</h3><div class="muted">Todo el historial de tu empresa queda guardado y puedes consultarlo por día.</div></div><span class="pill">Histórico permanente</span></div><div class="field"><label>Buscar por fecha · día / mes / año</label><input id="historyDate" type="date" value="'+defaultDate+'" onchange="loadClientServiceHistory()"><small class="muted">Selecciona cualquier día para consultar los servicios registrados de tu empresa.</small></div><div id="clientHistoryResults"><div class="empty">Cargando histórico…</div></div></div>';
  await loadClientServiceHistory();
 }
 async function loadClientServiceHistory(){
  const day=$("historyDate")?.value;
  const box=$("clientHistoryResults");if(!box||!day)return;
- const d=new Date(day+"T00:00:00"),next=new Date(d);next.setDate(next.getDate()+1);
+ const d=romanoMadridInputToDate(day+"T00:00"),next=romanoMadridInputToDate(day+"T23:59");
+ if(!d||!next){box.innerHTML='<div class="msg">Fecha no válida.</div>';return}
+ next.setMinutes(next.getMinutes()+1);
  const q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,started_at,finished_at,property_id,agreed_amount").gte("scheduled_at",d.toISOString()).lt("scheduled_at",next.toISOString()).order("scheduled_at",{ascending:false}).limit(500);
- const [sr,pr]=await Promise.all([q,sb.from("properties").select("id,name,code").order("name")]);
+ const [sr,pr]=await Promise.all([q,sb.from("properties").select("id,name,code,address,city").order("name")]);
  if(sr.error){box.innerHTML='<div class="msg">'+esc(sr.error.message)+'</div>';return}
  const props=Object.fromEntries((pr.data||[]).map(p=>[p.id,p]));
  const rows=sr.data||[];
  const completed=rows.filter(x=>x.status==="completed").length;
  const totalAmount=rows.reduce((a,x)=>a+Number(x.agreed_amount||0),0);
  let h='<div class="rpc-home-kpis" style="margin-top:12px"><div class="rpc-home-kpi"><small>Servicios encontrados</small><strong>'+rows.length+'</strong></div><div class="rpc-home-kpi"><small>Finalizados</small><strong>'+completed+'</strong></div><div class="rpc-home-kpi"><small>En operación</small><strong>'+rows.filter(x=>["on_the_way","in_progress","paused","supervised"].includes(x.status)).length+'</strong></div><div class="rpc-home-kpi"><small>Valor registrado</small><strong>'+masterMoney(totalAmount)+'</strong></div></div>';
- h+='<div class="panel" style="margin-top:12px;padding:0;overflow:hidden"><table class="table"><thead><tr><th>Fecha</th><th>Servicio</th><th>Propiedad</th><th>Estado</th><th>Importe</th><th></th></tr></thead><tbody>'+(rows.length?rows.map(x=>'<tr><td>'+esc(new Date(x.scheduled_at).toLocaleString("es-ES"))+'</td><td><b>'+esc(x.code)+'</b><div class="muted">'+esc(x.service_type)+' · '+esc(x.typology||"—")+'</div></td><td>'+esc(props[x.property_id]?.name||props[x.property_id]?.code||"—")+'</td><td><span class="status '+(x.status==="completed"?"completed":x.status==="rejected"?"rejected":"")+'">'+esc(statusNames[x.status]||x.status)+'</span></td><td>'+esc(x.agreed_amount==null?"—":masterMoney(x.agreed_amount))+'</td><td><button class="btn" onclick="viewService(\''+esc(x.id)+'\')">Ver servicio</button></td></tr>').join(""):'<tr><td colspan="6"><div class="empty">No hay servicios para esta fecha.</div></td></tr>')+'</tbody></table></div>';
+ h+='<div class="panel" style="margin-top:12px;padding:0;overflow:hidden"><table class="table"><thead><tr><th>Fecha</th><th>Servicio</th><th>Propiedad</th><th>Dirección</th><th>Estado</th><th>Importe</th><th></th></tr></thead><tbody>'+(rows.length?rows.map(x=>'<tr><td>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"—")+'</td><td><b>'+esc(x.code)+'</b><div class="muted">'+esc(serviceTypeLabel(x.service_type))+' · '+esc(x.typology||"—")+'</div></td><td>'+esc(props[x.property_id]?.name||props[x.property_id]?.code||"—")+'</td><td>'+esc([props[x.property_id]?.address,props[x.property_id]?.city].filter(Boolean).join(" · ")||"—")+'</td><td><span class="status '+(x.status==="completed"?"completed":x.status==="rejected"?"rejected":"")+'">'+esc(statusNames[x.status]||x.status)+'</span></td><td>'+esc(x.agreed_amount==null?"—":masterMoney(x.agreed_amount))+'</td><td><button class="btn" onclick="viewService(\''+esc(x.id)+'\')">Ver servicio</button></td></tr>').join(""):'<tr><td colspan="7"><div class="empty">No hay servicios para esta fecha.</div></td></tr>')+'</tbody></table></div>';
  box.innerHTML=h;
 }
 async function renderSearchPremium(){return searchPage()}
