@@ -1982,7 +1982,10 @@ async function renderCalendar(){
    clientIds.length?sb.from("clients").select("id,name").in("id",clientIds):Promise.resolve({data:[]}),
    employeeIds.length?sb.from("profiles").select("id,full_name,email").in("id",employeeIds):Promise.resolve({data:[]})
  ]);
- const props=Object.fromEntries((pr.data||[]).map(x=>[x.id,x])),clients=Object.fromEntries((cr.data||[]).map(x=>[x.id,x])),employees=Object.fromEntries((er.data||[]).map(x=>[x.id,x]));
+ const props=Object.fromEntries((pr.data||[]).map(x=>[x.id,x]));
+ const missingClientIds=[...new Set((pr.data||[]).map(x=>x.client_id).filter(Boolean))].filter(id=>!(cr.data||[]).some(x=>x.id===id));
+ const extraClients=missingClientIds.length?await sb.from("clients").select("id,name").in("id",missingClientIds).eq("company_id",currentProfile.company_id):{data:[]};
+ const clients=Object.fromEntries([...(cr.data||[]),...(extraClients.data||[])].map(x=>[x.id,x])),employees=Object.fromEntries((er.data||[]).map(x=>[x.id,x]));
  const now=new Date(),todayKey=now.toLocaleDateString("sv-SE"),selectedKey=window.__employeeCalendarDay||todayKey;
  const selectedDate=new Date(selectedKey+"T12:00:00");
  const selectedRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===selectedKey).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
@@ -1994,7 +1997,7 @@ async function renderCalendar(){
    const key=d.toLocaleDateString("sv-SE"),inMonth=d.getMonth()===month,isToday=key===todayKey,selected=key===selectedKey;
    const dayRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===key).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
    h+='<div class="rpc-month-day '+(!inMonth?"outside-month ":"")+(isToday?"is-today ":"")+(selected?"rpc-calendar-day-selected":"")+'" onclick="window.__employeeCalendarDay=\''+key+'\';renderCalendar()"><div class="rpc-month-day-head"><b>'+d.getDate()+'</b><span class="rpc-day-count '+(dayRows.length?"active":"")+'">'+(dayRows.length||"")+'</span></div>';
-   if(dayRows.length)dayRows.slice(0,3).forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||{};h+='<div class="rpc-month-service"><b>'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</b><span>'+esc(cl.name||"Cliente")+'</span><small>'+esc(p.name||p.code||"Apartamento")+'</small></div>'});
+   if(dayRows.length)dayRows.slice(0,3).forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||clients[p.client_id]||{};h+='<div class="rpc-month-service"><b>'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</b><span>'+esc(cl.name||"Cliente")+'</span><small>'+esc(p.name||p.code||"Apartamento")+'</small></div>'});
    if(dayRows.length>3)h+='<small class="muted">+'+(dayRows.length-3)+' más</small>';
    h+='</div>';
  });
@@ -2002,7 +2005,7 @@ async function renderCalendar(){
  if(isEmployee){
    h+='<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios del '+esc(selectedDate.toLocaleDateString("es-ES",{weekday:"long",day:"2-digit",month:"long"}))+'</h3><div class="muted">'+selectedRows.length+' servicio(s) asignado(s)</div></div></div>';
    if(!selectedRows.length)h+='<div class="empty">No tienes servicios asignados para este día.</div>';
-   else selectedRows.forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||{},em=employees[s.assigned_employee_id]||{};h+=rpcCalendarServiceCard(s,p,cl,em,false)});
+   else selectedRows.forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||clients[p.client_id]||{},em=employees[s.assigned_employee_id]||{};h+=rpcCalendarServiceCard(s,p,cl,em,false)});
    h+='</div>';
  }
  h+='<div class="rpc-calendar-legend"><span>● Programado</span><span>● A camino</span><span>● Iniciado</span><span>● Pausado</span><span>● Finalizado</span></div></div>';
