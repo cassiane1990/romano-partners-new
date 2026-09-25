@@ -3,7 +3,7 @@
   "name": "ROMANO PARTNERS · Property Care",
   "short_name": "ROMANO",
   "description": "ROMANO PROPERTY CARE · gestión de limpieza, mantenimiento y servicios en tiempo real.",
-  "start_url": "/",
+  "start_url": "/?app=romano",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay","standalone"],
