@@ -884,15 +884,14 @@ async function saveCleaningCatalogItem(id=null){
 
 async function renderCatalogMaster(){
  const fallback=[...MASTER_PRICES.cleaning,...MASTER_PRICES.maintenance,...MASTER_PRICES.linen,...MASTER_PRICES.amenities,...MASTER_PRICES.laundry];
- let all=fallback;
+ const byCode=new Map(fallback.map(x=>[String(x.code||""),x]));
  try{
   const q=await sb.from("service_catalog").select("id,code,name,price,tax_included,active,category").eq("company_id",currentProfile.company_id).eq("active",true).order("category").order("name");
-  if(!q.error&&q.data?.length){
-   const dynamic=q.data.map(x=>({id:x.id,code:x.code,name:x.name,price:x.price,tax:x.tax_included,category:x.category}));
-   const hasCleaning=dynamic.some(x=>x.category==="cleaning");
-   all=hasCleaning?dynamic.filter(x=>["cleaning","maintenance","linen","amenities","laundry"].includes(x.category)):fallback;
-  }
+  if(!q.error) (q.data||[]).filter(x=>["cleaning","maintenance","linen","amenities","laundry"].includes(x.category)).forEach(x=>{
+   const code=String(x.code||"");if(code)byCode.set(code,{id:x.id,code:x.code,name:x.name,price:x.price,tax:x.tax_included,category:x.category});
+  });
  }catch(e){}
+ const all=[...byCode.values()];
  const t1t5=all.filter(x=>/^T[1-5](?:-|$)/.test(String(x.code||"")));
  const others=all.filter(x=>!/^T[1-5](?:-|$)/.test(String(x.code||"")));
  const ordered=[...t1t5,...others];
@@ -1819,7 +1818,20 @@ async function saveEmployee(e){
  closeModal();renderEmployees();
 }
 async function loadEmployeeDocuments(id){
- const box=$("employeeDocs_"+id);if(!box)return;const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,expires_at,created_at").eq("employee_profile_id",id).order("created_at",{ascending:false});if(q.error){box.innerHTML='<div class="msg">'+esc(q.error.message)+'</div>';return}box.innerHTML='<div class="panel-head"><div><h3>Documentos del funcionario</h3><div class="muted">'+(q.data?.length||0)+' documentos</div></div></div><div class="field"><label>Añadir documento</label><input id="docFile_'+id+'" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"></div>'+(q.data?.length?q.data.map(d=>'<div class="line-item"><span><b>'+esc(d.title||d.file_name)+'</b><small class="muted" style="display:block">'+esc(d.document_type||"documento")+'</small></span><button class="btn" type="button" onclick="openEmployeeDocument(\''+esc(d.storage_path)+'\')">Abrir</button></div>').join(""):'<div class="empty">Sin documentos todavía.</div>')+'<button class="btn gold" type="button" style="margin-top:8px" onclick="uploadEmployeeDocumentFromInput(\''+id+'\')">＋ Guardar documento</button>';
+ const box=$("employeeDocs_"+id);if(!box)return;
+ const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,expires_at,created_at,employee_profile_id").eq("employee_profile_id",id).order("created_at",{ascending:false});
+ if(q.error){box.innerHTML='<div class="msg">'+esc(q.error.message)+'</div>';return}
+ const canDelete=role()==="admin"||role()==="supervisor"||(role()==="employee"&&id===currentUser?.id);
+ box.innerHTML='<div class="panel-head"><div><h3>Documentos del funcionario</h3><div class="muted">'+(q.data?.length||0)+' documentos</div></div></div><div class="field"><label>Añadir documento</label><input id="docFile_'+id+'" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"></div>'+(q.data?.length?q.data.map(d=>'<div class="line-item"><span><b>'+esc(d.title||d.file_name)+'</b><small class="muted" style="display:block">'+esc(d.document_type||"documento")+' · '+esc(d.file_name||"")+'</small></span><span class="actions"><button class="btn" type="button" onclick="openEmployeeDocument(\''+esc(d.storage_path)+'\')">Abrir</button>'+(canDelete?'<button class="btn" type="button" onclick="deleteEmployeeDocument(\''+esc(d.id)+'\',\''+esc(d.storage_path)+'\',\''+esc(id)+'\')">Eliminar</button>':"")+'</span></div>').join(""):'<div class="empty">Sin documentos todavía.</div>')+'<button class="btn gold" type="button" style="margin-top:8px" onclick="uploadEmployeeDocumentFromInput(\''+id+'\')">＋ Guardar documento</button>';
+}
+async function deleteEmployeeDocument(docId,path,employeeId){
+ if(!(role()==="admin"||role()==="supervisor"||(role()==="employee"&&employeeId===currentUser?.id))){toast("No tiene permisos para eliminar este documento.");return}
+ if(!confirm("¿Eliminar este documento?"))return;
+ const d=await sb.from("employee_documents").delete().eq("id",docId).eq("employee_profile_id",employeeId).eq("company_id",currentProfile.company_id);
+ if(d.error){toast(d.error.message);return}
+ const st=await sb.storage.from("company-documents").remove([path]);
+ if(st.error){toast("Documento eliminado de la ficha, pero no se pudo eliminar el archivo del almacenamiento.");return}
+ toast("Documento eliminado correctamente");await loadEmployeeDocuments(employeeId);
 }
 async function uploadEmployeeDocument(id,file,type="documento",title="Documento del funcionario"){if(!file)return;if(file.size>25*1024*1024){toast("El documento no puede superar 25 MB.");return}const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"_"),path=currentProfile.company_id+"/employees/"+id+"/"+crypto.randomUUID()+"-"+safe;const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||undefined});if(up.error){toast("No se pudo subir el documento: "+up.error.message);return}const ins=await sb.from("employee_documents").insert({company_id:currentProfile.company_id,employee_profile_id:id,document_type:type,title,file_name:file.name,storage_path:path,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id});if(ins.error){await sb.storage.from("company-documents").remove([path]);toast("No se pudo registrar el documento: "+ins.error.message);return}toast("Documento guardado");loadEmployeeDocuments(id)}
 async function uploadEmployeeDocumentFromInput(id){const f=$("docFile_"+id)?.files?.[0];if(!f){toast("Seleccione un documento.");return}const type=prompt("Tipo de documento","Contrato / Recibo / Identificación / Otro")||"documento";await uploadEmployeeDocument(id,f,type,type)}
@@ -2701,7 +2713,8 @@ async function renderDocumentsPremium(){
  if(isClient){
    h+='<div class="panel" style="margin-top:12px;background:#faf4ea"><div class="panel-head"><div><h3>Enviar documento a ROMANO</h3><div class="muted">Adjunta contrato, DNI/NIE, seguro, datos de empresa, certificado u otro documento.</div></div><span class="pill">Privado</span></div><form onsubmit="uploadClientDocument(event)"><div class="two"><div class="field"><label>Tipo de documento</label><select id="clientDocType"><option value="identidad">DNI / NIE / Identificación</option><option value="empresa">Documento de empresa</option><option value="contrato">Contrato</option><option value="seguro">Seguro</option><option value="fiscal">Documento fiscal</option><option value="otro">Otro</option></select></div><div class="field"><label>Nombre / título</label><input id="clientDocTitle" required placeholder="Ej.: Seguro de responsabilidad civil"></div></div><div class="field"><label>Archivo</label><input id="clientDocFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"></div><div class="actions"><button class="btn gold" type="submit">↑ Guardar y enviar a ROMANO</button><a class="btn" href="mailto:romanogestao@gmail.com?subject=Documento%20de%20cliente%20-%20ROMANO%20PROPERTY%20CARE">✉ Abrir e-mail de ROMANO</a></div><div class="muted" style="margin-top:8px;font-size:10px">El documento queda guardado dentro de la cuenta. El botón de e-mail abre el mensaje directamente dirigido a romanogestao@gmail.com.</div></form></div>';
  }
- h+='<div style="margin-top:12px">'+(rows.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.title)+'</b></td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="downloadClientDocument(\''+esc(x.storage_path)+'\',\''+esc(x.file_name)+'\')">↓ Abrir / descargar</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos guardados.</div>')+'</div></div>';
+ const canDeleteDocs=role()==="admin"||role()==="supervisor"||isClient;
+ h+='<div style="margin-top:12px">'+(rows.length?'<table class="table"><thead><tr><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.title)+'</b></td><td>'+esc(x.document_type)+'</td><td>'+esc(x.file_name)+'</td><td>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+'</td><td><button class="btn" onclick="downloadClientDocument(\''+esc(x.storage_path)+'\',\''+esc(x.file_name)+'\')">↓ Abrir / descargar</button>'+(canDeleteDocs?'<button class="btn" style="margin-left:6px" onclick="deleteOwnClientDocument(\''+esc(x.id)+'\',\''+esc(x.storage_path)+'\')">Eliminar</button>':"")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos guardados.</div>')+'</div></div>';
  $("content").innerHTML=h;
 }
 async function getCurrentClientRecord(){
@@ -2725,6 +2738,19 @@ async function uploadClientDocument(e){
  const ins=await sb.from("documents").insert({company_id:currentProfile.company_id,client_id:cr.data.id,title:$("clientDocTitle").value.trim()||file.name,document_type:$("clientDocType").value,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id});
  if(ins.error){await sb.storage.from("company-documents").remove([path]);toast(ins.error.message);return}
  toast("Documento guardado y enviado a ROMANO");renderDocumentsPremium();
+}
+async function deleteOwnClientDocument(id,path){
+ if(!(role()==="admin"||role()==="supervisor"||role()==="client")){toast("No tiene permisos para eliminar este documento.");return}
+ if(!confirm("¿Eliminar este documento PDF?"))return;
+ let query=sb.from("documents").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(role()==="client"){
+  const cr=await getCurrentClientRecord();if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
+  query=query.eq("client_id",cr.data.id);
+ }
+ const d=await query;if(d.error){toast(d.error.message);return}
+ const st=await sb.storage.from("company-documents").remove([path]);
+ if(st.error){toast("Documento eliminado, pero no se pudo eliminar el archivo del almacenamiento.");return}
+ toast("Documento eliminado correctamente");await renderDocumentsPremium();
 }
 async function downloadClientDocument(path,fileName){
  const r=await sb.storage.from("company-documents").createSignedUrl(path,300,{download:fileName||true});
