@@ -1456,14 +1456,25 @@ async function openClientEditModal(x){
  const props=ps.length?ps.map(p=>clientPropertyInlineHtml(p,x,demoMode?"demo":"real")).join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
  openModal("Editar cliente",'<form onsubmit="saveClientEdit(event,\''+esc(x.id)+'\')"><div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="ecPhotoPreview">'+photoBox(photo,x.name,false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de perfil</label><input id="ecPhoto" type="file" accept="image/*" onchange="photoPreview(\'ecPhoto\',\'ecPhotoPreview\',\''+esc(x.name||"Cliente")+'\')"><small class="muted">Seleccione una nueva foto para reemplazarla</small></div></div><div class="two"><div class="field"><label>Nombre</label><input id="ecName" value="'+esc(x.name||"")+'" required></div><div class="field"><label>Email</label><input id="ecEmail" type="email" value="'+esc(x.email||"")+'"></div></div><div class="field"><label>Teléfono</label><input id="ecPhone" value="'+esc(x.phone||"")+'"></div><div class="field"><label>Notas</label><textarea id="ecNotes">'+esc(x.notes||"")+'</textarea></div><div class="panel" style="margin:15px 0"><div class="panel-head"><div><h3>Propiedades / Apartamentos</h3><div class="muted">'+ps.length+' apartamento(s) asociados</div></div><button type="button" class="btn gold" onclick="newClientProperty(\''+esc(x.id)+'\')">+ Nuevo inmueble</button></div>'+props+'<div class="panel" style="margin:15px 0"><div class="panel-head"><div><h3>Acceso a ROMANO PARTNERS</h3><div class="muted">Envíe o reenvíe la invitación de acceso al cliente.</div></div></div><button type="button" class="btn gold" onclick="sendClientAccessInvite(\''+esc(x.id)+'\')">✉ Enviar invitación de acceso</button></div></div><button class="primary">Guardar cambios</button></form>');
 }
+async function sendExistingAccessRecovery(email){
+ const e=String(email||"").trim().toLowerCase();
+ if(!e)return{error:new Error("Falta el e-mail.")};
+ const rr=await sb.auth.resetPasswordForEmail(e,{redirectTo:window.location.origin});
+ return rr;
+}
 async function sendClientAccessInvite(id){
  if(!["admin","supervisor"].includes(role()))return;
  const q=await sb.from("clients").select("name,email").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error||!q.data){toast(q.error?.message||"Cliente no encontrado.");return}
  if(!q.data.email){toast("Este cliente no tiene e-mail registrado.");return}
  const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"client",entity_id:id,email:q.data.email,full_name:q.data.name,role:"client",redirect_to:window.location.origin}});
- if(inv.error||inv.data?.error){toast("No se pudo enviar el invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- toast("Invitación de acceso enviado a "+q.data.email);
+ if(inv.error||inv.data?.error){toast("No se pudo enviar la invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ if(inv.data?.existing){
+   const recovery=await sendExistingAccessRecovery(q.data.email);
+   if(recovery.error){toast("El usuario ya existe, pero no se pudo enviar el correo de acceso: "+recovery.error.message);return}
+   toast("Correo de acceso enviado a "+q.data.email);return;
+ }
+ toast("Invitación de acceso enviada a "+q.data.email);
 }
 async function saveClientEdit(e,id){
  e.preventDefault();
@@ -1900,8 +1911,13 @@ async function sendEmployeeAccessInvite(id){
  if(q.error||!q.data){toast(q.error?.message||"Funcionario no encontrado.");return}
  if(!q.data.email){toast("Este funcionario no tiene e-mail registrado.");return}
  const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:q.data.email,full_name:q.data.full_name,role:"employee",redirect_to:window.location.origin}});
- if(inv.error||inv.data?.error){toast("No se pudo enviar el invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
- toast("Invitación de acceso enviado a "+q.data.email);
+ if(inv.error||inv.data?.error){toast("No se pudo enviar la invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
+ if(inv.data?.existing){
+   const recovery=await sendExistingAccessRecovery(q.data.email);
+   if(recovery.error){toast("El usuario ya existe, pero no se pudo enviar el correo de acceso: "+recovery.error.message);return}
+   toast("Correo de acceso enviado a "+q.data.email);return;
+ }
+ toast("Invitación de acceso enviada a "+q.data.email);
 }
 async function saveEmployeeEdit(e,id){
  e.preventDefault();const data=employeeDataFromForm("ee"),photo=await readDemoPhoto("eePhoto"),contractFile=$("eeContractFile")?.files?.[0];if(!data.full_name||!data.employee_code||!data.function_title){toast("Nombre, código y función son obligatorios.");return}
