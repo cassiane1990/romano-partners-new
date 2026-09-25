@@ -1934,20 +1934,27 @@ function rpcCalendarServiceCard(s,property,client,employee,allowEdit){
    (allowEdit?'<button type="button" class="btn gold" onclick="event.stopPropagation();editDemoCalendarService(\''+s.id+'\')">Editar</button>':"")+
    '</div></div></div>';
 }
-function renderDemoCalendar(weekOffset=0){
- const base=new Date();base.setDate(base.getDate()+Number(weekOffset||0)*7);
- const monday=demoCalendarWeekStart(base),days=Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d});
- const weekLabel=days[0].toLocaleDateString("es-ES",{day:"2-digit",month:"long"})+" — "+days[6].toLocaleDateString("es-ES",{day:"2-digit",month:"long",year:"numeric"});
- const byDay=days.map(d=>DEMO_SERVICES.filter(s=>{const x=new Date(s.scheduled_at);return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x.getDate()===d.getDate()}).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at)));
- let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>Calendario de Servicios</h2><p>Visuliza, gestiona y haz seguimiento de todos tus servicios</p></div></div><div class="rpc-calendar-actions"><button class="btn" onclick="renderDemoCalendar('+(Number(weekOffset)-1)+')">‹</button><span class="rpc-week-label">'+esc(weekLabel)+'</span><button class="btn" onclick="renderDemoCalendar('+(Number(weekOffset)+1)+')">›</button><button class="btn gold" onclick="renderDemoCalendar(0)">Hoy</button></div></div><div class="rpc-week-grid">';
- days.forEach((d,i)=>{
-   const isToday=d.toDateString()===new Date().toDateString();
-   h+='<div class="rpc-day '+(isToday?"is-today":"")+'"><div class="rpc-day-head"><div class="rpc-day-name">'+esc(d.toLocaleDateString("es-ES",{weekday:"long"}))+'</div><div class="rpc-day-date">'+esc(d.toLocaleDateString("es-ES",{day:"2-digit",month:"short"}))+'</div><span class="rpc-day-count '+(byDay[i].length?"active":"")+'">'+byDay[i].length+'</span></div>';
-   if(!byDay[i].length)h+='<div class="empty" style="padding:30px 6px">Sin servicios</div>';
-   else byDay[i].forEach(s=>{
-     const property=DEMO_PROPERTIES.find(p=>p.id===s.property_id),client=DEMO_CLIENTS.find(c=>c.id===s.client_id),employee=DEMO_EMPLOYEES.find(e=>e.id===s.assigned_employee_id);
-     h+=rpcCalendarServiceCard(s,property,client,employee,true);
-   });
+function renderDemoCalendar(monthOffset=0){
+ const base=new Date();base.setDate(1);base.setHours(12,0,0,0);base.setMonth(base.getMonth()+Number(monthOffset||0));
+ const year=base.getFullYear(),month=base.getMonth();
+ const first=new Date(year,month,1,12,0,0);
+ const gridStart=new Date(first);gridStart.setDate(first.getDate()-((first.getDay()+6)%7));
+ const days=Array.from({length:42},(_,i)=>{const d=new Date(gridStart);d.setDate(gridStart.getDate()+i);return d});
+ const monthLabel=first.toLocaleDateString("es-ES",{month:"long",year:"numeric"});
+ const todayKey=new Date().toLocaleDateString("sv-SE");
+ let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>Calendario de Servicios</h2><p>Visualiza, gestiona y haz seguimiento de todos tus servicios</p></div></div><div class="rpc-calendar-actions"><button class="btn" type="button" onclick="renderDemoCalendar('+(Number(monthOffset)-1)+')">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" type="button" onclick="renderDemoCalendar('+(Number(monthOffset)+1)+')">›</button><button class="btn gold" type="button" onclick="renderDemoCalendar(0)">Hoy</button></div></div><div class="rpc-month-grid">';
+ ["lunes","martes","miércoles","jueves","viernes","sábado","domingo"].forEach(d=>h+='<div class="rpc-month-weekday">'+d+'</div>');
+ days.forEach(d=>{
+   const key=d.toLocaleDateString("sv-SE"),inMonth=d.getMonth()===month,isToday=key===todayKey;
+   const dayRows=DEMO_SERVICES.filter(s=>{const x=new Date(s.scheduled_at);return x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x.getDate()===d.getDate()}).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+   h+='<div class="rpc-month-day '+(!inMonth?"outside-month ":"")+(isToday?"is-today":"")+'"><div class="rpc-month-day-head"><b>'+d.getDate()+'</b><span class="rpc-day-count '+(dayRows.length?"active":"")+'">'+(dayRows.length||"")+'</span></div>';
+   if(dayRows.length){
+     dayRows.slice(0,4).forEach(s=>{
+       const property=DEMO_PROPERTIES.find(p=>p.id===s.property_id),client=DEMO_CLIENTS.find(c=>c.id===s.client_id),employee=DEMO_EMPLOYEES.find(e=>e.id===s.assigned_employee_id);
+       h+='<div class="rpc-month-service" onclick="event.stopPropagation();viewService(\''+s.id+'\')"><b>'+esc(new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</b><span>'+esc(client?.name||"Cliente")+'</span><small>'+esc(property?.name||property?.code||"Apartamento")+'</small></div>';
+     });
+     if(dayRows.length>4)h+='<small class="muted">+'+(dayRows.length-4)+' más</small>';
+   }
    h+='</div>';
  });
  h+='</div><div class="rpc-calendar-legend"><span>● Programado</span><span>● A camino</span><span>● Iniciado</span><span>● Pausado</span><span>● Finalizado</span></div></div>';
