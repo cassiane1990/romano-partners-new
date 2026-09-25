@@ -1985,50 +1985,127 @@ function romanoCalendarToday(){
 }
 async function renderCalendar(){
  if(demoMode){renderDemoCalendar(0);return}
- const isEmployee=role()==="employee";
- const monthRef=window.__employeeCalendarMonth ? new Date(window.__employeeCalendarMonth+"-01T12:00:00") : new Date();
+ const currentRole=role();
+ const isEmployee=currentRole==="employee";
+ const canCreateService=["admin","supervisor","client"].includes(currentRole);
+ if(!currentProfile?.company_id||!currentUser?.id){
+   $("content").innerHTML='<div class="panel"><div class="msg">No se pudo identificar la sesión activa. Vuelva a iniciar sesión.</div></div>';
+   return;
+ }
+ const monthRef=window.__employeeCalendarMonth
+   ? new Date(window.__employeeCalendarMonth+"-01T12:00:00")
+   : new Date();
  const year=monthRef.getFullYear(),month=monthRef.getMonth();
- const first=new Date(year,month,1,12,0,0),last=new Date(year,month+1,0,12,0,0);
- const gridStart=new Date(first);gridStart.setDate(first.getDate()-((first.getDay()+6)%7));
+ const first=new Date(year,month,1,12,0,0);
+ const gridStart=new Date(first);
+ gridStart.setDate(first.getDate()-((first.getDay()+6)%7));
  const gridDays=Array.from({length:42},(_,i)=>{const d=new Date(gridStart);d.setDate(gridStart.getDate()+i);return d});
- const rangeStart=new Date(gridStart);rangeStart.setHours(0,0,0,0);
+ const rangeStart=new Date(gridDays[0]);rangeStart.setHours(0,0,0,0);
  const rangeEnd=new Date(gridDays[41]);rangeEnd.setHours(23,59,59,999);
- let q=sb.from("services").select("id,code,service_type,typology,status,scheduled_at,property_id,client_id,assigned_employee_id").not("scheduled_at","is",null).gte("scheduled_at",rangeStart.toISOString()).lte("scheduled_at",rangeEnd.toISOString()).order("scheduled_at",{ascending:true}).limit(500);
- if(isEmployee)q=q.eq("assigned_employee_id",currentUser.id);else q=q.eq("company_id",currentProfile.company_id);
+
+ let q=sb.from("services")
+   .select("id,code,service_type,typology,status,scheduled_at,property_id,client_id,assigned_employee_id")
+   .not("scheduled_at","is",null)
+   .gte("scheduled_at",rangeStart.toISOString())
+   .lte("scheduled_at",rangeEnd.toISOString())
+   .order("scheduled_at",{ascending:true})
+   .limit(500);
+
+ if(isEmployee) q=q.eq("assigned_employee_id",currentUser.id);
+ else q=q.eq("company_id",currentProfile.company_id);
+
  const r=await q;
- if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
- const rows=r.data||[],propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],clientIds=[...new Set(rows.map(x=>x.client_id).filter(Boolean))],employeeIds=[...new Set(rows.map(x=>x.assigned_employee_id).filter(Boolean))];
+ if(r.error){
+   $("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario</h3></div><div class="msg">'+esc(r.error.message)+'</div></div>';
+   return;
+ }
+
+ const rows=r.data||[];
+ const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
+ const clientIds=[...new Set(rows.map(x=>x.client_id).filter(Boolean))];
+ const employeeIds=[...new Set(rows.map(x=>x.assigned_employee_id).filter(Boolean))];
+
  const [pr,cr,er]=await Promise.all([
-   propertyIds.length?sb.from("properties").select("id,name,code,photo_url,city,property_type,address,client_id").in("id",propertyIds):Promise.resolve({data:[]}),
-   clientIds.length?sb.from("clients").select("id,name").in("id",clientIds):Promise.resolve({data:[]}),
-   employeeIds.length?sb.from("profiles").select("id,full_name,email").in("id",employeeIds):Promise.resolve({data:[]})
+   propertyIds.length
+     ? sb.from("properties").select("id,name,code,photo_url,city,property_type,address,client_id").in("id",propertyIds)
+     : Promise.resolve({data:[],error:null}),
+   clientIds.length
+     ? sb.from("clients").select("id,name").in("id",clientIds)
+     : Promise.resolve({data:[],error:null}),
+   employeeIds.length
+     ? sb.from("profiles").select("id,full_name,email").in("id",employeeIds)
+     : Promise.resolve({data:[],error:null})
  ]);
+
+ const lookupError=pr.error||cr.error||er.error;
+ if(lookupError){
+   $("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario</h3></div><div class="msg">'+esc(lookupError.message)+'</div></div>';
+   return;
+ }
+
  const props=Object.fromEntries((pr.data||[]).map(x=>[x.id,x]));
- const missingClientIds=[...new Set((pr.data||[]).map(x=>x.client_id).filter(Boolean))].filter(id=>!(cr.data||[]).some(x=>x.id===id));
- const extraClients=missingClientIds.length?await sb.from("clients").select("id,name").in("id",missingClientIds).eq("company_id",currentProfile.company_id):{data:[]};
- const clients=Object.fromEntries([...(cr.data||[]),...(extraClients.data||[])].map(x=>[x.id,x])),employees=Object.fromEntries((er.data||[]).map(x=>[x.id,x]));
- const now=new Date(),todayKey=now.toLocaleDateString("sv-SE"),selectedKey=window.__employeeCalendarDay||todayKey;
+ const missingClientIds=[...new Set((pr.data||[]).map(x=>x.client_id).filter(Boolean))]
+   .filter(id=>!(cr.data||[]).some(x=>x.id===id));
+ let extraClients={data:[],error:null};
+ if(missingClientIds.length){
+   extraClients=await sb.from("clients")
+     .select("id,name")
+     .in("id",missingClientIds)
+     .eq("company_id",currentProfile.company_id);
+   if(extraClients.error){
+     $("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Calendario</h3></div><div class="msg">'+esc(extraClients.error.message)+'</div></div>';
+     return;
+   }
+ }
+ const clients=Object.fromEntries([...(cr.data||[]),...(extraClients.data||[])].map(x=>[x.id,x]));
+ const employees=Object.fromEntries((er.data||[]).map(x=>[x.id,x]));
+
+ const now=new Date();
+ const todayKey=now.toLocaleDateString("sv-SE");
+ let selectedKey=window.__employeeCalendarDay||todayKey;
  const selectedDate=new Date(selectedKey+"T12:00:00");
- const selectedRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===selectedKey).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+ if(Number.isNaN(selectedDate.getTime())) selectedKey=todayKey;
+
+ const selectedRows=rows
+   .filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===selectedKey)
+   .sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+
  const monthLabel=first.toLocaleDateString("es-ES",{month:"long",year:"numeric"});
- let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" onclick="romanoCalendarMonthOffset(-1)">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" onclick="romanoCalendarMonthOffset(1)">›</button><button class="btn gold" onclick="romanoCalendarToday()">Hoy</button></div></div><div class="rpc-month-grid">';
+ let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" type="button" onclick="romanoCalendarMonthOffset(-1)">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" type="button" onclick="romanoCalendarMonthOffset(1)">›</button><button class="btn gold" type="button" onclick="romanoCalendarToday()">Hoy</button>'+(canCreateService?'<button class="btn dark" type="button" onclick="newServicePremium()">＋ Nuevo servicio</button>':"")+'</div></div><div class="rpc-month-grid">';
  const weekday=["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
  weekday.forEach(d=>h+='<div class="rpc-month-weekday">'+d+'</div>');
  gridDays.forEach(d=>{
-   const key=d.toLocaleDateString("sv-SE"),inMonth=d.getMonth()===month,isToday=key===todayKey,selected=key===selectedKey;
+   const key=d.toLocaleDateString("sv-SE");
+   const inMonth=d.getMonth()===month;
+   const isToday=key===todayKey;
+   const selected=key===selectedKey;
    const dayRows=rows.filter(s=>new Date(s.scheduled_at).toLocaleDateString("sv-SE")===key).sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
    h+='<div class="rpc-month-day '+(!inMonth?"outside-month ":"")+(isToday?"is-today ":"")+(selected?"rpc-calendar-day-selected":"")+'" onclick="window.__employeeCalendarDay=\''+key+'\';renderCalendar()"><div class="rpc-month-day-head"><b>'+d.getDate()+'</b><span class="rpc-day-count '+(dayRows.length?"active":"")+'">'+(dayRows.length||"")+'</span></div>';
-   if(dayRows.length)dayRows.slice(0,3).forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||clients[p.client_id]||{};h+='<div class="rpc-month-service"><b>'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</b><span>'+esc(cl.name||"Cliente")+'</span><small>'+esc(p.name||p.code||"Apartamento")+'</small></div>'});
-   if(dayRows.length>3)h+='<small class="muted">+'+(dayRows.length-3)+' más</small>';
+   if(dayRows.length){
+     dayRows.slice(0,4).forEach(s=>{
+       const p=props[s.property_id]||{};
+       const cl=clients[s.client_id]||clients[p.client_id]||{};
+       h+='<div class="rpc-month-service" onclick="event.stopPropagation();viewService(\''+s.id+'\')"><b>'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</b><span>'+esc(cl.name||"Cliente")+'</span><small>'+esc(p.name||p.code||"Apartamento")+'</small></div>';
+     });
+     if(dayRows.length>4)h+='<small class="muted">+'+(dayRows.length-4)+' más</small>';
+   }
    h+='</div>';
  });
  h+='</div>';
+
  if(isEmployee){
-   h+='<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios del '+esc(selectedDate.toLocaleDateString("es-ES",{weekday:"long",day:"2-digit",month:"long"}))+'</h3><div class="muted">'+selectedRows.length+' servicio(s) asignado(s)</div></div></div>';
-   if(!selectedRows.length)h+='<div class="empty">No tienes servicios asignados para este día.</div>';
-   else selectedRows.forEach(s=>{const p=props[s.property_id]||{},cl=clients[s.client_id]||clients[p.client_id]||{},em=employees[s.assigned_employee_id]||{};h+=rpcCalendarServiceCard(s,p,cl,em,false)});
+   const safeSelectedDate=new Date(selectedKey+"T12:00:00");
+   h+='<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios del '+esc(safeSelectedDate.toLocaleDateString("es-ES",{weekday:"long",day:"2-digit",month:"long"}))+'</h3><div class="muted">'+selectedRows.length+' servicio(s) asignado(s)</div></div></div>';
+   if(!selectedRows.length) h+='<div class="empty">No tienes servicios asignados para este día.</div>';
+   else selectedRows.forEach(s=>{
+     const p=props[s.property_id]||{};
+     const cl=clients[s.client_id]||clients[p.client_id]||{};
+     const em=employees[s.assigned_employee_id]||{};
+     h+=rpcCalendarServiceCard(s,p,cl,em,false);
+   });
    h+='</div>';
  }
+
  h+='<div class="rpc-calendar-legend"><span>● Programado</span><span>● A camino</span><span>● Iniciado</span><span>● Pausado</span><span>● Finalizado</span></div></div>';
  $("content").innerHTML=h;
 }
