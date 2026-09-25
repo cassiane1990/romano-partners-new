@@ -974,7 +974,7 @@ async function renderServicesMaster(){
    const visibleProperty=p?.name||p?.code||"—";
    const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
    const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
-     (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar</button>':
+     (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       ["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())&&x.status==="scheduled"?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
