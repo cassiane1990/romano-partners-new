@@ -889,8 +889,8 @@ async function renderCatalogMaster(){
   const q=await sb.from("service_catalog").select("id,code,name,price,tax_included,active,category").eq("company_id",currentProfile.company_id).eq("active",true).order("category").order("name");
   if(!q.error&&q.data?.length){
    const dynamic=q.data.map(x=>({id:x.id,code:x.code,name:x.name,price:x.price,tax:x.tax_included,category:x.category}));
-   const hasCleaning=dynamic.some(x=>x.category==="cleaning");
-   all=hasCleaning?dynamic.filter(x=>["cleaning","maintenance","linen","amenities","laundry"].includes(x.category)):fallback;
+   const cleaning=dynamic.filter(x=>x.category==="cleaning");
+   if(cleaning.length) all=[...cleaning,...fallback.filter(x=>!["cleaning"].includes(x.category))];
   }
  }catch(e){}
  const t1t5=all.filter(x=>/^T[1-5](?:-|$)/.test(String(x.code||"")));
@@ -1882,12 +1882,30 @@ async function renderClientDocumentsSection(clientId){
  const host=$("romanoClientDocuments_"+clientId);if(!host)return;
  try{host.innerHTML=clientDocumentsHtml(clientId,await loadClientDocuments(clientId))}catch(e){host.innerHTML='<div class="msg">'+esc(e.message||"No se pudieron cargar los documentos.")+'</div>'}
 }
-async function renderDocuments(){
- const r=await sb.from("documents").select("id,title,document_type,file_name,storage_path,size_bytes,created_at,client_id,clients(name)").order("created_at",{ascending:false}).limit(100);
+async async function renderDocuments(){
+ const r=await sb.from("documents").select("id,title,document_type,file_name,storage_path,size_bytes,created_at,client_id,clients(name)").order("created_at",{ascending:false}).limit(200);
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
- const rows=r.data||[];
- const cards=await Promise.all(rows.map(async x=>{const s=await sb.storage.from("company-documents").createSignedUrl(x.storage_path,900);return {...x,_url:s.data?.signedUrl||null}}));
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Documentos seguros</h3><div class="muted">Documentación vinculada a clientes · Storage privado + RLS</div></div></div><p class="muted">Cada archivo queda asociado a un cliente concreto y el acceso se valida en el backend.</p>'+(cards.length?'<table class="table"><thead><tr><th>Cliente</th><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+cards.map(x=>'<tr><td>'+esc(x.clients?.name||"—")+'</td><td>'+esc(x.title)+'</td><td>'+esc(documentTypeLabel(x.document_type))+'</td><td>'+esc(x.file_name)+' · '+formatFileSize(x.size_bytes)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td><td>'+(x._url?'<a class="btn" href="'+esc(x._url)+'" target="_blank" rel="noopener">Ver / Descargar</a>':"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos cargados.</div>')+'</div>';
+ let clientDocs=r.data||[], employeeDocs=[];
+ if(role()==="client"){
+   const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+   clientDocs=own.data?clientDocs.filter(x=>x.client_id===own.data.id):[];
+ }else if(role()==="employee"||role()==="supervisor"){
+   const ep=await sb.from("employee_profiles").select("id,full_name").eq("company_id",currentProfile.company_id).eq("email",currentUser.email).maybeSingle();
+   if(ep.data){
+     const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,size_bytes,created_at").eq("employee_profile_id",ep.data.id).order("created_at",{ascending:false});
+     if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
+     employeeDocs=q.data||[];
+   }
+ }
+ const signed=async x=>{const s=await sb.storage.from("company-documents").createSignedUrl(x.storage_path,900);return {...x,_url:s.data?.signedUrl||null}};
+ const cards=await Promise.all([
+   ...clientDocs.map(async x=>({...await signed(x),_owner:x.clients?.name||"Cliente",_kind:"Cliente"})),
+   ...employeeDocs.map(async x=>({...await signed(x),_owner:"Mi contrato / documentación",_kind:"Funcionario"}))
+ ]);
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Documentos / Contratos</h3><div class="muted">'+(role()==="admin"?"Todos los documentos y contratos de la empresa.":"Solo se muestran sus documentos y contratos.")+'</div></div></div>'+
+ (cards.length?'<table class="table"><thead><tr><th>Propietario</th><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+
+ cards.map(x=>'<tr><td>'+esc(x._owner)+'</td><td>'+esc(x.title||x.file_name)+'</td><td>'+esc(documentTypeLabel(x.document_type))+'</td><td>'+esc(x.file_name)+' · '+formatFileSize(x.size_bytes)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td><td>'+(x._url?'<a class="btn" href="'+esc(x._url)+'" target="_blank" rel="noopener">Ver / Descargar</a>':"—")+'</td></tr>').join("")+
+ '</tbody></table>':'<div class="empty">No hay documentos o contratos disponibles para este perfil.</div>')+'</div>';
 }
 
 async function renderFinance(){const r=demoMode?{data:DEMO_INVOICES,error:null}:{data:null,error:null};const p=demoMode?{data:DEMO_PAYMENTS,error:null}:{data:null,error:null};if(!demoMode){const q=await sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100);const pp=await sb.from("payments").select("amount,method,paid_at").order("paid_at",{ascending:false}).limit(20);r.data=q.data;r.error=q.error;p.data=pp.data;p.error=pp.error}$("content").innerHTML='<div class="grid"><div class="stat"><small>Facturas</small><strong>'+((r.data||[]).length)+'</strong></div><div class="stat"><small>Total facturado</small><strong>'+((r.data||[]).reduce((a,x)=>a+Number(x.total||0),0)).toFixed(2)+' €</strong></div><div class="stat"><small>Pagos registrados</small><strong>'+((p.data||[]).length)+'</strong></div><div class="stat"><small>Pagado</small><strong>'+((p.data||[]).reduce((a,x)=>a+Number(x.amount||0),0)).toFixed(2)+' €</strong></div></div><div class="panel"><div class="panel-head"><h3>Facturación</h3><span class="pill">Servicio → factura → pago → costes → margen</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.status)+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas. Los valores reales de ROMANO PROPERTY CARE se introducirán cuando sean incorporados al sistema.</div>')+'</div>'}
