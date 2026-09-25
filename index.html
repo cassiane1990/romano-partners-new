@@ -3,6 +3,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1c1c19">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ROMANO">
+<link rel="apple-touch-icon" href="/icon.svg">
 <title>ROMANO PARTNERS · Property Care</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -644,7 +651,7 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 
 <div id="app" class="app hidden"><button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Abrir menú">☰</button><div id="mobileMenuBackdrop" class="mobile-menu-backdrop" style="display:none"></div><aside class="side"><div class="side-brand"><div class="crown-r">R</div><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
 <nav class="nav" id="masterNav"></nav><div class="side-footer"><div class="sf-user"><div class="sf-avatar">R</div><div><div class="sf-name" id="sideUserName">Rita Romano</div><div class="sf-role" id="sideUserRole">Administrador</div></div></div><div class="sf-logout" onclick="doLogout()">↪ Cerrar sesión</div></div></aside>
-<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
+<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="installAppBtn" class="btn gold" style="display:none" onclick="installRomanoApp()">＋ Instalar app</button><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="demoBtn" class="btn">DEMONSTRACIÓN</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
 <div id="modal" class="modal hidden"><div class="card modal-card"><div class="panel-head"><h3 id="modalTitle"></h3><button class="btn" onclick="closeModal()">Cerrar</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 
@@ -2397,6 +2404,13 @@ async function startRealtime(){
  })
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshChatMessages();})
  .subscribe();
+}
+let __romanoInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();__romanoInstallPrompt=e;const b=$("installAppBtn");if(b)b.style.display="inline-flex"});
+window.addEventListener("appinstalled",()=>{__romanoInstallPrompt=null;const b=$("installAppBtn");if(b)b.style.display="none";toast("ROMANO PARTNERS instalado como aplicación.")});
+async function installRomanoApp(){
+ if(__romanoInstallPrompt){__romanoInstallPrompt.prompt();const r=await __romanoInstallPrompt.userChoice;__romanoInstallPrompt=null;const b=$("installAppBtn");if(b)b.style.display="none";return}
+ toast(/iPhone|iPad|iPod/i.test(navigator.userAgent)?"En iPhone/iPad: Safari → Compartir → Añadir a pantalla de inicio.":"El navegador no ofrece la instalación en este momento. Abra ROMANO PARTNERS desde Chrome o Edge para instalarlo.");
 }
 async function registerRomanoServiceWorker(){
  try{
