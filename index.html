@@ -1881,10 +1881,11 @@ async function romanoCatalogDelete(id,category){
  if(!canManage()){toast("Solo Admin/Supervisor puede eliminar artículos.");return}
  if(!id)return;
  if(!confirm("¿Eliminar este artículo del catálogo?"))return;
- category=category||($("pageTitle")?.textContent?.includes("Lavandería")?"laundry":$("pageTitle")?.textContent?.includes("Ropa")?"linen":"amenities");
+ category=category||($("pageTitle")?.textContent?.includes("Materiales")?"material":$("pageTitle")?.textContent?.includes("Lavandería")?"laundry":$("pageTitle")?.textContent?.includes("Ropa")?"linen":"amenities");
  try{
-  const q=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+  const q=await sb.from("service_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id");
   if(q.error)throw q.error;
+  if(!q.data?.length)throw new Error("Artículo no encontrado o no pertenece a esta empresa.");
   toast("Artículo eliminado correctamente");await romanoCatalogManager(category);
  }catch(e){toast("No se pudo eliminar: "+(e?.message||String(e)))}
 }
