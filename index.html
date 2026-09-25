@@ -2060,11 +2060,48 @@ function playNotificationSound(){
   if(ac.state==="suspended")ac.resume().then(run).catch(()=>{});else run();
  }catch(e){}
 }
+function romanoIsIOS(){
+ return /iPad|iPhone|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+}
+function romanoIsStandalone(){
+ return window.matchMedia?.("(display-mode: standalone)")?.matches||window.navigator.standalone===true;
+}
 async function enableBrowserNotifications(){
- if(!("Notification" in window)){toast("Este navegador no admite notificaciones.");return}
+ const ios=romanoIsIOS();
+ const standalone=romanoIsStandalone();
+ if(!("serviceWorker" in navigator)){
+  toast("Este dispositivo no permite Service Worker para notificaciones.");
+  return;
+ }
+ const reg=window.__romanoSW||await registerRomanoServiceWorker();
+ if(!reg){
+  toast("No se pudo iniciar el sistema de notificaciones.");
+  return;
+ }
+ if(ios&&!standalone){
+  toast("En iPhone: añada ROMANO a la pantalla de inicio y abra el app desde el icono para activar las notificaciones.");
+  return;
+ }
+ if(!("Notification" in window)){
+  toast("Las notificaciones del sistema no están disponibles en este contexto.");
+  return;
+ }
+ if(!("PushManager" in window)||!reg.pushManager){
+  toast("Push no está disponible neste contexto. En iPhone, abra ROMANO desde la pantalla de inicio.");
+  return;
+ }
  const p=await Notification.requestPermission();
  unlockNotificationAudio();
- toast(p==="granted"?"Notificaciones del navegador activadas.":"Permiso de notificaciones no concedido.");
+ if(p!=="granted"){
+  toast(p==="denied"?"Notificaciones bloqueadas. Revise Ajustes > Notificaciones > ROMANO PROPERTY CARE.":"Permiso de notificaciones no concedido.");
+  return;
+ }
+ const sub=await reg.pushManager.getSubscription();
+ if(sub){
+  toast("Notificaciones activadas neste dispositivo.");
+  return;
+ }
+ toast("Notificaciones autorizadas. Falta configurar la suscripción Push del servidor.");
 }
 async function markNotificationRead(id,refresh=true){
  if(!id)return false;
