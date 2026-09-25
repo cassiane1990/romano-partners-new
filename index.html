@@ -3842,4 +3842,10 @@ async function sendChatPremium(e){
    for(const file of files) await uploadChatMediaFile(file);
    input.value="";if(mediaInput)mediaInput.value="";await refreshChatMessages();
  }catch(err){toast(err.message||String(err))}
-}</script></body></html>
+}
+
+// PWA: register/update the production service worker on every app launch.
+if("serviceWorker" in navigator){
+  registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
+}
+</script></body></html>
