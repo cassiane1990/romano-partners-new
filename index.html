@@ -776,7 +776,6 @@ async function renderServicesMaster(){
    const f=fin[x.id];
    return '<article class="service-card">'+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
-     (x._property?.photo_url?'<div style="margin:0 0 10px;border-radius:12px;overflow:hidden;background:#f3eadc;height:150px"><img src="'+esc(x._property._photoUrl||"")+'" alt="'+esc(x._property.name||"Apartamento")+'" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.display=\'none\'"></div>':"")+
      '<div class="service-card-meta">'+
        '<div><small>Cliente</small><strong>'+esc(x._client?.name||"—")+'</strong></div>'+
        '<div><small>Apartamento</small><strong>'+esc(x._property?.name||x._property?.code||"—")+'</strong></div>'+
@@ -790,8 +789,7 @@ async function renderServicesMaster(){
      '<div class="service-card-actions">'+actions+'</div>'+
    '</article>';
  }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
- const newServiceButton=romanoProfileCan("newservice")?'<button class="btn gold" onclick="openPage(\'newservice\')">＋ Nuevo servicio</button>':"";
- $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div>'+newServiceButton+'</div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
+ $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div><button class="btn gold" onclick="openPage(\'newservice\')">＋ Nuevo servicio</button></div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
 }
 async function renderCleaningCatalog(){
  const q=demoMode?{data:window.__DEMO_CLEANING_CATALOG||[],error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category","cleaning").order("name");
@@ -1019,21 +1017,15 @@ async function getPremiumDashboardData(){
  if(isDemo){
   const name=currentProfile?.full_name||currentUser?.email||"Rita";
   const props=DEMO_PROPERTIES.slice(0,6);
-  const services=DEMO_SERVICES.slice(0,6).map((s,i)=>({...s,client_id:s.client_id||DEMO_CLIENTS[i%DEMO_CLIENTS.length].id,_client:DEMO_CLIENTS.find(c=>c.id===s.client_id)||null,_property:props.find(p=>p.id===s.property_id)||null}));
+  const services=DEMO_SERVICES.slice(0,6).map((s,i)=>({...s,client_id:s.client_id||DEMO_CLIENTS[i%DEMO_CLIENTS.length].id}));
   return {name,avatar:currentProfile?.avatar_display_url||"",role:r,services,properties:props,unread:3};
  }
  const [sr,pr,nr]=await Promise.all([
   sb.from("services").select("id,code,service_type,typology,status,scheduled_at,priority,property_id,client_id,assigned_employee_id").order("scheduled_at",{ascending:true}).limit(12),
-  sb.from("properties").select("id,name,code,photo_url,city,address,country,property_type,client_id").order("created_at",{ascending:false}).limit(12),
+  sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").order("created_at",{ascending:false}).limit(12),
   sb.from("notifications").select("id").eq("recipient_id",currentUser.id).is("read_at",null).limit(100)
  ]);
- const services=sr.data||[], properties=pr.data||[];
- const clientIds=[...new Set(services.map(x=>x.client_id).filter(Boolean))];
- const cq=clientIds.length?await sb.from("clients").select("id,name").in("id",clientIds):{data:[]};
- const cm=Object.fromEntries((cq.data||[]).map(x=>[x.id,x]));
- const pm=Object.fromEntries(properties.map(x=>[x.id,x]));
- services.forEach(x=>{x._client=cm[x.client_id]||null;x._property=pm[x.property_id]||null});
- return {name:currentProfile?.full_name||currentUser?.email||"Usuario",avatar:currentProfile?.avatar_display_url||"",role:r,services,properties,unread:(nr.data||[]).length};
+ return {name:currentProfile?.full_name||currentUser?.email||"Usuario",avatar:currentProfile?.avatar_display_url||"",role:r,services:sr.data||[],properties:pr.data||[],unread:(nr.data||[]).length};
 }
 function premiumDashboardPropertyPhoto(p){return p?.photo_url||""}
 async function renderPremiumDashboard(){
@@ -1041,8 +1033,7 @@ async function renderPremiumDashboard(){
  const propertyMap=Object.fromEntries(d.properties.map(p=>[p.id,p]));
  const serviceRows=d.services.slice(0,6).map(s=>{
   const p=propertyMap[s.property_id],photo=premiumDashboardPropertyPhoto(p),status=s.status||"requested",cls=status==="completed"?"done":(["on_the_way","in_progress","paused","supervised"].includes(status)?"work":"");
-  const client=s._client, address=[p?.address,p?.city,p?.country].filter(Boolean).join(", ");
-  return '<div class="rpc-home-service" onclick="viewService(\''+s.id+'\')"><div class="rpc-home-thumb">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(p?.name||"Apartamento")+'">':esc((p?.name||"R").charAt(0)))+'</div><div><b>'+esc(p?.name||s.code||"Servicio")+'</b><small>Cliente: '+esc(client?.name||"—")+'</small><small>'+esc(address||"Dirección no registrada")+'</small><small>'+esc(s.service_type||"Servicio")+' · '+esc(s.typology||"—")+'</small></div><div><div class="rpc-home-time">'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</div><span class="rpc-home-status '+cls+'">'+esc(statusNames[status]||status)+'</span></div></div>';
+  return '<div class="rpc-home-service" onclick="viewService(\''+s.id+'\')"><div class="rpc-home-thumb">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(p?.name||"Apartamento")+'">':esc((p?.name||"R").charAt(0)))+'</div><div><b>'+esc(p?.name||s.code||"Servicio")+'</b><small>'+esc(s.service_type||"Servicio")+' · '+esc(s.typology||"—")+'</small><small>Cliente: '+esc(d.role==="client"?(currentProfile?.full_name||"Cliente"):"Operación")+'</small></div><div><div class="rpc-home-time">'+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}):"—")+'</div><span class="rpc-home-status '+cls+'">'+esc(statusNames[status]||status)+'</span></div></div>';
  }).join("")||'<div class="empty">No hay servicios programados.</div>';
  const propRows=d.properties.slice(0,5).map(p=>'<div class="rpc-home-property"><div class="rpc-home-thumb">'+(premiumDashboardPropertyPhoto(p)?'<img src="'+esc(premiumDashboardPropertyPhoto(p))+'" alt="'+esc(p.name||"Propiedad")+'">':esc((p.name||"R").charAt(0)))+'</div><div><b>'+esc(p.name||p.code||"Propiedad")+'</b><small>'+esc(p.city||p.address||"")+'</small></div><span class="rpc-home-badge">›</span></div>').join("")||'<div class="empty">No hay propiedades.</div>';
  const firstProp=first?propertyMap[first.property_id]:d.properties[0]; const heroPhoto=premiumDashboardPropertyPhoto(firstProp)||"https://images.unsplash.com/photo-1776876648949-63ccabf63b10?auto=format&fit=crop&fm=jpg&q=82&w=2200";
@@ -1050,7 +1041,7 @@ async function renderPremiumDashboard(){
  const firstLabel=first?((first.service_type||"Servicio")+" · "+(first.typology||"")):"Sin servicio en curso";
  const actions=[
   ["＋","Nuevo servicio","newservice"],["▦","Calendario","calendar"],["⚡","Adelantar check-in","change_requests"],["⌂","Mis propiedades","properties"],["◌","Chat","chat"],["▤","Documentos","documents"]
- ].filter(a=>romanoProfileCan(a[2]));
+ ];
  let h='<div class="rpc-home">'+
  '<div class="rpc-home-top"><div class="rpc-home-welcome"><h1>'+esc(greeting())+', '+esc((d.name||"Usuario").split("@")[0])+' 😊</h1><p>Excelencia en cada detalle · ROMANO PROPERTY CARE</p></div><div class="rpc-home-meta"><div class="rpc-home-location">📍 '+esc(locationText)+'</div><div class="rpc-home-date">📅 '+esc(new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long",year:"numeric"}))+'<strong>'+esc(new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}))+'</strong></div><div class="rpc-notice-count">🔔 '+d.unread+'</div></div></div>'+
  '<div class="rpc-home-hero"><div class="rpc-home-hero-photo" style="background-image:url("'+esc(heroPhoto)+'")"></div><div class="rpc-home-hero-copy"><div class="rpc-home-brand">ROMANO<small>PROPERTY CARE · PARTNERS</small></div><div class="rpc-home-eyebrow">GESTIÓN PREMIUM · '+esc(roleLabel.toUpperCase())+'</div><h2>PROPIEDADES IMPECABLES<br>CLIENTE SATISFECHO</h2><p>Todo bajo control para que cada propiedad y cada servicio estén impecables.</p></div><div class="rpc-home-current"><small>Servicio actual</small><strong>'+esc(firstLabel)+'</strong><span>'+esc(first?.code||"—")+' · '+esc(statusNames[first?.status]||first?.status||"Programado")+'</span></div></div>'+
