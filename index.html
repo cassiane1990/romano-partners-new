@@ -207,6 +207,43 @@
 @media(min-width:601px){
  .mobile-menu-toggle,.mobile-menu-backdrop{display:none!important}
 }
+</style><style id="romano-global-responsive-v2">
+/* Padrão responsivo único ROMANO PARTNERS — todos os perfis */
+html,body{max-width:100%;overflow-x:hidden}
+.app,.main,.content{min-width:0}
+.content>*{max-width:100%;min-width:0}
+.top>div:first-child{min-width:0;max-width:58vw}
+.top h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .user{min-width:0;max-width:42vw;flex-wrap:wrap;justify-content:flex-end}
+.top #userEmail{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpc-profile-page{width:100%;max-width:900px;min-width:0}
+.rpc-profile-hero{width:100%;min-width:0;overflow:hidden}
+.rpc-profile-hero>div:last-child{min-width:0}
+.rpc-profile-hero h2,.rpc-profile-hero p{overflow-wrap:anywhere}
+.rpc-profile-body{width:100%;min-width:0;overflow:hidden}
+.rpc-profile-body .two{min-width:0}
+.service-card,.panel,.master-hero,.master-cols,.cols{min-width:0;max-width:100%}
+.service-card-actions,.actions{display:flex;flex-wrap:wrap;gap:8px}
+@media(max-width:900px){
+ .top>div:first-child{max-width:52vw}
+ .top .user{max-width:48vw}
+ .top #userEmail{display:none}
+ .rpc-profile-hero{padding:20px}
+}
+@media(max-width:600px){
+ .top{min-height:64px;height:auto;padding-top:10px;padding-bottom:10px}
+ .top>div:first-child{max-width:calc(100vw - 58px);width:calc(100vw - 58px)}
+ .top .user{display:none}
+ .content{width:100%;padding-left:10px!important;padding-right:10px!important}
+ .rpc-profile-hero{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px;border-radius:18px}
+ .rpc-profile-avatar{width:76px;height:76px;border-radius:20px;font-size:30px}
+ .rpc-profile-hero h2{font-size:24px;line-height:1.15}
+ .rpc-profile-hero p{font-size:10px;line-height:1.4}
+ .rpc-profile-body{padding:14px;border-radius:16px}
+ .rpc-profile-body .two{grid-template-columns:1fr!important}
+ .panel-head{align-items:flex-start;flex-wrap:wrap}
+ .service-card-actions .btn,.actions .btn{max-width:100%}
+}
 </style><style id="romano-service-journey">
 .sj-board{max-width:1500px;margin:0 auto}.sj-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:18px}.sj-kicker{font-size:9px;letter-spacing:2.5px;color:#a77a34;font-weight:700}.sj-head h2{margin:5px 0 4px;font:400 30px Georgia,serif;color:#29231c}.sj-head p{margin:0;color:#81776b;font-size:11px}.sj-date{min-width:190px}.sj-date label{display:block;font-size:9px;color:#84796c;margin-bottom:6px}.sj-date input{width:100%;height:43px;border:1px solid #e1d5c4;border-radius:12px;background:#fffdf9;padding:0 12px;color:#4b4032}.sj-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}.sj-stat{background:#fffdf9;border:1px solid #e5dac8;border-radius:15px;padding:13px 15px}.sj-stat small{display:block;color:#8b8073;font-size:9px}.sj-stat strong{display:block;margin-top:4px;font:400 24px Georgia;color:#76531f}.sj-list{display:grid;gap:10px}.sj-card{display:grid;grid-template-columns:82px minmax(190px,1.25fr) minmax(220px,1fr) 150px;gap:16px;align-items:center;background:#fffdf9;border:1px solid #e4dacb;border-radius:17px;padding:12px 14px;box-shadow:0 7px 20px rgba(66,49,25,.045)}.sj-photo{width:82px;height:70px;border-radius:12px;overflow:hidden;background:#f1e9dd;border:1px solid #e4d8c7;display:grid;place-items:center;color:#b7893f;font-size:24px}.sj-photo img{width:100%;height:100%;object-fit:cover}.sj-main h3{margin:0 0 4px;font-size:14px;color:#2d2821}.sj-main p,.sj-location p{margin:3px 0;color:#7b7165;font-size:10px;line-height:1.35}.sj-type{display:inline-block;margin-top:5px;padding:4px 8px;border-radius:999px;background:#f4ead9;color:#795b2a;font-size:8px;font-weight:700;letter-spacing:.5px}.sj-time{font:400 18px Georgia;color:#73501d}.sj-status{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}.sj-dot{width:9px;height:9px;border-radius:50%;background:#c2964d;box-shadow:0 0 0 4px #c2964d18}.sj-status b{font-size:10px;color:#554a3d}.sj-btn{border:1px solid #dfd2c0;background:#fffdf9;border-radius:9px;padding:7px 9px;color:#76531f;font-size:9px}.sj-empty{padding:35px;text-align:center;color:#8a7f72;background:#fffdf9;border:1px dashed #ded2c0;border-radius:16px}@media(max-width:900px){.sj-card{grid-template-columns:70px 1fr 150px}.sj-location{grid-column:2/4}.sj-summary{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.sj-head{display:block}.sj-date{margin-top:13px}.sj-card{grid-template-columns:64px 1fr;gap:10px}.sj-photo{width:64px;height:60px}.sj-location{grid-column:2}.sj-status{grid-column:1/3;justify-content:flex-start;border-top:1px solid #eee7dc;padding-top:9px}.sj-head h2{font-size:25px}}
 </style><style id="romano-client-live-status">
@@ -761,7 +798,7 @@ async function openServiceAssignment(serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede designar.");return}
  const s=await sb.from("services").select("id,code,property_id,scheduled_at,status,assigned_employee_id").eq("id",serviceId).single();
  if(s.error){toast(s.error.message);return}
- if(s.data.status!=="scheduled"||s.data.assigned_employee_id){toast("El servicio debe estar aceptado y sin funcionario designado.");return}
+ if(!["requested","scheduled"].includes(s.data.status)||s.data.assigned_employee_id){toast("El servicio debe estar programado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
    sb.from("properties").select("id,name,code,latitude,longitude").eq("id",s.data.property_id).maybeSingle(),
    sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name"),
@@ -849,7 +886,7 @@ async function renderServicesMaster(){
    const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
-      x.status==="scheduled"&&x.accepted_at&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
+      ["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())&&x.status==="scheduled"?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card">'+
@@ -1551,14 +1588,22 @@ async function saveService(e){
  if(r.error||!r.data?.client_id){toast(r.error?.message||"La propiedad no tiene un cliente asociado.");return}
  const typedCode=$("sCode").value.trim();
  const code=typedCode||("SRV-"+new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14)+"-"+Math.random().toString(36).slice(2,6).toUpperCase());
- const payload={company_id:currentProfile.company_id,client_id:r.data.client_id,property_id:prop,code,service_type:$("sType").value,typology:$("sTyp").value,priority:$("sPriority").value,scheduled_at:$("sDate").value?new Date($("sDate").value).toISOString():null,instructions:$("sNotes").value.trim()||null,status:"requested",tax_country:"ES",requested_items:[],additional_items:[],laundry_catalog:false,pricing:{}};
+ const internalCreation=["admin","supervisor"].includes(role());const payload={company_id:currentProfile.company_id,client_id:r.data.client_id,property_id:prop,code,service_type:$("sType").value,typology:$("sTyp").value,priority:$("sPriority").value,scheduled_at:$("sDate").value?new Date($("sDate").value).toISOString():null,instructions:$("sNotes").value.trim()||null,status:internalCreation?"scheduled":"requested",supervisor_approved_at:internalCreation?new Date().toISOString():null,accepted_at:internalCreation?new Date().toISOString():null,created_by:currentUser.id,tax_country:"ES",requested_items:[],additional_items:[],laundry_catalog:false,pricing:{}};
  let x=await sb.from("services").insert(payload).select("id").single();
  if(x.error&&String(x.error.message||"").toLowerCase().includes("duplicate key")&&!/^SRV-/.test(code)){
    payload.code="SRV-"+new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14)+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
    x=await sb.from("services").insert(payload).select("id").single();
  }
  if(x.error){toast("No se pudo guardar el servicio: "+x.error.message);return}
- closeModal();toast("Servicio creado");await renderServices();
+ closeModal();
+ if(internalCreation&&x.data?.id){
+   toast("Servicio creado. Seleccione ahora el funcionario.");
+   await renderServices();
+   setTimeout(()=>openServiceAssignment(x.data.id),80);
+ }else{
+   toast("Servicio creado");
+   await renderServices();
+ }
 }
 
 function clientPropertyInlineHtml(p,client,mode){
