@@ -1960,6 +1960,14 @@ async function viewService(id){
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Fotos / evidencias de limpieza</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · Supervisor y Administrador deben abrirlas una a una.</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)">'+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div>');
 }
 async function setServiceStatusPremium(id,status){
+ if(status==="completed"){
+   const sr=await sb.from("services").select("id,service_type,assigned_employee_id,status").eq("id",id).single();
+   if(sr.error){toast(sr.error.message);return}
+   if(isCleaningServiceType(sr.data.service_type)){
+     if(role()==="employee"){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
+     if(["admin","supervisor"].includes(role())){await approveCleaningService(id);return}
+   }
+ }
  const now=new Date().toISOString();
  const patch={status,updated_at:now};
  if(status==="in_progress")patch.started_at=now;
