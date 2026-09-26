@@ -912,7 +912,7 @@ async function openServiceAssignment(serviceId){
  if(!["requested","scheduled"].includes(s.data.status)||s.data.assigned_employee_id){toast("El servicio debe estar programado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
    sb.from("properties").select("id,name,code,latitude,longitude").eq("id",s.data.property_id).maybeSingle(),
-   sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name"),
+   sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).in("role",["employee","maintenance_technician"]).eq("active",true).order("full_name"),
    sb.from("employee_locations").select("profile_id,latitude,longitude,recorded_at").eq("company_id",currentProfile.company_id).order("recorded_at",{ascending:false}).limit(500)
  ]);
  if(er.error){toast(er.error.message);return}
@@ -920,7 +920,8 @@ async function openServiceAssignment(serviceId){
  (lr.data||[]).forEach(x=>{if(!latest[x.profile_id])latest[x.profile_id]=x});
  const rad=x=>x*Math.PI/180;
  const dist=(a,b,c,d)=>{if([a,b,c,d].some(v=>v==null)||prop?.latitude==null||prop?.longitude==null)return null;const R=6371,la1=rad(prop.latitude),la2=rad(c),dl=rad(c)-la1,dlo=rad(d)-rad(prop.longitude);const h=Math.sin(dl/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dlo/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
- const employees=(er.data||[]).map(e=>({...e,location:latest[e.id]||null,distance:latest[e.id]?dist(prop?.latitude,prop?.longitude,latest[e.id].latitude,latest[e.id].longitude):null})).sort((a,b)=>(a.distance==null?1:b.distance==null?-1:a.distance-b.distance));
+ const maintenanceService=privateMaintenanceServiceType(s.data.service_type);
+ const employees=(er.data||[]).filter(e=>maintenanceService?e.role==="maintenance_technician":e.role==="employee").map(e=>({...e,location:latest[e.id]||null,distance:latest[e.id]?dist(prop?.latitude,prop?.longitude,latest[e.id].latitude,latest[e.id].longitude):null})).sort((a,b)=>(a.distance==null?1:b.distance==null?-1:a.distance-b.distance));
  openModal("Designar funcionario · "+esc(s.data.code),
    '<div class="notice"><strong>Propiedad:</strong> '+esc(prop?.name||prop?.code||"—")+'<br><strong>Horario:</strong> '+esc(s.data.scheduled_at?romanoMadridLabel(s.data.scheduled_at):"—")+'</div>'+
    '<div class="muted" style="margin:10px 0">Funcionarios activos · primeiro aparecem os que têm localização mais próxima. A designação no inicia el servicio: el funcionario ainda precisa aceitar.</div>'+
