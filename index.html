@@ -3646,7 +3646,7 @@ async function loadServiceCreationContext(){
    const assigned=(await sb.from("services").select("property_id,client_id").eq("company_id",currentProfile.company_id).eq("assigned_employee_id",currentUser.id)).data||[];
    const propertyIds=[...new Set(assigned.map(x=>x.property_id).filter(Boolean))];
    const clientIds=[...new Set(assigned.map(x=>x.client_id).filter(Boolean))];
-   props=propertyIds.length?(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).in("id",propertyIds).order("name")).data||:[];
+   props=propertyIds.length?(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).in("id",propertyIds).order("name")).data||[];
    clients=clientIds.length?(await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).in("id",clientIds).order("name")).data||:[];
  }else{
    clients=(await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name")).data||[];
