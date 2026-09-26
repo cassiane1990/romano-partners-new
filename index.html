@@ -2006,8 +2006,12 @@ async function viewService(id){
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sin observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
- const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
- const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
+ const r=role()==="employee"
+  ? await sb.rpc("employee_service_detail",{p_service_id:id})
+  : await sb.from("services").select("*").eq("id",id).single();
+ if(r.error){toast(r.error.message);return}
+ const x=role()==="employee"?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
+ if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
  const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
