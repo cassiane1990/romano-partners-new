@@ -3095,7 +3095,7 @@ function showApp(){closeMobileMenu();
  $("roleBadge").textContent=roleNames[role()]||role();
  const roleAvatar=roleAvatarUrl(role());
  const av=$("avatar");if(av){av.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';av.classList.add("has-role-avatar")}
- const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';sf.classList.add("has-role-avatar")}}
+ const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';sf.classList.add("has-role-avatar")}
  if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usurio";
  if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();
  buildMasterNav();startRealtime();initOfflineSync();startRomanoMadridClock();initRomanoPullToRefresh();openPage("dashboard")
