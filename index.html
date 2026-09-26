@@ -1030,7 +1030,8 @@ async function renderServicesMaster(){
      (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
       role()==="supervisor"&&x.status==="requested"&&!x.assigned_employee_id?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       role()==="supervisor"&&x.status==="scheduled"&&!x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
-      ["admin","supervisor"].includes(role())&&x.status==="scheduled"&&x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
+      role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':
+      role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card">'+
@@ -1130,6 +1131,7 @@ function journeyActionsForService(s){
  if((r==="employee"||r==="maintenance_technician")&&!own)return "";
  if(r==="supervisor"&&!s.assigned_employee_id&&(s.status==="requested"||(s.status==="scheduled"&&!s.supervisor_approved_at)))return '<button type="button" class="btn gold" onclick="event.stopPropagation();acceptServiceRequest('+sid+')">✓ ACEPTAR SOLICITUD</button>';
  if(s.status==="scheduled")return ["employee","maintenance_technician"].includes(r)?'<button type="button" class="btn gold" onclick="event.stopPropagation();acceptAssignedService('+sid+')">✓ ACEPTAR</button>':(r==="admin"||r==="supervisor")&&s.supervisor_approved_at&&!s.assigned_employee_id?'<button type="button" class="btn gold" onclick="event.stopPropagation();openServiceAssignment('+sid+')">DESIGNAR FUNCIONARIO</button>':"";
+ if(r==="admin"&&s.status==="requested"&&!s.assigned_employee_id)return '<button type="button" class="btn gold" onclick="event.stopPropagation();openServiceAssignment('+sid+')">DESIGNAR FUNCIONARIO</button>';
  if(["employee","maintenance_technician"].includes(r)&&own&&s.status==="on_the_way")return btn("▶ Iniciar","in_progress",true);
  if(["employee","maintenance_technician"].includes(r)&&own&&s.status==="in_progress")return btn("Ⅱ Pausar","paused",false)+(maint&&r==="maintenance_technician"?btn("✓ Finalizar","completed",true):"");
  if(["employee","maintenance_technician"].includes(r)&&own&&s.status==="paused")return btn("▶ Continuar","in_progress",true)+(maint&&r==="maintenance_technician"?btn("✓ Finalizar","completed",true):"");
@@ -1255,7 +1257,7 @@ async function renderEmployeeWorkPanel(){
 async function renderLocationsMaster(){
  const r=role();
  const work=["employee","maintenance_technician"].includes(r)?await renderEmployeeWorkPanel():"";
- const mapIntro=r==="client"?"Mapa de sus propiedades autorizadas.":(["employee","maintenance_technician"].includes(r)?"Su ubicación y propiedades asignadas.":"Geolocalización / Radar operativo.");
+ const mapIntro=r==="client"?"Mapa de sus propiedades autorizadas.":(["employee","maintenance_technician"].includes(r)?"Su ubicación actual.":"Geolocalización / Radar operativo.");
  const side=r==="client"
    ? '<div class="notice">Solo se muestran las propiedades de su propia cuenta.</div>'
    : '<div class="panel"><h3>Dispatch</h3><p class="muted">Proximidad real + disponibilidad + conflictos + escopo + elegibilidad.</p><div class="notice">La visibilidad se limita automáticamente según el perfil.</div></div>';
@@ -2172,14 +2174,16 @@ async function viewService(id){
  if(actorIds.length){const aq=await sb.from("profiles").select("id,full_name,email").in("id",actorIds);(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usurio");}
  const canUpdate=["admin","supervisor","employee","maintenance_technician"].includes(role());
  const isPendingAdmin=role()==="supervisor"&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
+ const isPendingAdminDirect=role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
+ const adminDirectAssignmentButton=isPendingAdminDirect?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">DESIGNAR FUNCIONARIO</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
  const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
- openModal(isPendingAdmin?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
-  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':"")+
+ openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
+  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
   '<div class="field"><label>Descrição / observações</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
-  (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+clientAdvanceButton+cleaningFlowHtml+maintenanceFlowHtml+
+  (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+adminDirectAssignmentButton+clientAdvanceButton+cleaningFlowHtml+maintenanceFlowHtml+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],["employee","maintenance_technician"].includes(role()))+'</div></div>'+
   (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"&&isCleaningServiceType(x.service_type)?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
  renderServiceStatusActions(x)+
