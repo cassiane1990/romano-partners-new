@@ -2689,12 +2689,25 @@ async function installRomanoApp(){
  if(__romanoInstallPrompt){__romanoInstallPrompt.prompt();const r=await __romanoInstallPrompt.userChoice;__romanoInstallPrompt=null;const b=$("installAppBtn");if(b)b.style.display="none";return}
  toast(/iPhone|iPad|iPod/i.test(navigator.userAgent)?"En iPhone/iPad: Safari → Compartir → Añadir a pantalla de inicio.":"El navegador no ofrece la instalación en este momento. Abra ROMANO PARTNERS desde Chrome o Edge para instalarlo.");
 }
-async function registerRomanoServiceWorker(){
+async let __romanoSWReloading=false;
+function registerRomanoServiceWorker(){
  try{
   if(!("serviceWorker" in navigator))return null;
-  const reg=await navigator.serviceWorker.register("/sw.js?v=10",{scope:"/",updateViaCache:"none"});
+  if(!window.__romanoSWControllerWatch){
+   window.__romanoSWControllerWatch=true;
+   navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(__romanoSWReloading)return;
+    __romanoSWReloading=true;
+    window.location.reload();
+   });
+  }
+  const reg=await navigator.serviceWorker.register("/sw.js",{scope:"/",updateViaCache:"none"});
   await navigator.serviceWorker.ready;
   window.__romanoSW=reg;
+  await reg.update().catch(()=>{});
+  if(reg.waiting){
+   try{reg.waiting.postMessage({type:"SKIP_WAITING"});}catch(e){}
+  }
   return reg;
  }catch(e){console.warn("ROMANO Service Worker:",e);return null}
 }
