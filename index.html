@@ -1327,13 +1327,13 @@ async function getPremiumDashboardData(){
  let pq=sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").order("created_at",{ascending:false}).limit(12);
  if(r==="employee"||r==="maintenance_technician")sq=sq.eq("assigned_employee_id",currentUser.id);
  if(r==="maintenance_technician")pq=pq.in("id",[]);
+ let sq=sb.from("services").select("id,code,service_type,typology,status,scheduled_at,priority,property_id,client_id,assigned_employee_id").order("scheduled_at",{ascending:true}).limit(12);
+ let pq=sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").order("created_at",{ascending:false}).limit(12);
+ if(r==="employee"||r==="maintenance_technician")sq=sq.eq("assigned_employee_id",currentUser.id);
+ if(r==="maintenance_technician")pq=pq.in("id",[]);
  const [sr,pr,nr]=await Promise.all([sq,pq,sb.from("notifications").select("id").eq("recipient_id",currentUser.id).is("read_at",null).limit(100)]);
  let services=sr.data||[],properties=pr.data||[];
- if(r==="maintenance_technician"){
-   services=services.filter(s=>privateMaintenanceServiceType(s.service_type));
-   const pids=[...new Set(services.map(s=>s.property_id).filter(Boolean))];
-   if(pids.length){const pp=await sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").in("id",pids);properties=pp.data||[]}
- }
+ if(r==="maintenance_technician"){services=services.filter(s=>privateMaintenanceServiceType(s.service_type));const pids=[...new Set(services.map(s=>s.property_id).filter(Boolean))];if(pids.length){const pp=await sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").in("id",pids);properties=pp.data||[]}}
  return {name:currentProfile?.full_name||currentUser?.email||"Usurio",avatar:currentProfile?.avatar_display_url||"",role:r,services,properties,unread:(nr.data||[]).length};
 }
 function premiumDashboardPropertyPhoto(p){return p?.photo_url||""}
