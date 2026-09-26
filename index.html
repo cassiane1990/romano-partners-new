@@ -2127,14 +2127,29 @@ function renderCleaningFlow(service,checklist,media){
  }
  return h+"</div>";
 }
+function romanoMaintenanceElapsedLabel(startedAt){
+ if(!startedAt)return "Tiempo trabajado: 00:00:00";
+ const sec=Math.max(0,Math.floor((Date.now()-new Date(startedAt).getTime())/1000));
+ const hh=String(Math.floor(sec/3600)).padStart(2,"0"),mm=String(Math.floor((sec%3600)/60)).padStart(2,"0"),ss=String(sec%60).padStart(2,"0");
+ return "Tiempo trabajado: "+hh+":"+mm+":"+ss;
+}
+function romanoStartMaintenanceTimer(id,startedAt){
+ if(!startedAt)return;
+ window.__romanoMaintenanceTimers=window.__romanoMaintenanceTimers||{};
+ if(window.__romanoMaintenanceTimers[id])clearInterval(window.__romanoMaintenanceTimers[id]);
+ const paint=()=>{const el=$("maintenanceTimer_"+id);if(!el){clearInterval(window.__romanoMaintenanceTimers[id]);delete window.__romanoMaintenanceTimers[id];return}el.textContent=romanoMaintenanceElapsedLabel(startedAt)};
+ paint();window.__romanoMaintenanceTimers[id]=setInterval(paint,1000);
+}
 function renderMaintenanceEmployeeFlow(x){
  if(role()!=="maintenance_technician"||x.assigned_employee_id!==currentUser.id||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
  let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Trabajo de mantenimiento</h3><div class="muted">Acepte la designación, inicie el trabajo y adjunte fotos o vídeos del resultado.</div></div><span class="pill">'+esc(serviceTypeLabel(x.service_type))+'</span></div>';
+ if(["in_progress","paused"].includes(x.status))h+='<div class="notice" style="margin-top:10px"><strong id="maintenanceTimer_'+esc(x.id)+'">'+romanoMaintenanceElapsedLabel(x.started_at)+'</strong><br><span class="muted">El tiempo se calcula desde el momento en que pulsó «Iniciar mantenimiento» y se utiliza para calcular el importe final.</span></div>';
  if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
  if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ INICIAR MANTENIMIENTO</button></div>';
  if(x.status==="in_progress")h+='<div class="actions"><button class="btn" onclick="setServiceStatusPremium(\''+x.id+'\',\'paused\')">Ⅱ PAUSAR</button><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
  if(x.status==="paused")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ CONTINUAR</button><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
- h+='<div class="notice" style="margin-top:10px">Antes de finalizar, debe existir al menos una foto o vídeo del trabajo realizado. Al finalizar, el cliente recibirá una notificación y podrá abrir las evidencias.</div></div>';
+ h+='<div class="notice" style="margin-top:10px">Antes de finalizar, debe existir al menos una foto o vídeo del trabajo realizado. Al finalizar, el sistema calcula el tiempo real entre Inicio y Finalización, actualiza el importe y bloquea el servicio como Finalizado.</div></div>';
+ if(["in_progress","paused"].includes(x.status))setTimeout(()=>romanoStartMaintenanceTimer(x.id,x.started_at),0);
  return h;
 }
 async function viewRelatedCleaning(id){
@@ -2237,9 +2252,16 @@ async function setServiceStatusPremium(id,status){
      if(["employee","maintenance_technician"].includes(role())){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
      if(["admin","supervisor"].includes(role())){await approveCleaningService(id);return}
    }else if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id){
+     const mediaCheck=await sb.from("service_media").select("id,media_type").eq("service_id",id).in("media_type",["photo","video"]);
+     if(mediaCheck.error){toast("No se pudo verificar las fotos/vídeos: "+mediaCheck.error.message);return}
+     if((mediaCheck.data||[]).length<1){toast("ANEXE_FOTO_VIDEO: anexe al menos una foto o vídeo antes de finalizar.");return}
      const done=await sb.rpc("employee_finish_maintenance_service",{p_service_id:id});
      if(done.error){toast(String(done.error.message||"No se pudo finalizar el mantenimiento"));return}
-     toast("✓ Mantenimiento finalizado. El cliente ha sido notificado y podrá ver las evidencias.");
+     const result=Array.isArray(done.data)?done.data[0]:done.data;
+     const mins=Number(result?.worked_minutes||0),total=Number(result?.total_with_vat||0);
+     const h=Math.floor(mins/60),m=Math.round(mins%60);
+     Object.values(window.__romanoMaintenanceTimers||{}).forEach(t=>clearInterval(t));window.__romanoMaintenanceTimers={};
+     toast("✓ Mantenimiento FINALIZADO · "+h+" h "+String(m).padStart(2,"0")+" min · Importe final "+masterMoney(total));
      closeModal();await renderServicesMaster();return;
    }
  }
