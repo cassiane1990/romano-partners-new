@@ -685,7 +685,7 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
  #app .top #dateLine{font-size:9px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
  #app .top .user{min-width:0!important;max-width:48vw!important;gap:5px!important}
  #app .top #userEmail,#app .top #demoBtn{display:none!important}
- #app .top #syncStatus,#app .top #installAppBtn{max-width:105px!important;padding:7px 8px!important;font-size:9px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+ #app .top #syncStatus,#app .top #installAppBtn,#app .top #refreshAppBtn{max-width:105px!important;padding:7px 8px!important;font-size:9px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
  #app .top #avatar{flex:0 0 34px!important;width:34px!important;height:34px!important}
 }
 </style></style><style id="romano-mobile-tablet-final-2026-09-25">
@@ -755,7 +755,7 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 
 <div id="app" class="app hidden"><button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Abrir menú">☰</button><div id="mobileMenuBackdrop" class="mobile-menu-backdrop" style="display:none"></div><aside class="side"><div class="side-brand"><div class="crown-r">R</div><strong>ROMANO</strong><span>PARTNERS</span><div id="roleBadge" class="role"></div></div>
 <nav class="nav" id="masterNav"></nav><div class="side-footer"><div class="sf-user"><div class="sf-avatar">R</div><div><div class="sf-name" id="sideUserName">Rita Romano</div><div class="sf-role" id="sideUserRole">Administrador</div></div></div><div class="sf-logout" onclick="doLogout()">↪ Cerrar sesión</div></div></aside>
-<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="installAppBtn" class="btn gold" style="display:none" onclick="installRomanoApp()">＋ Instalar app</button><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
+<main class="main"><header class="top"><div><h2 id="pageTitle">Dashboard 360</h2><div id="dateLine" class="muted"></div></div><div class="user"><button id="installAppBtn" class="btn gold" style="display:none" onclick="installRomanoApp()">＋ Instalar app</button><button id="syncStatus" class="btn" onclick="showSyncCenter()">ONLINE · sincronizado</button><button id="refreshAppBtn" class="btn" onclick="refreshRomanoApp()" title="Actualizar app">↻ Actualizar</button><div id="userEmail"></div><div id="avatar" class="avatar">R</div></div></header><section id="content" class="content"></section></main></div>
 <div id="modal" class="modal hidden"><div class="card modal-card"><div class="panel-head"><h3 id="modalTitle"></h3><button class="btn" onclick="closeModal()">Cerrar</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 
@@ -1495,7 +1495,7 @@ async function renderBackupPremium(){
  const rows=r.data||[];
  const last=rows.find(x=>x.status==="completed");
  const totalRows=last?.row_counts?Object.values(last.row_counts).reduce((a,b)=>a+Number(b||0),0):0;
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Backup / Recuperación</h3><div class="muted">Copia lógica de los datos de ROMANO PARTNERS · acceso exclusivo de Administración</div></div><button class="btn gold" onclick="generateRomanoBackup()">＋ Generar backup ahora</button></div><div class="master-kpis" style="grid-template-columns:repeat(4,1fr)"><div class="master-kpi"><small>Último backup</small><strong>'+(last?esc(new Date(last.created_at).toLocaleDateString("es-ES")):"—")+'</strong></div><div class="master-kpi"><small>Estado</small><strong>'+(last?esc(last.status):"—")+'</strong></div><div class="master-kpi"><small>Registros</small><strong>'+totalRows+'</strong></div><div class="master-kpi"><small>Tamaño</small><strong>'+(last?.bytes?Math.round(last.bytes/1024)+" KB":"—")+'</strong></div></div><div class="notice"><b>Recuperación:</b> el backup lógico de esta aplicación queda en un bucket privado y puede descargarse. Para una recuperación completa del proyecto, Supabase mantiene sus mecanismos de backup de base de datos; Storage y configuraciones requieren tratamiento separado. La restauración destructiva no se ejecuta desde la interfaz.</div></div><div class="panel"><div class="panel-head"><h3>Historial de backups</h3><span class="pill">20 últimos</span></div>'+(rows.length?rows.map(x=>'<div class="line-item"><span><b>'+esc(x.status)+'</b><br><small>'+esc(new Date(x.created_at).toLocaleString("es-ES"))+' · '+esc(x.storage_path)+'</small></span><span class="pill">'+(x.bytes?Math.round(x.bytes/1024)+" KB":"—")+'</span></div>').join(""):'<div class="empty">Todavía no hay backups lógicos generados desde ROMANO PARTNERS.</div>')+'</div><div class="panel"><div class="panel-head"><h3>Plan de recuperación</h3></div><div class="line-item"><span>1 · Base de datos</span><b>Backup / PITR de Supabase</b></div><div class="line-item"><span>2 · Archivos</span><b>Storage privado + copia externa pendiente</b></div><div class="line-item"><span>3 · Aplicación</span><b>GitHub · ROMANO PARTNERS</b></div><div class="line-item"><span>4 · Prueba</span><b>Restaurar en proyecto independiente y validar</b></div></div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Backup / Recuperación</h3><div class="muted">Copia lógica de los datos de ROMANO PARTNERS · acceso exclusivo de Administración</div></div><button class="btn gold" onclick="generateRomanoBackup()">＋ Generar backup ahora</button></div><div class="master-kpis" style="grid-template-columns:repeat(4,1fr)"><div class="master-kpi"><small>Último backup</small><strong>'+(last?esc(new Date(last.created_at).toLocaleDateString("es-ES")):"—")+'</strong></div><div class="master-kpi"><small>Estado</small><strong>'+(last?esc(last.status):"—")+'</strong></div><div class="master-kpi"><small>Registros</small><strong>'+totalRows+'</strong></div><div class="master-kpi"><small>Tamaño</small><strong>'+(last?.bytes?Math.round(last.bytes/1024)+" KB":"—")+'</strong></div></div><div class="notice"><b>Recuperación:</b> el backup lógico de esta aplicación queda en un bucket privado y puede descargarse. Para una recuperación completa del proyecto, Supabase mantiene sus mecanismos de backup de base de datos; Storage y configuraciones requieren tratamiento separado. La restauración destructiva no se ejecuta desde la interfaz.</div></div><div class="panel"><div class="panel-head"><h3>Historial de backups</h3><span class="pill">20 últimos</span></div>'+(rows.length?rows.map(x=>'<div class="line-item"><span><b>'+esc(x.status)+'</b><br><small>'+esc(romanoMadridLabel(x.created_at))+' · '+esc(x.storage_path)+'</small></span><span class="pill">'+(x.bytes?Math.round(x.bytes/1024)+" KB":"—")+'</span></div>').join(""):'<div class="empty">Todavía no hay backups lógicos generados desde ROMANO PARTNERS.</div>')+'</div><div class="panel"><div class="panel-head"><h3>Plan de recuperación</h3></div><div class="line-item"><span>1 · Base de datos</span><b>Backup / PITR de Supabase</b></div><div class="line-item"><span>2 · Archivos</span><b>Storage privado + copia externa pendiente</b></div><div class="line-item"><span>3 · Aplicación</span><b>GitHub · ROMANO PARTNERS</b></div><div class="line-item"><span>4 · Prueba</span><b>Restaurar en proyecto independiente y validar</b></div></div>';
 }
 
 async function renderSyncPremium(){
@@ -1521,8 +1521,58 @@ document.addEventListener("click",e=>{
 function role(){return currentProfile?.role}
 function canManage(){return ["admin","supervisor"].includes(role())}
 function canSeeFinance(){return ["admin","client"].includes(role())}
-function greeting(){const h=new Date().getHours();return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
-function updateDate(){const el=$("dateLine");if(el)el.textContent=new Date().toLocaleString("es-ES",{weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"})}
+function greeting(){const h=Number(romanoMadridParts(new Date()).hour);return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
+function updateDate(){const el=$("dateLine");if(el)el.textContent=new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date())+" · España (Madrid)"}
+let __romanoClockTimer=null,__romanoRefreshBusy=false,__romanoPullStartY=0,__romanoPullTracking=false;
+function startRomanoMadridClock(){
+ if(__romanoClockTimer)clearInterval(__romanoClockTimer);
+ updateDate();
+ __romanoClockTimer=setInterval(()=>updateDate(),1000);
+}
+async function refreshRomanoApp(){
+ if(__romanoRefreshBusy)return;
+ if(!$("modal")?.classList.contains("hidden")){toast("Cierre la ventana abierta antes de actualizar.");return}
+ __romanoRefreshBusy=true;
+ const b=$("refreshAppBtn"),old=b?.textContent;
+ if(b)b.textContent="↻ Actualizando…";
+ try{await registerRomanoServiceWorker();}catch(e){}
+ setTimeout(()=>location.reload(),250);
+}
+function initRomanoPullToRefresh(){
+ if(window.__romanoPullReady)return;
+ window.__romanoPullReady=true;
+ const indicator=document.createElement("div");
+ indicator.id="romanoPullIndicator";
+ indicator.textContent="↓ Suelte para actualizar";
+ indicator.style.cssText="position:fixed;top:8px;left:50%;transform:translate(-50%,-70px);opacity:0;z-index:10000;background:#1c1c19;color:#fff;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:800;pointer-events:none;transition:transform .12s,opacity .12s;box-shadow:0 8px 24px rgba(0,0,0,.16)";
+ document.body.appendChild(indicator);
+ window.addEventListener("touchstart",e=>{
+   if(window.__romanoRefreshBusy||window.scrollY>0||!$("app")||$("app").classList.contains("hidden")||!$("modal")?.classList.contains("hidden"))return;
+   const t=e.touches?.[0];if(!t)return;
+   const tag=String(e.target?.tagName||"").toLowerCase();
+   if(["input","textarea","select","button"].includes(tag))return;
+   __romanoPullStartY=t.clientY;__romanoPullTracking=true;
+ },{passive:true});
+ window.addEventListener("touchmove",e=>{
+   if(!__romanoPullTracking)return;
+   const t=e.touches?.[0];if(!t)return;
+   const dy=t.clientY-__romanoPullStartY;
+   if(dy<=0){indicator.style.transform="translate(-50%,-70px)";indicator.style.opacity="0";return}
+   const p=Math.min(1,dy/90);
+   indicator.style.transform="translate(-50%,"+(-70+80*p)+"px)";
+   indicator.style.opacity=String(.25+.75*p);
+   if(dy>90)indicator.textContent="↻ Suelte para actualizar";
+ },{passive:true});
+ window.addEventListener("touchend",()=>{
+   if(!__romanoPullTracking)return;
+   __romanoPullTracking=false;
+   const shown=indicator.style.opacity!=="0";
+   const y=indicator.style.transform||"";
+   indicator.style.transform="translate(-50%,-70px)";indicator.style.opacity="0";
+   if(shown&&y.includes("10px"))refreshRomanoApp();
+ },{passive:true});
+}
+
 
 async function profileLoad(){
  const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();
@@ -2747,7 +2797,7 @@ function showApp(){closeMobileMenu();
  const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML=currentProfile?.avatar_display_url?'<img src="'+esc(currentProfile.avatar_display_url)+'" alt="Foto de perfil">':esc((currentProfile?.full_name||"R").charAt(0).toUpperCase());sf.classList.toggle("has-photo",!!currentProfile?.avatar_display_url)}
  if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usurio";
  if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();
- buildMasterNav();startRealtime();initOfflineSync();openPage("dashboard")
+ buildMasterNav();startRealtime();initOfflineSync();startRomanoMadridClock();initRomanoPullToRefresh();openPage("dashboard")
 }
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
@@ -3372,7 +3422,7 @@ async function emergency(){
  const r=await sb.from("occurrences").select("id,service_id,property_id,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100),rows=r.data||[];const canWrite=["admin","supervisor","employee","client"].includes(role());let props=[],services=[],clients=[];
  if(rows.length){const pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],sids=[...new Set(rows.map(x=>x.service_id).filter(Boolean))];const [pr,sv]=await Promise.all([pids.length?sb.from("properties").select("id,name,code,address,city,client_id").in("id",pids):Promise.resolve({data:[]}),sids.length?sb.from("services").select("id,code,client_id,property_id").in("id",sids):Promise.resolve({data:[]})]);props=pr.data||[];services=sv.data||[];const cids=[...new Set([...props.map(x=>x.client_id),...services.map(x=>x.client_id)].filter(Boolean))];if(cids.length)clients=(await sb.from("clients").select("id,name,email,phone,client_code").in("id",cids)).data||[]}
  const pm=new Map(props.map(x=>[x.id,x])),sm=new Map(services.map(x=>[x.id,x])),cm=new Map(clients.map(x=>[x.id,x]));let h='<div class="panel"><div class="panel-head"><div><h3>Emergencia 24H · Incidencias</h3><div class="muted">Identificada por cliente, apartamento, dirección y contacto. El código es solo referencia.</div></div>'+(canWrite?'<button class="btn gold" onclick="newEmergency()">＋ Registrar incidencia</button>':'')+'</div>';
- h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':rows.length?rows.map(x=>{const p=pm.get(x.property_id),s=sm.get(x.service_id),cl=cm.get(p?.client_id||s?.client_id);return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+'</strong><div class="muted">'+esc(p?.address||"Dirección no registrada")+(p?.city?" · "+esc(p.city):"")+'</div></div><span class="status '+(x.status==="open"?"urgent":"approved")+'">'+esc(x.status==="open"?"Pendiente de aceptación":x.status==="accepted"?"Recibido":"Resuelta")+'</span></div><div class="two"><div><small class="muted">Contacto cliente</small><div>'+esc(cl?.phone||"—")+' · '+esc(cl?.email||"—")+'</div></div><div><small class="muted">Referencia</small><div>'+esc(s?.code||"Sin servicio")+' · '+esc(x.category||"General")+' · '+esc(x.priority||"normal")+'</div></div></div><div style="margin-top:10px"><b>Problema</b><div>'+esc(x.description)+'</div></div><div class="muted" style="margin-top:8px">Creada: '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.resolution?" · Resolución: "+esc(x.resolution):"")+'</div>'+(canManage()&&x.status==="open"?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="acceptOccurrence(\''+x.id+'\')">✓ Aceptar como recibido</button></div>':"")+'</div>'}).join(""):'<div class="empty">No hay incidencias.</div>');h+='</div>';$("content").innerHTML=h;
+ h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':rows.length?rows.map(x=>{const p=pm.get(x.property_id),s=sm.get(x.service_id),cl=cm.get(p?.client_id||s?.client_id);return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+'</strong><div class="muted">'+esc(p?.address||"Dirección no registrada")+(p?.city?" · "+esc(p.city):"")+'</div></div><span class="status '+(x.status==="open"?"urgent":"approved")+'">'+esc(x.status==="open"?"Pendiente de aceptación":x.status==="accepted"?"Recibido":"Resuelta")+'</span></div><div class="two"><div><small class="muted">Contacto cliente</small><div>'+esc(cl?.phone||"—")+' · '+esc(cl?.email||"—")+'</div></div><div><small class="muted">Referencia</small><div>'+esc(s?.code||"Sin servicio")+' · '+esc(x.service_type||x.category||"General")+' · '+esc(x.priority||"normal")+'</div></div></div><div style="margin-top:10px"><b>Problema</b><div>'+esc(x.description)+'</div></div><div class="muted" style="margin-top:8px">Creada: '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.resolution?" · Resolución: "+esc(x.resolution):"")+'</div>'+(canManage()&&x.status==="open"?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="acceptOccurrence(\''+x.id+'\')">✓ Aceptar como recibido</button></div>':"")+'</div>'}).join(""):'<div class="empty">No hay incidencias.</div>');h+='</div>';$("content").innerHTML=h;
 }
 async function newEmergency(){
  const currentRole=role();
@@ -3380,17 +3430,13 @@ async function newEmergency(){
  if(demoMode){
    props=DEMO_PROPERTIES||[]; clients=DEMO_CLIENTS||[]; services=(DEMO_SERVICES||[]).filter(x=>String(x.service_type||"").toLowerCase().includes("manten"));
  }else if(currentRole==="employee"){
+   const ctx=await sb.rpc("employee_service_creation_context");
+   if(ctx.error){toast("No se pudo cargar clientes y apartamentos para Emergencia 24H: "+ctx.error.message);return}
+   clients=Array.isArray(ctx.data?.clients)?ctx.data.clients:[];
+   props=Array.isArray(ctx.data?.properties)?ctx.data.properties:[];
    const sr=await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300);
    if(sr.error){toast(sr.error.message);return}
-   services=(sr.data||[]).filter(x=>String(x.service_type||"").toLowerCase().includes("manten")||String(x.service_type||"").toLowerCase().includes("pint")||String(x.service_type||"").toLowerCase().includes("electric")||String(x.service_type||"").toLowerCase().includes("fontan")||String(x.service_type||"").toLowerCase().includes("hydraulic"));
-   const pids=[...new Set(services.map(x=>x.property_id).filter(Boolean))],cids=[...new Set(services.map(x=>x.client_id).filter(Boolean))];
-   const [pr0,cr0]=await Promise.all([
-     pids.length?sb.from("properties").select("id,name,code,address,city,client_id").in("id",pids).order("name"):Promise.resolve({data:[]}),
-     cids.length?sb.from("clients").select("id,name,email,phone,client_code").in("id",cids).order("name"):Promise.resolve({data:[]})
-   ]);
-   props=pr0.data||[]; clients=cr0.data||[];
-   const extraIds=[...new Set(props.map(x=>x.client_id).filter(Boolean))].filter(id=>!clients.some(c=>c.id===id));
-   if(extraIds.length){const ec=await sb.from("clients").select("id,name,email,phone,client_code").in("id",extraIds);clients=clients.concat(ec.data||[])}
+   services=(sr.data||[]).filter(x=>/manten|pint|electric|fontan|hydraulic|plumb/i.test(String(x.service_type||"").toLowerCase()));
  }else{
    props=(await sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name")).data||[];
    clients=(await sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name")).data||[];
@@ -3409,13 +3455,28 @@ async function newEmergency(){
    : '<option value="">Seleccione el funcionario de mantenimiento</option>'+maintenanceEmployees.map(x=>'<option value="'+x.id+'">'+esc(x.full_name||x.email||"Funcionario")+' · '+esc(x.function_title||"Mantenimiento")+'</option>').join("");
  const clientField=currentRole==="client"
    ? '<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>'
-   : '<select id="eClient"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>';
- openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="notice">Emergencia 24H está reservada exclusivamente para incidencias urgentes de mantenimiento. Al seleccionar un servicio relacionado, cliente, apartamento y dirección se identifican automáticamente.</div><div class="two"><div class="field"><label>Servicio de mantenimiento relacionado</label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div><div class="field"><label>Funcionario de mantenimiento</label><select id="eEmployee" required>'+employeeOptions+'</select></div></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Enviar emergencia 24H de mantenimiento</button></form>');
+   : '<select id="eClient" onchange="filterEmergencyProperties()"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>';
+ const typeOptions='<option value="">Seleccione el tipo de servicio</option><option value="mantenimiento">Mantenimiento</option><option value="pintura">Pintura</option><option value="electricidad">Electricidad</option><option value="fontaneria">Fontanería</option><option value="hidraulica">Hidráulica</option><option value="silicona">Silicona</option><option value="montaje">Montaje / instalación</option><option value="reparacion">Reparación</option>';
+ openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="two"><div class="field"><label>Tipo de servicio</label><select id="eType" required>'+typeOptions+'</select></div><div class="field"><label>Servicio de mantenimiento relacionado <small>(opcional)</small></label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div></div><div class="notice">Emergencia 24H está reservada exclusivamente para incidencias urgentes. Cliente, apartamento y tipo de servicio son obligatorios. Si selecciona un servicio relacionado, los datos del cliente y apartamento se identifican automáticamente.</div><div class="two"><div class="field"><label>Funcionario de mantenimiento</label><select id="eEmployee" required>'+employeeOptions+'</select></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Enviar emergencia 24H de mantenimiento</button></form>');
+ if($("eClient")?.tagName==="SELECT")filterEmergencyProperties();
+
  const emergencyServiceSelect=$("eService");
- if(emergencyServiceSelect&&maintenanceServices.length){
+ if(emergencyServiceSelect&&maintenanceServices.length&&currentRole!=="employee"){
    emergencyServiceSelect.value=maintenanceServices[0].id;
    syncEmergencyFromService(emergencyServiceSelect.value);
  }
+}
+function filterEmergencyProperties(){
+ const clientId=$("eClient")?.value||"";
+ const sel=$("eProperty");if(!sel)return;
+ const current=sel.value;
+ const options=Array.from(sel.options);
+ options.forEach((o,i)=>{
+   if(i===0){o.hidden=false;return}
+   const match=!clientId||String(o.dataset.client||"")===String(clientId);
+   o.hidden=!match;
+   if(!match&&o.value===current)sel.value="";
+ });
 }
 function syncEmergencyFromService(serviceId){
  const sel=$("eService"),opt=sel?.options[sel.selectedIndex];if(!opt)return;
@@ -3425,8 +3486,9 @@ function syncEmergencyFromService(serviceId){
 }
 async function saveEmergency(e){
  e.preventDefault();
- const propertyId=$("eProperty")?.value||null,serviceId=$("eService")?.value||null,employeeId=$("eEmployee")?.value||null,priority=$("ePriority")?.value||"urgent",description=$("eDesc")?.value.trim()||"";
- if(!propertyId||!employeeId||!description){toast("Seleccione apartamento, funcionario de mantenimiento y describa la emergencia.");return}
+ const propertyId=$("eProperty")?.value||null,serviceId=$("eService")?.value||null,employeeId=$("eEmployee")?.value||null,serviceType=$("eType")?.value||null,priority=$("ePriority")?.value||"urgent",description=$("eDesc")?.value.trim()||"";
+ const selectedClientId=$("eClient")?.tagName==="SELECT"?($("eClient")?.value||null):null;
+ if(!propertyId||!employeeId||!serviceType||!description){toast("Seleccione cliente, apartamento, tipo de servicio, funcionario y describa la emergencia.");return}
  if(serviceId){
    const s=await sb.from("services").select("id,property_id,client_id,assigned_employee_id,service_type").eq("id",serviceId).maybeSingle();
    if(s.error){toast(s.error.message);return}
@@ -3435,12 +3497,16 @@ async function saveEmergency(e){
    if(!(type.includes("manten")||type.includes("pint")||type.includes("electric")||type.includes("fontan")||type.includes("hydraulic"))){toast("La emergencia 24H solo admite servicios de mantenimiento.");return}
    if(s.data.property_id!==propertyId){toast("El servicio seleccionado no pertenece a ese apartamento.");return}
    if(role()==="employee"&&s.data.assigned_employee_id!==currentUser.id){toast("Solo puede registrar la emergencia del mantenimiento que tiene asignado.");return}
+   const relatedType=String(s.data.service_type||"").toLowerCase();
+   if(serviceType!=="mantenimiento" && !relatedType.includes(serviceType.replace("fontaneria","fontan").replace("hidraulica","hydraulic"))){toast("El tipo de servicio no coincide con el servicio relacionado.");return}
  }
  const pr=await sb.from("properties").select("id,client_id").eq("id",propertyId).eq("company_id",currentProfile.company_id).maybeSingle();
  if(pr.error||!pr.data){toast(pr.error?.message||"Apartamento no encontrado.");return}
  const clientId=pr.data.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
- const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,category:"maintenance",priority,description,status:"open"};
+ if(selectedClientId&&selectedClientId!==clientId){toast("El apartamento seleccionado no pertenece al cliente elegido.");return}
+ if(currentRole==="employee"&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
+ const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,service_type:serviceType,category:"maintenance",priority,description,status:"open"};
  if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · emergencia guardada para sincronizar");return}
  const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · emergencia puesta en cola")}else toast(r.error.message);return}
