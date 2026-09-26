@@ -2462,10 +2462,10 @@ async function viewEmployee(id){
 async function editEmployee(id){const q=demoMode?{data:DEMO_EMPLOYEES.find(z=>z.id===id),error:null}:await sb.from("employee_profiles").select("*").eq("id",id).single(),x=q.data;if(!x){toast("Funcionario no encontrado.");return}openModal("Editar funcionario",employeeFormHtml(x,true));if(!demoMode)await loadEmployeeDocuments(id)}
 async function sendEmployeeAccessInvite(id){
  if(!["admin","supervisor"].includes(role()))return;
- const q=await sb.from("employee_profiles").select("full_name,email").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ const q=await sb.from("employee_profiles").select("full_name,email,function_title").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error||!q.data){toast(q.error?.message||"Funcionario no encontrado.");return}
  if(!q.data.email){toast("Este funcionario no tiene e-mail registrado.");return}
- const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:q.data.email,full_name:q.data.full_name,role:"employee",redirect_to:window.location.origin}});
+ const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:q.data.email,full_name:q.data.full_name,role:employeeRoleFromFunction(q.data.function_title),redirect_to:window.location.origin}});
  if(inv.error||inv.data?.error){toast("No se pudo enviar la invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  if(inv.data?.existing){
    const recovery=await sendExistingAccessRecovery(q.data.email);
