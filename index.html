@@ -3728,7 +3728,7 @@ function syncEmergencyFromService(serviceId){
 async function uploadEmergencyMedia(occurrenceId,files){
  const list=Array.from(files||[]);if(!list.length)return;
  for(const file of list){
-   if(!/^image\\/|^video\\//.test(file.type||""))continue;
+   if(!/^(image|video)\//.test(file.type||""))continue;
    if(file.size>25*1024*1024){toast("Un archivo supera el límite de 25 MB y no fue subido.");continue}
    const safe=(file.name||"emergency").replace(/[^a-zA-Z0-9._-]+/g,"_");
    const path=currentProfile.company_id+"/"+currentUser.id+"/occurrences/"+occurrenceId+"/"+crypto.randomUUID()+"-"+safe;
