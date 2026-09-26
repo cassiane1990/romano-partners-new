@@ -1949,8 +1949,9 @@ async function viewService(id){
  }
  const r=await sb.from("services").select("*").eq("id",id).single();if(r.error){toast(r.error.message);return}
  const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
+ let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
  const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
-  sb.from("service_media").select("id,media_type,file_name,storage_path,created_at").eq("service_id",id).order("created_at",{ascending:false}),
+  sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,reviewed_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
   sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
   sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle(),
