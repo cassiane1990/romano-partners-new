@@ -4264,13 +4264,13 @@ async function renderChatContacts(){
    const contacts=[];
    for(const targetRole of targetRoles){
      const q=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name");
-     (q.data||[]).forEach(target=>contacts.push([target.id,targetRole,target.full_name|| (targetRole==="supervisor"?"Supervisor":targetRole==="employee"?"Funcionario":"Cliente")]));
+     (q.data||[]).forEach(target=>contacts.push([target.id,targetRole,target.full_name|| (targetRole==="supervisor"?"Supervisor":targetRole==="employee"?"Funcionario de Limpieza":targetRole==="maintenance_technician"?"Técnico de Mantenimiento":"Cliente")]));
    }
-   el.innerHTML=contacts.map(([id,key,label])=>'<button class="romano-chat-contact" onclick="selectDirectChat(\''+id+'\',\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":key==="employee"?"F":"C")+'</span><span class="rc-info"><b>'+esc(label)+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">No hay contactos disponibles.</div>';
+   el.innerHTML=contacts.map(([id,key,label])=>'<button class="romano-chat-contact" onclick="selectDirectChat(\''+id+'\',\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":key==="employee"?"F":key==="maintenance_technician"?"T":"C")+'</span><span class="rc-info"><b>'+esc(label)+'</b><small>Chat privado</small></span></button>').join("")||'<div class="romano-chat-empty">No hay contactos disponibles.</div>';
  }
 }
 async function selectDirectChat(targetId,targetRole){
- if(!["admin","supervisor","employee"].includes(role()))return;
+ if(!["admin","supervisor","employee","maintenance_technician"].includes(role()))return;
  const target=await sb.from("profiles").select("id,full_name,role").eq("id",targetId).eq("company_id",currentProfile.company_id).eq("active",true).maybeSingle();
  if(target.error||!target.data){toast("Destinatario no disponible.");return}
  const q=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
