@@ -3880,9 +3880,23 @@ async function saveEmergency(e){
    const relatedType=String(s.data.service_type||"").toLowerCase();
    if(serviceType!=="mantenimiento" && !relatedType.includes(serviceType.replace("fontaneria","fontan").replace("hidraulica","hydraulic"))){toast("El tipo de servicio no coincide con el servicio relacionado.");return}
  }
- const pr=await sb.from("properties").select("id,client_id").eq("id",propertyId).eq("company_id",currentProfile.company_id).maybeSingle();
- if(pr.error||!pr.data){toast(pr.error?.message||"Apartamento no encontrado.");return}
- const clientId=pr.data.client_id||null;
+ let propertyRecord=null;
+ const currentRole=role();
+ if(currentRole==="maintenance_technician"){
+   const ctx=await sb.rpc("maintenance_technician_emergency_context");
+   if(ctx.error){toast("No se pudo validar el apartamento: "+ctx.error.message);return}
+   propertyRecord=(Array.isArray(ctx.data?.properties)?ctx.data.properties:[]).find(p=>String(p.id)===String(propertyId))||null;
+ }else if(currentRole==="employee"){
+   const ctx=await sb.rpc("employee_emergency_context");
+   if(ctx.error){toast("No se pudo validar el apartamento: "+ctx.error.message);return}
+   propertyRecord=(Array.isArray(ctx.data?.properties)?ctx.data.properties:[]).find(p=>String(p.id)===String(propertyId))||null;
+ }else{
+   const pr=await sb.from("properties").select("id,client_id").eq("id",propertyId).eq("company_id",currentProfile.company_id).maybeSingle();
+   if(pr.error){toast(pr.error.message);return}
+   propertyRecord=pr.data||null;
+ }
+ if(!propertyRecord){toast("Apartamento no encontrado.");return}
+ const clientId=propertyRecord.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(selectedClientId&&selectedClientId!==clientId){toast("El apartamento seleccionado no pertenece al cliente elegido.");return}
  if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
