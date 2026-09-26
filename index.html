@@ -2351,11 +2351,11 @@ async function saveEmployee(e){
 }
 async function loadEmployeeDocuments(id){
  const box=$("employeeDocs_"+id)||$("employeeSelfDocs");if(!box)return;
- const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,expires_at,created_at,employee_profile_id,employee_id").eq("employee_profile_id",id).order("created_at",{ascending:false});
+ const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,expires_at,created_at,employee_profile_id,employee_id,review_status,reviewed_at,review_notes").eq("employee_profile_id",id).order("created_at",{ascending:false});
  if(q.error){box.innerHTML='<div class="msg">'+esc(q.error.message)+'</div>';return}
  const canManageDocs=role()==="admin"||role()==="supervisor";
  const canDelete=canManageDocs||(role()==="employee"&&(q.data||[]).some(d=>d.employee_id===currentUser?.id));
- box.innerHTML='<div class="panel-head"><div><h3>Documentos del funcionario</h3><div class="muted">'+(q.data?.length||0)+' documentos · el funcionario puede enviarlos desde su perfil</div></div></div><div class="field"><label>Añadir documento</label><input id="docFile_'+id+'" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"><small class="muted">PDF, imágenes y documentos · máximo 25 MB.</small></div>'+(q.data?.length?q.data.map(d=>'<div class="line-item"><span><b>'+esc(d.title||d.file_name)+'</b><small class="muted" style="display:block">'+esc(d.document_type||"documento")+' · '+esc(d.file_name||"")+(d.expires_at?" · Vence "+esc(d.expires_at):"")+'</small></span><span class="actions"><button class="btn" type="button" onclick="openEmployeeDocument(\''+esc(d.storage_path)+'\')">Abrir</button>'+(canDelete?'<button class="btn" type="button" onclick="deleteEmployeeDocument(\''+esc(d.id)+'\',\''+esc(d.storage_path)+'\',\''+esc(id)+'\')">Eliminar</button>':"")+'</span></div>').join(""):'<div class="empty">Sin documentos todavía.</div>')+'<button class="btn gold" type="button" style="margin-top:8px" onclick="uploadEmployeeDocumentFromInput(\''+id+'\')">＋ Guardar documento</button>';
+ box.innerHTML='<div class="panel-head"><div><h3>Documentos del funcionario</h3><div class="muted">'+(q.data?.length||0)+' documentos · el funcionario puede enviarlos desde su perfil</div></div></div><div class="field"><label>Añadir documento</label><input id="docFile_'+id+'" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"><small class="muted">PDF, imágenes y documentos · máximo 25 MB.</small></div>'+(q.data?.length?q.data.map(d=>'<div class="line-item"><span><b>'+esc(d.title||d.file_name)+'</b><small class="muted" style="display:block">'+esc(d.document_type||"documento")+' · '+esc(d.file_name||"")+(d.expires_at?" · Vence "+esc(d.expires_at):"")+' · '+(d.review_status==="verified"?"✓ Verificado":d.review_status==="needs_correction"?"⚠ Corregir":"⏳ Pendiente")+(d.review_notes?" · "+esc(d.review_notes):"")+'</small></span><span class="actions"><button class="btn" type="button" onclick="openEmployeeDocument(\''+esc(d.storage_path)+'\')">Abrir</button>'+(canDelete?'<button class="btn" type="button" onclick="deleteEmployeeDocument(\''+esc(d.id)+'\',\''+esc(d.storage_path)+'\',\''+esc(id)+'\')">Eliminar</button>':"")+'</span></div>').join(""):'<div class="empty">Sin documentos todavía.</div>')+'<button class="btn gold" type="button" style="margin-top:8px" onclick="uploadEmployeeDocumentFromInput(\''+id+'\')">＋ Guardar documento</button>';
 }
 async function deleteEmployeeDocument(docId,path,employeeProfileId){
  const q=await sb.from("employee_documents").select("employee_id").eq("id",docId).eq("employee_profile_id",employeeProfileId).eq("company_id",currentProfile.company_id).maybeSingle();
@@ -2384,7 +2384,13 @@ async function uploadEmployeeDocument(employeeProfileId,file,type="documento",ti
 }
 async function uploadEmployeeDocumentFromInput(id){
  const f=$("docFile_"+id)?.files?.[0];if(!f){toast("Seleccione un documento.");return}
- const type=prompt("Tipo de documento","Contrato / Recibo / Identificación / Otro")||"documento";await uploadEmployeeDocument(id,f,type,type);
+ openModal("Tipo de documento","<div class='field'><label>Seleccione el tipo</label><select id='employeeDocType'><option value='Contrato'>Contrato</option><option value='Identificación'>Identificación</option><option value='Recibo'>Recibo / Nómina</option><option value='NIE/NIF'>NIE / NIF</option><option value='Formación'>Formación / Certificado</option><option value='Otro'>Otro</option></select></div><div class='notice'>El documento quedará en su ficha como <b>Pendiente de verificación</b> hasta que Administración lo revise.</div><div class='actions'><button class='btn' type='button' onclick='closeModal()'>Cancelar</button><button class='btn gold' type='button' onclick='saveSelectedEmployeeDocument(\''+esc(id)+'\')'>Guardar documento</button></div>");
+}
+async function saveSelectedEmployeeDocument(id){
+ const f=$("docFile_"+id)?.files?.[0],type=$("employeeDocType")?.value||"Otro";
+ if(!f){closeModal();toast("Seleccione un documento.");return}
+ await uploadEmployeeDocument(id,f,type,type);
+ closeModal();
 }
 async function openEmployeeDocument(path){
  const s=await sb.storage.from("company-documents").createSignedUrl(path,600);
