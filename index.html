@@ -753,6 +753,9 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 .sj-avatar-step.final .sj-avatar{background:linear-gradient(145deg,#e9f4e9,#bdd7bd);border-color:#6d9b6d}
 .sj-avatar-label{margin-top:5px;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.2px;color:#81776b;text-align:center;white-space:nowrap}
 .sj-avatar-step.done .sj-avatar-label,.sj-avatar-step.current .sj-avatar-label{color:#5e4828}
+.sj-avatar-action{cursor:pointer!important;font:inherit;padding:0;appearance:none;-webkit-appearance:none}
+.sj-avatar-action:hover{transform:translateY(-2px) scale(1.03)}
+.sj-avatar-action:active{transform:translateY(0) scale(.98)}
 .sj-avatar-time{font-size:7px;color:#a0978b;margin-top:2px;white-space:nowrap}
 @media(max-width:650px){.sj-avatar-step{min-width:64px}.sj-avatar{width:40px;height:40px;font-size:17px}.sj-avatar-step:not(:last-child):after{top:20px}.sj-avatar-label{font-size:7px}.sj-avatar-time{font-size:6px}}
 </style></head>
@@ -1146,11 +1149,26 @@ function renderServiceStatusAvatarSequence(s){
  const progress={scheduled:0,requested:0,on_the_way:2,in_progress:3,paused:3,supervision_pending:4,supervised:4,completed:5,approved:5,rejected:-1,returned:-1,cancelled:-1};
  const current=Object.prototype.hasOwnProperty.call(progress,status)?progress[status]:0;
  const activeStatus=status==="paused"?"Pausado":status==="supervision_pending"?"Esperando supervisión":"";
+ const r=role(),own=["employee","maintenance_technician"].includes(r)&&s?.assigned_employee_id===currentUser?.id;
+ let next=null;
+ if(own){
+   if(status==="scheduled")next={label:"Aceptar",target:"accept"};
+   else if(status==="on_the_way")next={label:"Iniciar",target:"in_progress"};
+   else if(status==="in_progress")next={label:"Pausar",target:"paused"};
+   else if(status==="paused")next={label:"Continuar",target:"in_progress"};
+ }
+ const sid=JSON.stringify(s?.id);
  return '<div class="sj-avatar-sequence" aria-label="Secuencia del servicio">'+steps.map((x,i)=>{
    const done=current>i,now=current===i;
    const extra=x.key==="completed"&&current===5?" final":"";
    const sub=now&&activeStatus?activeStatus:"";
-   return '<div class="sj-avatar-step '+(done?"done ":"")+(now?"current ":"")+extra+'"><div class="sj-avatar" title="'+esc(x.label)+'">'+x.icon+'</div><div class="sj-avatar-label">'+esc(x.label)+'</div>'+(sub?'<div class="sj-avatar-time">'+esc(sub)+'</div>':"")+'</div>';
+   let node='<div class="sj-avatar" title="'+esc(x.label)+'">'+x.icon+'</div>';
+   const clickable=(status==="scheduled"&&x.key==="received")||(status==="on_the_way"&&x.key==="on_the_way")||(status==="in_progress"&&x.key==="in_progress")||(status==="paused"&&x.key==="in_progress");
+   if(next&&clickable){
+     const call=next.target==="accept"?'acceptAssignedService('+sid+')':'setServiceStatusPremium('+sid+','+JSON.stringify(next.target)+')';
+     node='<button type="button" class="sj-avatar sj-avatar-action" title="'+esc(next.label)+'" onclick="event.preventDefault();event.stopPropagation();'+call+'">'+x.icon+'</button>';
+   }
+   return '<div class="sj-avatar-step '+(done?"done ":"")+(now?"current ":"")+extra+'>'+node+'<div class="sj-avatar-label">'+esc(x.label)+'</div>'+(sub?'<div class="sj-avatar-time">'+esc(sub)+'</div>':"")+'</div>';
  }).join("")+'</div>';
 }
 async function renderServiceJourneyBoard(){
@@ -1189,12 +1207,12 @@ async function renderServiceJourneyBoard(){
   const [pr,cr,er]=await Promise.all([
    ids.length?sb.from("properties").select("id,code,name,address,city,country,photo_url,property_type,client_id").in("id",ids):Promise.resolve({data:[]}),
    cids.length?sb.from("clients").select("id,name").in("id",cids):Promise.resolve({data:[]}),
-   eids.length?sb.from("employee_profiles").select("id,full_name,employee_code,function_title,photo_url").in("id",eids):Promise.resolve({data:[]})
+   eids.length?sb.from("employee_profiles").select("id,profile_id,full_name,employee_code,function_title,photo_url").in("profile_id",eids):Promise.resolve({data:[]})
   ]);
   if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}
   props=pr.data||[];clients=cr.data||[];employees=er.data||[];
  }
- const pm=Object.fromEntries(props.map(p=>[p.id,p])),cm=Object.fromEntries(clients.map(x=>[x.id,x])),em=Object.fromEntries(employees.map(x=>[x.id,x]));
+ const pm=Object.fromEntries(props.map(p=>[p.id,p])),cm=Object.fromEntries(clients.map(x=>[x.id,x])),em=Object.fromEntries(employees.map(x=>[x.profile_id||x.id,x]));
  const photos={};if(!demoMode)await Promise.all(props.filter(p=>p.photo_url).map(async p=>{const u=await sb.storage.from("property-media").createSignedUrl(p.photo_url,900);if(!u.error)photos[p.id]=u.data.signedUrl}));
  const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervision_pending:"Esperando supervisión",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
  const statusIcon={requested:"○",scheduled:"◷",on_the_way:"🚗",in_progress:"▶",paused:"Ⅱ",supervision_pending:"🔎",supervised:"✓",completed:"✓",approved:"✓",rejected:"×",returned:"↩",cancelled:"×"};
@@ -2159,9 +2177,21 @@ async function viewService(id){
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sin observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
- const r=["employee","maintenance_technician"].includes(role())
-  ? await sb.rpc("employee_service_detail",{p_service_id:id})
-  : await sb.from("services").select("*").eq("id",id).single();
+ let r;
+ if(["employee","maintenance_technician"].includes(role())){
+   r=await sb.rpc("employee_service_detail",{p_service_id:id});
+   if(r.error||!(Array.isArray(r.data)?r.data.length:r.data)){
+     const fb=await sb.from("services").select("id,code,company_id,client_id,property_id,service_type,typology,status,priority,scheduled_at,instructions,assigned_employee_id,assigned_supervisor_id,accepted_at,accepted_by,started_at,started_by,finished_at,finished_by,created_at,updated_at,requested_items,additional_items")
+       .eq("id",id).eq("company_id",currentProfile.company_id).eq("assigned_employee_id",currentUser.id).maybeSingle();
+     if(fb.error){toast("No se pudo abrir la ficha: "+fb.error.message);return}
+     if(!fb.data){toast("Servicio no disponible para este funcionario.");return}
+     if(role()==="maintenance_technician"&&!privateMaintenanceServiceType(fb.data.service_type)){toast("Este servicio no corresponde al Técnico de Mantenimiento.");return}
+     if(role()==="employee"&&privateMaintenanceServiceType(fb.data.service_type)){toast("Este servicio no corresponde al Funcionario de Limpieza.");return}
+     r={data:fb.data,error:null};
+   }
+ }else{
+   r=await sb.from("services").select("*").eq("id",id).single();
+ }
  if(r.error){toast(r.error.message);return}
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
