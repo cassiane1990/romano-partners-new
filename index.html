@@ -3478,11 +3478,24 @@ function filterEmergencyProperties(){
    if(!match&&o.value===current)sel.value="";
  });
 }
+function emergencyTypeFromService(value){
+ const t=String(value||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+ if(t.includes("fontan")||t.includes("plumb"))return "fontaneria";
+ if(t.includes("hidraul")||t.includes("hydraulic"))return "hidraulica";
+ if(t.includes("electric"))return "electricidad";
+ if(t.includes("pint"))return "pintura";
+ if(t.includes("silicon"))return "silicona";
+ if(t.includes("montaj")||t.includes("instal"))return "montaje";
+ if(t.includes("repar"))return "reparacion";
+ return "mantenimiento";
+}
 function syncEmergencyFromService(serviceId){
  const sel=$("eService"),opt=sel?.options[sel.selectedIndex];if(!opt)return;
  const pid=opt.dataset.property||"",cid=opt.dataset.client||"";
+ if(cid&&$("eClient")&&$("eClient").tagName==="SELECT"){$("eClient").value=cid;filterEmergencyProperties()}
  if(pid&&$("eProperty")){$("eProperty").value=pid}
- if(cid&&$("eClient")&&$("eClient").tagName==="SELECT"){$("eClient").value=cid}
+ const serviceText=opt.textContent||"";
+ if($("eType"))$("eType").value=emergencyTypeFromService(serviceText);
 }
 async function saveEmergency(e){
  e.preventDefault();
@@ -3505,7 +3518,7 @@ async function saveEmergency(e){
  const clientId=pr.data.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(selectedClientId&&selectedClientId!==clientId){toast("El apartamento seleccionado no pertenece al cliente elegido.");return}
- if(currentRole==="employee"&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
+ if(role()==="employee"&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
  const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,service_type:serviceType,category:"maintenance",priority,description,status:"open"};
  if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · emergencia guardada para sincronizar");return}
  const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
