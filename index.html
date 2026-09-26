@@ -1100,6 +1100,20 @@ async function renderCatalogMaster(){
  const ordered=[...t1t5,...others];
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Tipologías y Precios</h3><div class="muted">Tarifas de ROMANO PROPERTY CARE · T1 a T5 y servicios complementarios.</div></div></div><div class="notice">Las tipologías T1, T2, T3, T4 y T5 están disponibles aquí. T5 puede quedar como “Consultar” cuando la propiedad requiera valoración.</div><table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Precio</th><th>IVA</th></tr></thead><tbody>'+ordered.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+esc(x.name)+'</td><td>'+esc(x.price==null?"Consultar":masterMoney(x.price))+'</td><td>'+esc(x.price==null?"Consultar":x.tax?"Incluido":"No incluido")+'</td></tr>').join("")+'</tbody></table><div class="muted" style="margin-top:12px">España 21% · Portugal 23%. El IVA se muestra según la tarifa configurada.</div></div>';
 }
+
+function journeyActionsForService(s){
+ const r=role(),own=r==="employee"&&s.assigned_employee_id===currentUser.id;
+ if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(s.status))return "";
+ const maint=/manten|electric|plumb|pint|repar/i.test(String(s.service_type||""));
+ const sid=JSON.stringify(s.id);
+ const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium('+sid+','+JSON.stringify(status)+')">'+label+'</button>';
+ if(r==="employee"&&!own)return "";
+ if(s.status==="scheduled")return r==="employee"?'<button type="button" class="btn gold" onclick="event.stopPropagation();acceptAssignedService('+sid+')">✓ ACEPTAR</button>':"";
+ if(s.status==="on_the_way")return btn("▶ Iniciar","in_progress",true);
+ if(s.status==="in_progress")return btn("Ⅱ Pausar","paused",false)+(maint&&r!=="employee"?btn("✓ Finalizar","completed",true):"");
+ if(s.status==="paused")return btn("▶ Continuar","in_progress",true)+(maint&&r!=="employee"?btn("✓ Finalizar","completed",true):"");
+ return "";
+}
 async function renderServiceJourneyBoard(){
  const day=window.__sjDay||new Date().toLocaleDateString("sv-SE");
  let services=[],props=[],clients=[],employees=[];
@@ -1108,19 +1122,12 @@ async function renderServiceJourneyBoard(){
   if(!services.length)services=(DEMO_SERVICES||[]).slice(0,8);
   props=DEMO_PROPERTIES||[];clients=DEMO_CLIENTS||[];employees=DEMO_EMPLOYEES||[];
  }else{
-  const startDay=day+"T00:00:00",endDay=day+"T23:59:59.999"; let q;
+  const startDay=day+"T00:00:00",endDay=day+"T23:59:59.999";let q;
   const fields="id,code,property_id,client_id,assigned_employee_id,service_type,typology,status,scheduled_at,priority";
-  if(role()==="client"){
-   const cr=await sb.from("clients").select("id").eq("profile_id",currentUser.id).single();
-   if(cr.error||!cr.data){$("content").innerHTML='<div class="panel"><div class="msg">No se encontró el cliente asociado.</div></div>';return}
-   q=await sb.from("services").select(fields).eq("client_id",cr.data.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
-  }else if(role()==="employee"){
-   q=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
-  }else if(role()==="supervisor"){
-   q=await sb.from("services").select(fields).eq("assigned_supervisor_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
-  }else{
-   q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
-  }
+  if(role()==="client"){const cr=await sb.from("clients").select("id").eq("profile_id",currentUser.id).single();if(cr.error||!cr.data){$("content").innerHTML='<div class="panel"><div class="msg">No se encontró el cliente asociado.</div></div>';return}q=await sb.from("services").select(fields).eq("client_id",cr.data.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }else if(role()==="employee")q=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  else if(role()==="supervisor")q=await sb.from("services").select(fields).eq("assigned_supervisor_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  else q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
   services=q.data||[];
   const ids=[...new Set(services.map(s=>s.property_id).filter(Boolean))],cids=[...new Set(services.map(s=>s.client_id).filter(Boolean))],eids=[...new Set(services.map(s=>s.assigned_employee_id).filter(Boolean))];
@@ -1133,25 +1140,23 @@ async function renderServiceJourneyBoard(){
   props=pr.data||[];clients=cr.data||[];employees=er.data||[];
  }
  const pm=Object.fromEntries(props.map(p=>[p.id,p])),cm=Object.fromEntries(clients.map(x=>[x.id,x])),em=Object.fromEntries(employees.map(x=>[x.id,x]));
- const photos={};
- if(!demoMode)await Promise.all(props.filter(p=>p.photo_url).map(async p=>{const u=await sb.storage.from("property-media").createSignedUrl(p.photo_url,900);if(!u.error)photos[p.id]=u.data.signedUrl}));
- const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
- const statusIcon={requested:"○",scheduled:"◷",on_the_way:"🚗",in_progress:"▶",paused:"Ⅱ",supervised:"✓",completed:"✓",approved:"✓",rejected:"×",returned:"↩",cancelled:"×"};
- const canStatus=["admin","supervisor","employee"].includes(role());
+ const photos={};if(!demoMode)await Promise.all(props.filter(p=>p.photo_url).map(async p=>{const u=await sb.storage.from("property-media").createSignedUrl(p.photo_url,900);if(!u.error)photos[p.id]=u.data.signedUrl}));
+ const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervision_pending:"Esperando supervisión",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
+ const statusIcon={requested:"○",scheduled:"◷",on_the_way:"🚗",in_progress:"▶",paused:"Ⅱ",supervision_pending:"🔎",supervised:"✓",completed:"✓",approved:"✓",rejected:"×",returned:"↩",cancelled:"×"};
  const isMaint=s=>/manten|electric|plumb|pint|repar/i.test(String(s.service_type||""));
  const cleaning=services.filter(s=>!isMaint(s)).length,maintenance=services.length-cleaning;
- const active=services.filter(s=>["on_the_way","in_progress","paused","supervised"].includes(s.status)).length;
+ const active=services.filter(s=>["on_the_way","in_progress","paused","supervision_pending"].includes(s.status)).length;
  const cards=services.map(s=>{
-   const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{};
-   const photo=demoMode?demoPropertyPhotoData(p.id):photos[p.id]||"";
-   const isOwn=role()==="employee"&&s.assigned_employee_id===currentUser.id;
-   const canAct=canStatus&&(role()!=="employee"||isOwn);
-   const quick=(role()==="employee"&&isCleaningServiceType(s.service_type))
- ? ["on_the_way","in_progress","paused"].map(st=>canAct&&s.status!==st?'<button type="button" class="btn" onclick="event.stopPropagation();setServiceStatusPremium(\''+s.id+'\',\''+st+'\')">'+statusIcon[st]+' '+labels[st]+'</button>':"").join("")+'<button type="button" class="btn gold" onclick="event.stopPropagation();requestCleaningSupervision(\''+s.id+'\')">✓ Supervisión</button>'
- : ["on_the_way","in_progress","paused","supervised","completed"].map(st=>canAct&&s.status!==st?'<button type="button" class="btn '+(st==="completed"?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium(\''+s.id+'\',\''+st+'\')">'+statusIcon[st]+' '+labels[st]+'</button>':"").join("");
-   return '<article class="sj-card" onclick="viewService(\''+s.id+'\')"><div class="sj-photo">'+(photo?'<img src="'+esc(photo)+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type">'+(isMaint(s)?"MANTENIMIENTO":"LIMPIEZA")+'</span><div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||s.employee_name||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(s.service_type||"Servicio")+'</p><span class="sj-priority">'+esc(s.priority||"normal")+'</span></div><div class="sj-status"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><button class="sj-btn" onclick="event.stopPropagation();viewService(\''+s.id+'\')">Ver jornada</button>'+(quick?'<div class="sj-quick">'+quick+'</div>':"")+'</div></article>';
+  const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{},own=role()==="employee"&&s.assigned_employee_id===currentUser.id;
+  const action=journeyActionsForService(s),terminal=["supervision_pending","supervised","completed","approved","cancelled","rejected","returned"].includes(s.status);
+  const stageText=terminal?"Estado bloqueado":s.status==="scheduled"?"Próximo paso: aceptar":s.status==="on_the_way"?"Próximo paso: iniciar":s.status==="in_progress"?"Trabajo en curso":s.status==="paused"?"Próximo paso: continuar":"Estado";
+  const stages=["scheduled","on_the_way","in_progress","paused","supervision_pending","completed"];
+  const currentIndex=s.status==="paused"?3:s.status==="supervision_pending"?4:s.status==="completed"||s.status==="approved"?5:["scheduled","on_the_way","in_progress"].indexOf(s.status);
+  const stageHtml='<div class="sj-stagebar">'+stages.map((st,idx)=>'<span class="'+(idx<currentIndex?"done ":idx===currentIndex?"current ":"")+(st==="paused"||st==="supervision_pending"?"optional":"")+'">'+esc(labels[st])+'</span>').join("")+'</div>';
+  const sid=JSON.stringify(s.id);
+  return '<article class="sj-card '+(own?"sj-own":"")+'" onclick="viewService('+sid+')"><div class="sj-photo">'+(p.photo_url?'<img src="'+esc(photos[p.id]||"")+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type '+(isMaint(s)?"maint":"clean")+'">'+(isMaint(s)?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</span><div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(serviceTypeLabel(s.service_type))+'</p><span class="sj-priority">'+esc(servicePriorityLabel(s.priority))+'</span></div><div class="sj-status"><div class="sj-current"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><small>'+esc(stageText)+'</small></div>'+stageHtml+'<button class="sj-btn" onclick="event.stopPropagation();viewService('+sid+')">Ver ficha</button>'+(action?'<div class="sj-quick">'+action+'</div>':"")+'</div></article>';
  }).join("");
- $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>Servicios del día · apartamento · cliente · funcionario · estado en tiempo real.</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados</small><strong>'+services.filter(s=>["completed","approved"].includes(s.status)).length+'</strong></div></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
+ $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>Una sola acción siguiente por servicio. Los estados verificados/finalizados quedan bloqueados.</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>🧹 Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>🔧 Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados / cerrados</small><strong>'+services.filter(s=>["completed","approved","supervised"].includes(s.status)).length+'</strong></div></div><div class="sj-legend"><span>🚗 A camino</span><span>▶ Iniciado</span><span>Ⅱ Pausado</span><span>🔎 Esperando supervisión</span><span>✓ Finalizado</span></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
  $("sjDay").onchange=()=>{window.__sjDay=$("sjDay").value;renderServiceJourneyBoard()};
 }
 async function renderJourneyMaster(){
