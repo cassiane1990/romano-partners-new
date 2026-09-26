@@ -3096,6 +3096,38 @@ async function registerRomanoServiceWorker(){
  }catch(e){console.warn("ROMANO Service Worker:",e);return null}
 }
 let __romanoSWUpdateTimer=null;
+let __romanoPageETag=null;
+let __romanoUpdateCheckBusy=false;
+async function checkRomanoProductionUpdate(){
+ if(__romanoUpdateCheckBusy||document.visibilityState==="hidden")return;
+ __romanoUpdateCheckBusy=true;
+ try{
+  const r=await fetch("/index.html?__romano_update_check="+Date.now(),{method:"HEAD",cache:"no-store",credentials:"same-origin"});
+  const etag=r.headers.get("etag");
+  if(!etag)return;
+  if(__romanoPageETag===null){__romanoPageETag=etag;return}
+  if(etag!==__romanoPageETag){
+   const modal=document.querySelector(".modal,.modal-backdrop,[role='dialog']");
+   const focused=document.activeElement;
+   const editing=modal||focused?.matches?.("input,textarea,select");
+   if(editing){
+    toast("Nova versão disponível. Será aplicada quando terminar esta operação.");
+    window.__romanoUpdatePending=true;
+   }else{
+    window.location.reload();
+   }
+  }
+ }catch(e){}finally{__romanoUpdateCheckBusy=false}
+}
+setInterval(checkRomanoProductionUpdate,60000);
+document.addEventListener("visibilitychange",()=>{
+ if(document.visibilityState==="visible"){
+  if(window.__romanoUpdatePending&&!document.querySelector(".modal,.modal-backdrop,[role='dialog']")){
+   window.location.reload();return;
+  }
+  checkRomanoProductionUpdate();
+ }
+},{passive:true});
 function scheduleRomanoSWUpdates(){
  if(__romanoSWUpdateTimer)clearInterval(__romanoSWUpdateTimer);
  __romanoSWUpdateTimer=setInterval(()=>{registerRomanoServiceWorker().catch(()=>{})},300000);
