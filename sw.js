@@ -20,8 +20,7 @@ self.addEventListener("push",event=>{
  try{data=event.data?.json()||{}}catch(e){data={body:event.data?.text()||"Nueva alerta"}}
  const n=data.notification||data;
  const title=n.title||data.title||"ROMANO PROPERTY CARE";
- const serviceId=n.service_id||data.service_id||null;
- const options={body:n.body||data.body||"Nueva alerta",icon:n.icon||data.icon||"/icon.svg",badge:n.badge||data.badge||"/icon.svg",tag:n.tag||data.tag||"romano-alert",renotify:true,requireInteraction:!!serviceId,data:{url:n.navigate||data.url||"/",service_id:serviceId},actions:serviceId?[{action:"accept_service",title:"✓ Aceptar"},{action:"open_service",title:"Ver servicio"}]:[],silent:n.silent===true,vibrate:[200,100,200]};
+  const options={body:n.body||data.body||"Nueva alerta",icon:n.icon||data.icon||"/icon.svg",badge:n.badge||data.badge||"/icon.svg",tag:n.tag||data.tag||"romano-alert",renotify:true,requireInteraction:true,data:{url:n.navigate||data.url||"/"},silent:n.silent===true,vibrate:[200,100,200]};
  event.waitUntil(self.registration.showNotification(title,options));
 });
 self.addEventListener("notificationclick",event=>{
