@@ -3093,7 +3093,8 @@ function showApp(){closeMobileMenu();
  window.__romanoAppReady=true;
  $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";
  $("roleBadge").textContent=roleNames[role()]||role();
- const av=$("avatar");if(av){av.innerHTML=currentProfile?.avatar_display_url?'<img src="'+esc(currentProfile.avatar_display_url)+'" alt="Foto de perfil">':esc((currentProfile?.full_name||"R").charAt(0).toUpperCase());av.classList.toggle("has-photo",!!currentProfile?.avatar_display_url)}
+ const roleAvatar=roleAvatarUrl(role());
+ const av=$("avatar");if(av){av.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';av.classList.add("has-role-avatar")}
  const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';sf.classList.add("has-role-avatar")}}
  if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usurio";
  if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();
