@@ -1680,6 +1680,7 @@ async function runAdminFinancialAlerts(){
  const r=await sb.rpc("notify_admin_financial_alerts");
  if(r.error)console.warn("Financial alerts:",r.error.message);
 }
+if(role()==="admin"){runAdminFinancialAlerts().catch(()=>{})}
 async function initOfflineSync(){if(__offlineListenersReady)return;__offlineListenersReady=true;await updateOfflineIndicator();if(navigator.onLine)syncOfflineQueue()}
 
 function toast(t){$("toast").textContent=t;$("toast").classList.remove("hidden");setTimeout(()=>$("toast").classList.add("hidden"),3000)}
@@ -3561,7 +3562,7 @@ async function renderDocumentsPremium(){
    $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Documentos del cliente</h3><span class="muted">Área privada · DEMOSTRACIÓN</span></div><span class="pill">Privado · RLS</span></div><div class="notice">Aquí el cliente puede adjuntar sus documentos y comunicarlos directamente a ROMANO PROPERTY CARE. En producción el archivo se guarda de forma privada y el equipo autorizado recibe la notificación.</div><div class="panel" style="margin-top:12px;background:#faf4ea"><div class="panel-head"><div><h3>Enviar documento a ROMANO</h3><div class="muted">DNI/NIE, contrato, seguro, documento de empresa, fiscal u otro.</div></div></div><div class="actions"><button class="btn gold" type="button" onclick="demoDocumentUploadNotice()">↑ Adjuntar documento</button><a class="btn" href="mailto:romanogestao@gmail.com?subject=Documento%20de%20cliente%20-%20ROMANO%20PROPERTY%20CARE">✉ Enviar e-mail a ROMANO</a></div><div class="muted" style="margin-top:8px;font-size:10px">En DEMOSTRACIÓN estos botones muestran el flujo. En producción el archivo se guarda y queda disponible para ROMANO.</div></div></div>';
    return;
  }
- const q=await sb.from("documents").select("id,title,document_type,file_name,storage_path,mime_type,size_bytes,created_at,uploaded_by").order("created_at",{ascending:false}).limit(100);
+ const q=await sb.from("documents").select("id,client_id,title,document_type,file_name,storage_path,mime_type,size_bytes,created_at,uploaded_by,version,parent_document_id,edited_at,edited_by").order("created_at",{ascending:false}).limit(100);
  if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
  const rows=q.data||[];
  let h='<div class="panel"><div class="panel-head"><div><h3>Mis documentos</h3><div class="muted">Documentos privados · cada perfil solo ve los archivos que él mismo ha anexado; Administración puede gestionarlos todos.</div></div><span class="pill">Storage + RLS</span></div>';
@@ -3607,7 +3608,7 @@ async function downloadDocumentForWord(id){
 async function uploadDocumentVersion(input,parentId){
  const file=input?.files?.[0];if(!file)return;
  if(!/\.(doc|docx)$/i.test(file.name)){toast("Anexe um arquivo Word .doc ou .docx.");input.value="";return}
- const q=await sb.from("documents").select("id,company_id,title,document_type,storage_path,file_name,uploaded_by,version,parent_document_id").eq("id",parentId).maybeSingle();
+ const q=await sb.from("documents").select("id,company_id,client_id,title,document_type,storage_path,file_name,uploaded_by,version,parent_document_id").eq("id",parentId).maybeSingle();
  if(q.error||!q.data){toast(q.error?.message||"Documento original não encontrado.");input.value="";return}
  if(!canOwnDocument(q.data)){toast("Solo el propietario o Administración puede anexar una nova versão.");input.value="";return}
  const root=q.data.parent_document_id||q.data.id;
@@ -3617,7 +3618,7 @@ async function uploadDocumentVersion(input,parentId){
  const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream"});
  if(up.error){toast("No se pudo subir la versión: "+up.error.message);input.value="";return}
  const nextVersion=Number(q.data.version||1)+1;
- const ins=await sb.from("documents").insert({company_id:q.data.company_id,client_id:null,title:q.data.title,document_type:q.data.document_type,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size,uploaded_by:q.data.uploaded_by,version:nextVersion,parent_document_id:root,edited_at:new Date().toISOString(),edited_by:currentUser.id});
+ const ins=await sb.from("documents").insert({company_id:q.data.company_id,client_id:q.data.client_id||null,title:q.data.title,document_type:q.data.document_type,storage_path:path,file_name:file.name,mime_type:file.type||null,size_bytes:file.size,uploaded_by:q.data.uploaded_by,version:nextVersion,parent_document_id:root,edited_at:new Date().toISOString(),edited_by:currentUser.id});
  if(ins.error){await sb.storage.from("company-documents").remove([path]);toast("No se pudo registrar la versão: "+ins.error.message);input.value="";return}
  toast("✓ Versão v"+nextVersion+" anexada.");
  input.value="";await renderDocumentsPremium();
