@@ -1941,12 +1941,12 @@ async function ensureCleaningChecklist(service){
  if(q.error)throw q.error;return q.data||[];
 }
 async function toggleServiceChecklist(itemId,checked,serviceId){
- if(!["employee","maintenance_technician"].includes(role())){toast("Solo el funcionario puede completar este checklist.");return}
+ if(role()!=="employee"){toast("Solo el funcionario de limpieza puede completar este checklist.");return}
  const r=await sb.from("service_checklist_items").update({checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",itemId).eq("service_id",serviceId);
  if(r.error){toast(r.error.message);return} await viewService(serviceId);
 }
 async function requestCleaningSupervision(serviceId){
- if(!["employee","maintenance_technician"].includes(role())){toast("Solo el funcionario puede solicitar la supervisión.");return}
+ if(role()!=="employee"){toast("Solo el funcionario de limpieza puede solicitar la supervisión.");return}
  const r=await sb.rpc("request_cleaning_supervision",{p_service_id:serviceId});if(r.error){toast(r.error.message);return}
  toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");await viewService(serviceId);
 }
@@ -1989,7 +1989,7 @@ function renderCleaningFlow(service,checklist,media){
  return h+"</div>";
 }
 function renderMaintenanceEmployeeFlow(x){
- if(!["employee","maintenance_technician"].includes(role())||x.assigned_employee_id!==currentUser.id||isCleaningServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
+ if(role()!=="maintenance_technician"||x.assigned_employee_id!==currentUser.id||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
  let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Trabajo de mantenimiento</h3><div class="muted">Acepte la designación, inicie el trabajo y adjunte fotos o vídeos del resultado.</div></div><span class="pill">'+esc(serviceTypeLabel(x.service_type))+'</span></div>';
  if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
  if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ INICIAR MANTENIMIENTO</button></div>';
@@ -1999,7 +1999,7 @@ function renderMaintenanceEmployeeFlow(x){
  return h;
 }
 async function viewRelatedCleaning(id){
- if(!["employee","maintenance_technician"].includes(role())){toast("Esta visualización es exclusiva del flujo interno.");return}
+ if(role()!=="employee"){toast("El seguimiento de limpieza es exclusivo del funcionario de limpieza.");return}
  const q=await sb.rpc("maintenance_employee_cleaning_context");
  if(q.error){toast(q.error.message);return}
  const x=(q.data||[]).find(s=>s.id===id);
@@ -2057,7 +2057,7 @@ async function viewService(id){
  const actorIds=[...new Set(auditRows.map(a=>a.actor_id).filter(Boolean))];
  let actorNames={};
  if(actorIds.length){const aq=await sb.from("profiles").select("id,full_name,email").in("id",actorIds);(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usurio");}
- const canUpdate=["admin","supervisor","employee"].includes(role());
+ const canUpdate=["admin","supervisor","employee","maintenance_technician"].includes(role());
  const isPendingAdmin=["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
@@ -2070,7 +2070,7 @@ async function viewService(id){
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],["employee","maintenance_technician"].includes(role()))+'</div></div>'+
   (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"&&isCleaningServiceType(x.service_type)?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
  renderServiceStatusActions(x)+
-  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)" '+(["admin","supervisor","employee"].includes(role())?"":"style=\'display:none\'")+'>'+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div>');
+  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)" '+(["admin","supervisor","employee","maintenance_technician"].includes(role())?"":"style=\'display:none\'")+'>'+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div>');
 }
 async function setServiceStatusPremium(id,status){
  const sr=await sb.from("services").select("id,service_type,assigned_employee_id,status").eq("id",id).single();
