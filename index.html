@@ -948,6 +948,17 @@ function serviceTypeLabel(v){
 function romanoMadridDateLabel(date=new Date()){return new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,dateStyle:"long"}).format(date)}
 function romanoMadridTimeLabel(date=new Date()){const d=romanoMadridValidDate(date);return d?new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,hour:"2-digit",minute:"2-digit"}).format(d):"—"}
 function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta",urgent:"Urgente"})[v]||v||"—"}
+async function loadEmployeeOperationalServices(){
+ if(role()!=="employee")return [];
+ const base=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
+ if(base.error)throw base.error;
+ const own=base.data||[];
+ const related=await sb.rpc("maintenance_employee_cleaning_context");
+ if(related.error)throw related.error;
+ const ownIds=new Set(own.map(x=>x.id));
+ const relatedRows=(related.data||[]).filter(x=>!ownIds.has(x.id)).map(x=>({...x,__relatedCleaning:true}));
+ return own.concat(relatedRows);
+}
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
@@ -960,7 +971,7 @@ async function renderServicesMaster(){
    }else if(role()==="employee"){
      q=q.eq("assigned_employee_id",currentUser.id);
    }
-   if(!r.error){const qr=await q;r.data=qr.data;r.error=qr.error}
+   if(!r.error){const qr=await q;r.data=qr.data;r.error=qr.error;if(!r.error&&role()==="employee"){try{r.data=await loadEmployeeOperationalServices()}catch(e){r.data=[];r.error=e}}}
  }
  let fin={};
  if(canSeeFinance()&&r.data?.length){
@@ -1175,7 +1186,7 @@ const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcion
 const ROMANO_PROFILE_MASTER=Object.freeze({
  admin:Object.freeze({key:"admin",label:"Administrador",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
  supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
- employee:Object.freeze({key:"employee",label:"Funcionario",allowed:["dashboard","service_journey","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","employee_documents","sync","profile"]}),
+ employee:Object.freeze({key:"employee",label:"Funcionario",allowed:["dashboard","service_journey","operations","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","employee_documents","sync","profile"]}),
  client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]})
 });
 function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
