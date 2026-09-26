@@ -897,7 +897,7 @@ async function renderDashboardReference(){
  if(window.L){const m=L.map("dashMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);[[40.425,-3.695,"Ana Silva · A camino"],[40.415,-3.69,"Pedro Costa · En servicio"],[40.405,-3.72,"Laura Mendes · Supervisado"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));}
 }
 async function rejectServiceRequest(id){
- if(!["admin","supervisor","employee"].includes(role()))return;
+ if(!["admin","supervisor","employee","maintenance_technician"].includes(role()))return;
  if(!confirm("Recusar este pedido?"))return;
  const q=await sb.rpc("admin_reject_service_request",{p_service_id:id});
  if(q.error){toast("No se pudo rechazar: "+q.error.message);return}
@@ -4260,7 +4260,7 @@ async function renderChatContacts(){
    const contacts=[["supervisor",sup,"Supervisor"],["admin",adm,"Administrador"]];
    el.innerHTML=contacts.map(([key,t,label])=>'<button class="romano-chat-contact '+(t?.id===__activeChatId?"active":"")+'" onclick="selectRoleChat(\''+key+'\')"><span class="rc-avatar">'+(key==="supervisor"?"S":"A")+'</span><span class="rc-info"><b>'+label+'</b><small>Conversación privada</small></span></button>').join("");
  }else{
-   const targetRoles=role()==="admin"?["supervisor","employee","client"]:role()==="supervisor"?["admin","employee"]:["supervisor","admin"];
+   const targetRoles=role()==="admin"?["supervisor","employee","maintenance_technician","client"]:role()==="supervisor"?["admin","employee","maintenance_technician"]:["supervisor","admin"];
    const contacts=[];
    for(const targetRole of targetRoles){
      const q=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name");
