@@ -11,6 +11,24 @@ using (
   and role in ('admin','supervisor')
 );
 
+create or replace function private.maintenance_technician_assigned_property_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path to ''
+as $function$
+  select distinct s.property_id
+  from public.services s
+  where s.assigned_employee_id = (select auth.uid())
+    and s.property_id is not null
+    and s.company_id = (
+      select p.company_id from public.profiles p
+      where p.id=(select auth.uid()) and p.active=true limit 1
+    )
+    and private.current_role() = 'maintenance_technician'
+$function$;
+
 create or replace function public.maintenance_technician_emergency_context()
 returns jsonb
 language plpgsql
@@ -44,7 +62,7 @@ begin
           select distinct p.client_id
           from public.properties p
           where p.company_id = v_company_id
-            and p.id in (select private.employee_property_ids())
+            and p.id in (select private.maintenance_technician_assigned_property_ids())
             and p.client_id is not null
         )
     ), '[]'::jsonb),
@@ -61,7 +79,7 @@ begin
       )
       from public.properties p
       where p.company_id = v_company_id
-        and p.id in (select private.employee_property_ids())
+        and p.id in (select private.maintenance_technician_assigned_property_ids())
     ), '[]'::jsonb)
   );
 end;
