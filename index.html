@@ -2576,18 +2576,20 @@ async function deleteEmployeeDocument(docId,path,employeeProfileId){
  toast("Documento eliminado correctamente");await loadEmployeeDocuments(employeeProfileId);
 }
 async function uploadEmployeeDocument(employeeProfileId,file,type="documento",title="Documento del funcionario"){
- if(!file)return;if(file.size>25*1024*1024){toast("El documento no puede superar 25 MB.");return}
+ if(!file)return false;
+ if(file.size>25*1024*1024){toast("El documento no puede superar 25 MB.");return false}
  const ep=await sb.from("employee_profiles").select("id,profile_id").eq("id",employeeProfileId).eq("company_id",currentProfile.company_id).maybeSingle();
- if(ep.error||!ep.data){toast(ep.error?.message||"Ficha del funcionario no encontrada.");return}
+ if(ep.error||!ep.data){toast(ep.error?.message||"Ficha del funcionario no encontrada.");return false}
  const employeeId=ep.data.profile_id||null;
- if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("Solo puede enviar documentos de su propia ficha.");return}
+ if(!employeeId){toast("La ficha no está vinculada a un usuario de acceso.");return false}
+ if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("Solo puede enviar documentos de su propia ficha.");return false}
  const storageOwner=["employee","maintenance_technician"].includes(role())?currentUser.id:employeeProfileId;
  const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"_"),path=currentProfile.company_id+"/employees/"+storageOwner+"/"+crypto.randomUUID()+"-"+safe;
  const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||undefined});
- if(up.error){toast("No se pudo subir el documento: "+up.error.message);return}
+ if(up.error){toast("No se pudo subir el documento: "+up.error.message);return false}
  const ins=await sb.from("employee_documents").insert({company_id:currentProfile.company_id,employee_id:employeeId,employee_profile_id:employeeProfileId,document_type:type,title,file_name:file.name,storage_path:path,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id});
- if(ins.error){await sb.storage.from("company-documents").remove([path]);toast("No se pudo registrar el documento: "+ins.error.message);return}
- toast("Documento guardado correctamente");await loadEmployeeDocuments(employeeProfileId);
+ if(ins.error){await sb.storage.from("company-documents").remove([path]);toast("No se pudo registrar el documento: "+ins.error.message);return false}
+ toast("✓ Documento guardado correctamente");await loadEmployeeDocuments(employeeProfileId);return true;
 }
 async function uploadEmployeeDocumentFromInput(id){
  const f=$("docFile_"+id)?.files?.[0];if(!f){toast("Seleccione un documento.");return}
@@ -2595,9 +2597,9 @@ async function uploadEmployeeDocumentFromInput(id){
 }
 async function saveSelectedEmployeeDocument(id){
  const f=$("docFile_"+id)?.files?.[0],type=$("employeeDocType")?.value||"Otro";
- if(!f){closeModal();toast("Seleccione un documento.");return}
- await uploadEmployeeDocument(id,f,type,type);
- closeModal();
+ if(!f){toast("Seleccione un documento.");return}
+ const ok=await uploadEmployeeDocument(id,f,type,type);
+ if(ok)closeModal();
 }
 async function openEmployeeDocument(path){
  const s=await sb.storage.from("company-documents").createSignedUrl(path,600);
