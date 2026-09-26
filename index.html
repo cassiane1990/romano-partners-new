@@ -1243,9 +1243,34 @@ async function renderEmployeeWorkPanel(){
  return '<div class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3>Mis trabajos</h3><div class="muted">Mantenimiento asignado y, para funcionarios de mantenimiento, el estado de la limpieza relacionada.</div></div><span class="pill">'+rows.length+'</span></div>'+body+'</div>';
 }
 async function renderLocationsMaster(){
- const work=["employee","maintenance_technician"].includes(role())?await renderEmployeeWorkPanel():"";
- $("content").innerHTML=work+'<div class="master-cols"><div class="panel"><div class="panel-head"><h3>Geolocalización / Radar</h3><button class="btn" onclick="openPage(\'locations\')">Actualizar</button></div><div id="radarMap" class="master-map"></div></div><div class="panel"><h3>Dispatch</h3><p class="muted">Proximidade real + disponibilidade + conflitos + escopo + elegibilidade.</p><div class="notice">Se um funcionario no aceptar dentro do prazo do pedido, o sistema registra a rejeição/expiração e o próximo candidato elegível pode ser acionado.</div></div></div>';
- if(window.L){const m=L.map("radarMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);if(demoMode){[[40.4168,-3.7038,"👩🏻‍🧹 Ana Silva · En camino · Alehost"],[40.421,-3.69,"👩🏻‍💼 Carla Santos · Supervisado"],[40.405,-3.72,"👨🏻‍🎨 Pedro Costa · Pintura · En curso"],[40.43,-3.71,"👨🏻‍🔧 João Martins · Finalizado"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]))}else{const r=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").order("recorded_at",{ascending:false}).limit(50);const seen={};(r.data||[]).forEach(x=>{if(seen[x.profile_id])return;seen[x.profile_id]=1;L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Precisão: "+(x.accuracy_m||"—")+" m")})}}
+ const r=role();
+ const work=["employee","maintenance_technician"].includes(r)?await renderEmployeeWorkPanel():"";
+ const mapIntro=r==="client"?"Mapa de sus propiedades autorizadas.":(["employee","maintenance_technician"].includes(r)?"Su ubicación y propiedades asignadas.":"Geolocalización / Radar operativo.");
+ const side=r==="client"
+   ? '<div class="notice">Solo se muestran las propiedades de su propia cuenta.</div>'
+   : '<div class="panel"><h3>Dispatch</h3><p class="muted">Proximidad real + disponibilidad + conflictos + escopo + elegibilidad.</p><div class="notice">La visibilidad se limita automáticamente según el perfil.</div></div>';
+ $("content").innerHTML=work+'<div class="master-cols"><div class="panel"><div class="panel-head"><div><h3>Geolocalización / Mapa</h3><div class="muted">'+mapIntro+'</div></div><button class="btn" onclick="openPage(\'locations\')">Actualizar</button></div><div id="radarMap" class="master-map"></div></div>'+side+'</div>';
+ if(!window.L)return;
+ const m=L.map("radarMap").setView([40.4168,-3.7038],12);
+ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
+ if(demoMode){
+   [[40.4168,-3.7038,"👩🏻‍🧹 Limpieza · Demo"],[40.421,-3.69,"👨🏻‍🔧 Mantenimiento · Demo"],[40.405,-3.72,"👩🏻‍💼 Supervisión · Demo"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));
+   return;
+ }
+ if(r==="client"){
+   const cr=await sb.from("clients").select("id,name").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+   if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
+   const pr=await sb.from("properties").select("id,name,code,address,city,latitude,longitude").eq("company_id",currentProfile.company_id).eq("client_id",cr.data.id).not("latitude","is",null).not("longitude","is",null).order("name");
+   (pr.data||[]).forEach(p=>L.marker([Number(p.latitude),Number(p.longitude)]).addTo(m).bindPopup("<b>"+esc(p.name||p.code||"Propiedad")+"</b><br>"+esc([p.address,p.city].filter(Boolean).join(" · ")||"Sin dirección")));
+   return;
+ }
+ if(["employee","maintenance_technician"].includes(r)){
+   const loc=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").eq("profile_id",currentUser.id).order("recorded_at",{ascending:false}).limit(1);
+   (loc.data||[]).forEach(x=>L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Mi última ubicación<br>Precisión: "+(x.accuracy_m||"—")+" m"));
+   return;
+ }
+ const loc=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").eq("company_id",currentProfile.company_id).order("recorded_at", {ascending:false}).limit(50);
+ const seen={};(loc.data||[]).forEach(x=>{if(seen[x.profile_id])return;seen[x.profile_id]=1;L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Última actualización: "+romanoMadridLabel(x.recorded_at))});
 }
 async function renderMaterialsMaster(){
  const r=await sb.from("material_requests").select("item_name,quantity,unit,status,created_at").order("created_at",{ascending:false}).limit(100);
@@ -1279,8 +1304,8 @@ const ROMANO_PROFILE_MASTER=Object.freeze({
  admin:Object.freeze({key:"admin",label:"Administrador",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
  supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
  employee:Object.freeze({key:"employee",label:"Funcionario de Limpieza",allowed:["dashboard","service_journey","services","calendar","journey","notifications","employee_documents","profile"]}),
- maintenance_technician:Object.freeze({key:"maintenance_technician",label:"Técnico de Mantenimiento",allowed:["dashboard","service_journey","operations","services","calendar","journey","locations","materialsreq","stock","maintenance_catalog","emergency","chat","notifications","employee_documents","sync","profile"]}),
- client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]})
+ maintenance_technician:Object.freeze({key:"maintenance_technician",label:"Técnico de Mantenimiento",allowed:["dashboard","service_journey","operations","services","calendar","journey","locations","materialsreq","stock","emergency","chat","notifications","employee_documents","sync","profile"]}),
+ client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","locations","sync","profile"]})
 });
 function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
 function romanoProfileCan(page,roleKey=role()){return romanoProfileMaster(roleKey).allowed.includes(page)}
@@ -3659,6 +3684,7 @@ async function renderPrivacyPremium(){return privacy()}
 async function renderProfilePremium(){return profile()}
 async function renderNotificationsPremium(){return renderNotifications()}
 async function maintenance(){
+ if(!["admin","supervisor"].includes(role())){toast("El catálogo de valores está reservado a Administración y Supervisión.");openPage("dashboard");return}
  const q=demoMode?{data:window.__DEMO_SERVICE_CATALOG||[],error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category","maintenance").order("name");
  const rows=q.data||[];
  let h='<div class="panel"><div class="panel-head"><div><h3>Catálogo de servicios de mantenimiento</h3><div class="muted">Aquí puedes editar los servicios, valores e IVA. Estos datos son del catálogo y no crean un pedido.</div></div><button class="btn gold" onclick="newMaintenanceCatalogItem()">＋ Añadir línea</button></div>';
@@ -3757,13 +3783,13 @@ async function newEmergency(){
    if(sr.error){toast(sr.error.message);return}
    services=(sr.data||[]).filter(x=>/manten|pint|electric|fontan|hydraulic|plumb/i.test(String(x.service_type||"").toLowerCase()));
  }else if(currentRole==="maintenance_technician"){
-   const [pr,cr,sr]=await Promise.all([
-     sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name"),
-     sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name"),
-     sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300)
-   ]);
-   if(pr.error||cr.error||sr.error){toast(pr.error?.message||cr.error?.message||sr.error?.message||"No se pudo cargar la emergencia.");return}
-   props=pr.data||[];clients=cr.data||[];services=(sr.data||[]).filter(x=>privateMaintenanceServiceType(x.service_type));
+   const ctx=await sb.rpc("maintenance_technician_emergency_context");
+   if(ctx.error){toast("No se pudo cargar clientes y apartamentos para Emergencia 24H: "+ctx.error.message);return}
+   clients=Array.isArray(ctx.data?.clients)?ctx.data.clients:[];
+   props=Array.isArray(ctx.data?.properties)?ctx.data.properties:[];
+   const sr=await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300);
+   if(sr.error){toast(sr.error.message);return}
+   services=(sr.data||[]).filter(x=>privateMaintenanceServiceType(x.service_type));
  }else{
    props=(await sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name")).data||[];
    clients=(await sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name")).data||[];
