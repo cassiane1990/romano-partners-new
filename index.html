@@ -740,6 +740,19 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 .rpc-month-service{display:flex;flex-direction:column;gap:1px;padding:4px 5px;margin:3px 0;border-left:3px solid #b7893f;border-radius:6px;background:#fff;overflow:hidden}
 .rpc-month-service b{font-size:8px}.rpc-month-service span{font-size:8px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rpc-month-service small{font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:600px){.rpc-month-grid{border-radius:10px}.rpc-month-weekday{font-size:7px;padding:6px 1px}.rpc-month-day{min-height:88px!important;padding:4px 2px!important}.rpc-month-day-head b{font-size:10px}.rpc-month-service{padding:2px 3px;margin:2px 0;border-left-width:2px}.rpc-month-service b{font-size:6px}.rpc-month-service span,.rpc-month-service small{font-size:6px}.rpc-month-day .muted{font-size:6px}}
+</style><style id="romano-status-avatar-sequence">
+.sj-avatar-sequence{display:flex;align-items:flex-start;gap:0;margin-top:10px;width:100%;overflow-x:auto;padding:3px 1px 7px;scrollbar-width:thin}
+.sj-avatar-step{position:relative;display:flex;flex-direction:column;align-items:center;min-width:72px;flex:1}
+.sj-avatar-step:not(:last-child):after{content:"";position:absolute;top:23px;left:50%;width:100%;height:2px;background:#e3d7c5;z-index:0}
+.sj-avatar-step.done:not(:last-child):after,.sj-avatar-step.current:not(:last-child):after{background:#b7893f}
+.sj-avatar{position:relative;z-index:1;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#f4ead8,#dfc99f);border:2px solid #e2d4bf;box-shadow:0 4px 12px rgba(72,52,25,.10);font-size:20px;filter:grayscale(.35);opacity:.7;transition:.18s}
+.sj-avatar-step.done .sj-avatar,.sj-avatar-step.current .sj-avatar{filter:none;opacity:1;border-color:#c59643;background:linear-gradient(145deg,#fffdf9,#ead5aa);box-shadow:0 5px 14px rgba(183,137,63,.20)}
+.sj-avatar-step.current .sj-avatar{box-shadow:0 0 0 4px #c596431c,0 6px 16px rgba(183,137,63,.25);transform:translateY(-2px)}
+.sj-avatar-step.final .sj-avatar{background:linear-gradient(145deg,#e9f4e9,#bdd7bd);border-color:#6d9b6d}
+.sj-avatar-label{margin-top:5px;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.2px;color:#81776b;text-align:center;white-space:nowrap}
+.sj-avatar-step.done .sj-avatar-label,.sj-avatar-step.current .sj-avatar-label{color:#5e4828}
+.sj-avatar-time{font-size:7px;color:#a0978b;margin-top:2px;white-space:nowrap}
+@media(max-width:650px){.sj-avatar-step{min-width:64px}.sj-avatar{width:40px;height:40px;font-size:17px}.sj-avatar-step:not(:last-child):after{top:20px}.sj-avatar-label{font-size:7px}.sj-avatar-time{font-size:6px}}
 </style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
@@ -1117,6 +1130,26 @@ function journeyActionsForService(s){
  if(s.status==="paused")return btn("▶ Continuar","in_progress",true)+(maint&&r!=="employee"?btn("✓ Finalizar","completed",true):"");
  return "";
 }
+function renderServiceStatusAvatarSequence(s){
+ const status=String(s?.status||"scheduled");
+ const steps=[
+  {key:"received",label:"Recibido",icon:"📄"},
+  {key:"accepted",label:"Aceptado",icon:"✓"},
+  {key:"on_the_way",label:"A camino",icon:"📍"},
+  {key:"in_progress",label:"En curso",icon:"🔧"},
+  {key:"supervised",label:"Supervisado",icon:"🔎"},
+  {key:"completed",label:"Finalizado",icon:"✓"}
+ ];
+ const progress={scheduled:0,requested:0,on_the_way:2,in_progress:3,paused:3,supervision_pending:4,supervised:4,completed:5,approved:5,rejected:-1,returned:-1,cancelled:-1};
+ const current=Object.prototype.hasOwnProperty.call(progress,status)?progress[status]:0;
+ const activeStatus=status==="paused"?"Pausado":status==="supervision_pending"?"Esperando supervisión":"";
+ return '<div class="sj-avatar-sequence" aria-label="Secuencia del servicio">'+steps.map((x,i)=>{
+   const done=current>i,now=current===i;
+   const extra=x.key==="completed"&&current===5?" final":"";
+   const sub=now&&activeStatus?activeStatus:"";
+   return '<div class="sj-avatar-step '+(done?"done ":"")+(now?"current ":"")+extra+'"><div class="sj-avatar" title="'+esc(x.label)+'">'+x.icon+'</div><div class="sj-avatar-label">'+esc(x.label)+'</div>'+(sub?'<div class="sj-avatar-time">'+esc(sub)+'</div>':"")+'</div>';
+ }).join("")+'</div>';
+}
 async function renderServiceJourneyBoard(){
  const day=window.__sjDay||new Date().toLocaleDateString("sv-SE");
  let services=[],props=[],clients=[],employees=[];
@@ -1155,7 +1188,7 @@ async function renderServiceJourneyBoard(){
   const stageText=terminal?"Estado bloqueado":s.status==="scheduled"?"Próximo paso: aceptar":s.status==="on_the_way"?"Próximo paso: iniciar":s.status==="in_progress"?"Trabajo en curso":s.status==="paused"?"Próximo paso: continuar":"Estado";
   const stages=["scheduled","on_the_way","in_progress","paused","supervision_pending","completed"];
   const currentIndex=s.status==="paused"?3:s.status==="supervision_pending"?4:s.status==="completed"||s.status==="approved"?5:["scheduled","on_the_way","in_progress"].indexOf(s.status);
-  const stageHtml='<div class="sj-stagebar">'+stages.map((st,idx)=>'<span class="'+(idx<currentIndex?"done ":idx===currentIndex?"current ":"")+(st==="paused"||st==="supervision_pending"?"optional":"")+'">'+esc(labels[st])+'</span>').join("")+'</div>';
+  const stageHtml=renderServiceStatusAvatarSequence(s);
   const sid=JSON.stringify(s.id);
   return '<article class="sj-card '+(own?"sj-own":"")+'" onclick="viewService('+sid+')"><div class="sj-photo">'+(p.photo_url?'<img src="'+esc(photos[p.id]||"")+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type '+(isMaint(s)?"maint":"clean")+'">'+(isMaint(s)?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</span><div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(serviceTypeLabel(s.service_type))+'</p><span class="sj-priority">'+esc(servicePriorityLabel(s.priority))+'</span></div><div class="sj-status"><div class="sj-current"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><small>'+esc(stageText)+'</small></div>'+stageHtml+'<button class="sj-btn" onclick="event.stopPropagation();viewService('+sid+')">Ver ficha</button>'+(action?'<div class="sj-quick">'+action+'</div>':"")+'</div></article>';
  }).join("");
