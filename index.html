@@ -2807,7 +2807,13 @@ async function notificationAction(id,title,body){
    const m=b.match(/SRV-[A-Z0-9-]+/i);
    if(m){
     const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",m[0]).maybeSingle();
-    if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){await viewService(q.data.id);return}
+    if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){
+      const a=await sb.rpc("employee_accept_service_assignment",{p_service_id:q.data.id});
+      if(a.error){toast("No se pudo aceptar: "+a.error.message);return}
+      toast("✓ Servicio aceptado. Estado: A camino.");
+      await renderServicesMaster();
+      return;
+    }
    }
    openPage("services");return;
  }
@@ -2850,7 +2856,7 @@ async function renderNotifications(){
    const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
    const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
    const action=(isMessage||isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
-   const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ VER Y ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
+   const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
    return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
  }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';enableNotificationSwipe();
 }
