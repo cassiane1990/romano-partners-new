@@ -3670,7 +3670,7 @@ async function newEmergency(){
    clients=(await sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name")).data||[];
    services=(await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("company_id",currentProfile.company_id).order("scheduled_at",{ascending:false}).limit(300)).data||[];
    const ep=(await sb.from("employee_profiles").select("profile_id,full_name,function_title").eq("company_id",currentProfile.company_id)).data||[];
-   const pp=(await sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name")).data||[];
+   const pp=(await sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).in("role",["employee","maintenance_technician"]).eq("active",true).order("full_name")).data||[];
    maintenanceEmployees=pp.map(p=>{const e=ep.find(x=>x.profile_id===p.id);return {...p,function_title:e?.function_title||""}}).filter(x=>{const t=String(x.function_title||"").toLowerCase();return /manten|maintenance|pint|electric|fontan|hidraul|hydraulic|silicone|montaje|instal/.test(t)});
    if(!maintenanceEmployees.length){const maintenanceEmployeeIds=new Set(services.filter(x=>String(x.service_type||"").toLowerCase().match(/manten|pint|electric|fontan|hydraulic/)).map(x=>x.assigned_employee_id).filter(Boolean));maintenanceEmployees=pp.filter(p=>maintenanceEmployeeIds.has(p.id)).map(p=>({...p,function_title:"Mantenimiento"}));}
  }
