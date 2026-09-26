@@ -68,6 +68,24 @@
 }
 <style id="sj-quick-fix">
 .sj-employee{margin-top:7px;font-size:11px;font-weight:700;color:#6e542a}.sj-client{margin-top:4px;font-size:10px;color:#81786d}.sj-priority{display:inline-block;margin-top:5px;padding:4px 7px;border-radius:999px;background:#f4ead8;color:#80602d;font-size:9px;text-transform:capitalize}.sj-quick{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.sj-quick .btn{padding:6px 7px;font-size:9px}.sj-status{min-width:190px}.sj-card{display:grid;grid-template-columns:150px minmax(220px,1.2fr) minmax(190px,1fr) minmax(190px,.8fr);gap:14px;align-items:stretch}.sj-photo{min-height:150px}.sj-main,.sj-location,.sj-status{padding-top:6px}.sj-time{font:700 20px Georgia,serif}@media(max-width:1050px){.sj-card{grid-template-columns:120px 1fr 1fr}.sj-status{grid-column:2/-1}}@media(max-width:650px){.sj-card{display:block}.sj-photo{height:150px;margin-bottom:10px}.sj-main,.sj-location,.sj-status{padding-top:0;margin-top:10px}.sj-status{min-width:0}.sj-quick .btn{flex:1}}
+
+/* ROMANO premium login — CSS only, no external image */
+.login{padding:0;background:#161512;display:grid;place-items:stretch;min-height:100vh}
+.login-shell{width:100%;min-height:100vh;display:grid;grid-template-columns:minmax(0,1.12fr) minmax(390px,.88fr);background:radial-gradient(circle at 18% 18%,#d8b56b22,transparent 38%),linear-gradient(135deg,#171613,#29251d)}
+.login-visual{position:relative;overflow:hidden;padding:56px 7vw;display:flex;flex-direction:column;justify-content:center;color:#fff;background:radial-gradient(circle at 72% 38%,#d7b56820,transparent 30%),linear-gradient(135deg,#171613,#242018)}
+.login-visual:before{content:"";position:absolute;inset:7%;border:1px solid #d8b56b35;border-radius:34px;box-shadow:inset 0 0 80px #d8b56b08,0 0 80px #0008;pointer-events:none}
+.hero-logo{position:relative;width:92px;height:92px;border-radius:30px;display:grid;place-items:center;margin-bottom:24px;background:linear-gradient(145deg,#f3d99c,#b88735 58%,#7e5a25);color:#fff;font:700 54px Georgia,serif;box-shadow:0 18px 55px #b8873544,0 0 0 1px #f7e5b555}
+.login-visual h1{position:relative;margin:0;font:700 clamp(44px,6vw,78px) Georgia,serif;letter-spacing:9px;color:#f5e5bf}
+.login-visual .subtitle{position:relative;margin-top:3px;font-size:13px;letter-spacing:7px;color:#d7b568;font-weight:700}
+.gold-line{position:relative;width:105px;height:2px;background:linear-gradient(90deg,#f0d18c,#a8752b);margin:28px 0 18px}
+.tagline{position:relative;font-size:12px;letter-spacing:4px;color:#eee5d5}
+.login-features{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:38px;max-width:570px}
+.login-feature{padding:14px 16px;border:1px solid #d8b56b26;border-radius:15px;background:#ffffff08;backdrop-filter:blur(5px)}
+.login-feature strong{display:block;color:#e5c77f;font-size:12px;letter-spacing:1px}.login-feature span{display:block;margin-top:4px;color:#bdb5a8;font-size:10px}
+.login-values{position:relative;display:flex;gap:18px;flex-wrap:wrap;margin-top:30px;color:#bdb5a8;font-size:9px;letter-spacing:2px}.login-values b{color:#e2c17a}
+.login-card{width:auto;align-self:stretch;border:0;border-left:1px solid #d8b56b25;border-radius:0;background:#fffdf9;box-shadow:-30px 0 80px #0004;padding:clamp(30px,6vw,72px);display:flex;flex-direction:column;justify-content:center}.login-card .brand{text-align:left}.login-card .logo{display:none}.login-card .brand h1{font-size:36px;letter-spacing:1px;margin:0 0 8px}.login-card .brand p{letter-spacing:2px;line-height:1.7}.login-card .primary{background:linear-gradient(135deg,#c99a4b,#9d6d27);box-shadow:0 10px 25px #b7893f44;font-size:13px;letter-spacing:.4px}.login-card .btn{background:#fffaf2}.login-card .btn:hover{border-color:#b7893f}.login-card:after{content:"ROMANO PROPERTY CARE  ·  EXCELENCIA EN CADA DETALLE";display:block;margin-top:30px;color:#a89478;font-size:8px;letter-spacing:1.6px;text-align:center}
+@media(max-width:850px){.login-shell{grid-template-columns:1fr}.login-visual{min-height:45vh;padding:34px 28px}.login-visual:before{inset:18px}.login-visual h1{font-size:45px}.login-features{margin-top:22px}.login-card{min-height:55vh;border-left:0;border-top:1px solid #d8b56b25;padding:38px 28px}}
+@media(max-width:520px){.login-visual{padding:28px 22px}.hero-logo{width:72px;height:72px;font-size:42px;border-radius:23px}.login-visual h1{font-size:34px;letter-spacing:5px}.login-visual .subtitle{font-size:10px;letter-spacing:4px}.login-features{grid-template-columns:1fr}.login-values{display:none}.login-card{padding:32px 22px}.login-card .brand h1{font-size:30px}}
 </style></style></style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
@@ -733,12 +751,19 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 @media(max-width:600px){.rpc-month-grid{border-radius:10px}.rpc-month-weekday{font-size:7px;padding:6px 1px}.rpc-month-day{min-height:88px!important;padding:4px 2px!important}.rpc-month-day-head b{font-size:10px}.rpc-month-service{padding:2px 3px;margin:2px 0;border-left-width:2px}.rpc-month-service b{font-size:6px}.rpc-month-service span,.rpc-month-service small{font-size:6px}.rpc-month-day .muted{font-size:6px}}
 </style></head>
 <body>
-<div id="login" class="login"><div class="card login-card">
-<div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
+<div id="login" class="login"><div class="login-shell">
+<section class="login-visual" aria-label="ROMANO PROPERTY CARE">
+<div class="hero-logo">R</div><h1>ROMANO</h1><div class="subtitle">PROPERTY CARE</div><div class="gold-line"></div><div class="tagline">EXCELENCIA EN CADA DETALLE</div>
+<div class="login-features"><div class="login-feature"><strong>LIMPIEZA PROFESIONAL</strong><span>Alojamiento, hoteles, oficinas y clínicas</span></div><div class="login-feature"><strong>MANTENIMIENTO INTEGRAL</strong><span>Preventivo, correctivo e instalaciones</span></div><div class="login-feature"><strong>CONTROL Y CALIDAD</strong><span>Supervisión y seguimiento de cada servicio</span></div><div class="login-feature"><strong>EQUIPO ESPECIALIZADO</strong><span>Profesionales formados para estándares premium</span></div></div>
+<div class="login-values"><b>CONFIANZA</b><span>•</span><b>CALIDAD</b><span>•</span><b>COMPROMISO</b><span>•</span><b>RESULTADOS</b></div>
+</section>
+<div class="card login-card">
+<div class="brand"><h1>Bienvenido</h1><p>ACCEDE A TU CUENTA DE ROMANO PROPERTY CARE</p></div>
 <form id="loginForm"><div class="field"><label>Correo electrónico</label><input id="email" type="email" autocomplete="username" required></div>
 <div class="field"><label>Contraseña</label><input id="password" type="password" autocomplete="current-password" required></div>
-<button class="primary">Entrar al sistema</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
+<button class="primary">Iniciar Sesión →</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
 </div></div>
+</div>
 
 <div id="mfa" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>VERIFICACIÓN</h1><p>SEGURIDAD ROMANO PARTNERS</p></div>
 <p class="muted">Introduce el código de tu aplicación autenticadora.</p><div class="field"><label>Código MFA</label><input id="mfaCode" inputmode="numeric" maxlength="6"></div>
