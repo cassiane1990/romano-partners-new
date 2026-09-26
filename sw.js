@@ -1,4 +1,4 @@
-const CACHE="romano-pwa-v14";
+const CACHE="romano-pwa-v15";
 const CORE=["/","/index.html","/manifest.json","/icon.svg"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
@@ -33,3 +33,4 @@ self.addEventListener("notificationclick",event=>{
  }));
 });
 self.addEventListener("notificationclose",()=>{});
+self.addEventListener("message",event=>{if(event.data?.type==="SKIP_WAITING")self.skipWaiting()});
