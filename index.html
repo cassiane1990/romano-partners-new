@@ -1172,7 +1172,23 @@ async function renderServiceJourneyBoard(){
   else if(role()==="supervisor")q=await sb.from("services").select(fields).or("assigned_supervisor_id.eq."+currentUser.id+",created_by.eq."+currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   else q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
-  services=q.data||[]; if(role()==="maintenance_technician")services=services.filter(s=>privateMaintenanceServiceType(s.service_type));
+  services=q.data||[];
+  if(["employee","maintenance_technician"].includes(role())&&services.length===0){
+    const activeQ=await sb.from("services").select(fields)
+      .eq("assigned_employee_id",currentUser.id)
+      .in("status",["scheduled","on_the_way","in_progress","paused","supervision_pending"])
+      .order("scheduled_at",{ascending:true})
+      .limit(100);
+    if(!activeQ.error&&activeQ.data?.length){
+      services=activeQ.data;
+      window.__sjShowingActiveAssigned=true;
+    }else{
+      window.__sjShowingActiveAssigned=false;
+    }
+  }else{
+    window.__sjShowingActiveAssigned=false;
+  }
+  if(role()==="maintenance_technician")services=services.filter(s=>privateMaintenanceServiceType(s.service_type));
   const ids=[...new Set(services.map(s=>s.property_id).filter(Boolean))],cids=[...new Set(services.map(s=>s.client_id).filter(Boolean))],eids=[...new Set(services.map(s=>s.assigned_employee_id).filter(Boolean))];
   const [pr,cr,er]=await Promise.all([
    ids.length?sb.from("properties").select("id,code,name,address,city,country,photo_url,property_type,client_id").in("id",ids):Promise.resolve({data:[]}),
@@ -1204,7 +1220,8 @@ async function renderServiceJourneyBoard(){
   const sid=JSON.stringify(s.id);
   return '<article class="sj-card '+(own?"sj-own":"")+'" onclick="viewService('+sid+')"><div class="sj-photo">'+(p.photo_url?'<img src="'+esc(photos[p.id]||"")+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type '+(isMaint(s)?"maint":"clean")+'">'+(isMaint(s)?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</span><div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(serviceTypeLabel(s.service_type))+'</p><span class="sj-priority">'+esc(servicePriorityLabel(s.priority))+'</span></div><div class="sj-status"><div class="sj-current"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><small>'+esc(stageText)+'</small></div>'+stageHtml+'<button class="sj-btn" onclick="event.stopPropagation();viewService('+sid+')">Ver ficha</button>'+(action?'<div class="sj-quick">'+action+'</div>':"")+'</div></article>';
  }).join("");
- $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>Una sola acción siguiente por servicio. Los estados verificados/finalizados quedan bloqueados.</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>🧹 Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>🔧 Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados / cerrados</small><strong>'+services.filter(s=>["completed","approved","supervised"].includes(s.status)).length+'</strong></div></div><div class="sj-legend"><span>🚗 A camino</span><span>▶ Iniciado</span><span>Ⅱ Pausado</span><span>🔎 Esperando supervisión</span><span>✓ Finalizado</span></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
+ const sjHint=window.__sjShowingActiveAssigned?'Mostrando también servicios activos que siguen asignados a ti, aunque su fecha programada ya haya pasado.': 'Una sola acción siguiente por servicio. Los estados verificados/finalizados quedan bloqueados.';
+ $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>'+esc(sjHint)+'</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>🧹 Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>🔧 Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados / cerrados</small><strong>'+services.filter(s=>["completed","approved","supervised"].includes(s.status)).length+'</strong></div></div><div class="sj-legend"><span>🚗 A camino</span><span>▶ Iniciado</span><span>Ⅱ Pausado</span><span>🔎 Esperando supervisión</span><span>✓ Finalizado</span></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
  $("sjDay").onchange=()=>{window.__sjDay=$("sjDay").value;renderServiceJourneyBoard()};
 }
 async function renderJourneyMaster(){
@@ -1236,7 +1253,15 @@ async function renderJourneyMaster(){
    else if(act==="view")viewService(id);
  }));
 }
-async function masterClockIn(){const pos=await masterGeo();const r=await sb.from("work_journal_entries").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,check_in_at:new Date().toISOString(),check_in_lat:pos?.lat||null,check_in_lng:pos?.lng||null,status:"open"});if(r.error)toast(r.error.message);else{toast("Entrada registrada");renderJourneyMaster()}}
+async function masterClockIn(){
+ const existing=await sb.from("work_journal_entries").select("id,check_in_at").eq("profile_id",currentUser.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
+ if(existing.error){toast("No se pudo comprobar la jornada: "+existing.error.message);return}
+ if(existing.data){toast("✓ Ya tienes una jornada abierta desde "+romanoMadridLabel(existing.data.check_in_at));await renderJourneyMaster();return}
+ const pos=await masterGeo();
+ const r=await sb.from("work_journal_entries").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,check_in_at:new Date().toISOString(),check_in_lat:pos?.lat||null,check_in_lng:pos?.lng||null,status:"open"});
+ if(r.error)toast("No se pudo registrar la entrada: "+r.error.message);
+ else{toast("✓ Entrada registrada");await renderJourneyMaster()}
+}
 async function masterClockOut(){const pos=await masterGeo();const r=await sb.from("work_journal_entries").update({check_out_at:new Date().toISOString(),check_out_lat:pos?.lat||null,check_out_lng:pos?.lng||null,status:"closed"}).eq("profile_id",currentUser.id).eq("status","open");if(r.error)toast(r.error.message);else{toast("Salida registrada");renderJourneyMaster()}}
 function masterGeo(){return new Promise(resolve=>{if(!navigator.geolocation)return resolve(null);navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),()=>resolve(null),{enableHighAccuracy:true,timeout:7000})})}
 async function renderEmployeeWorkPanel(){
