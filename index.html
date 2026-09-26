@@ -857,7 +857,7 @@ async function renderDashboardReference(){
    ]);
    services=sr.data||[];properties=pr.data||[];alerts=nr.data||[];
   }
-  const statusLabel={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado"};
+  const statusLabel={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervision_pending:"Pendiente de supervisión",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado"};
   const avatar=(s)=>{
    const t=String(s?.service_type||"").toLowerCase();
    const cls=t.includes("pint")?"male-paint":(t.includes("manten")||t.includes("electric")||t.includes("plumb")?"male-maint":"female-clean");
