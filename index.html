@@ -1281,9 +1281,11 @@ async function renderPremiumDashboard(){
  const firstProp=first?propertyMap[first.property_id]:d.properties[0]; const heroPhoto=premiumDashboardPropertyPhoto(firstProp)||"https://images.unsplash.com/photo-1776876648949-63ccabf63b10?auto=format&fit=crop&fm=jpg&q=82&w=2200";
  const locationText=firstProp?[firstProp.name,firstProp.city].filter(Boolean).join(" · "):"Sin propiedad activa";
  const firstLabel=first?((first.service_type||"Servicio")+" · "+(first.typology||"")):"Sin servicio en curso";
- const actions=[
-  ["＋","Nuevo servicio ▾","newservice"],["▦","Calendario","calendar"],["⚡","Adelantar check-in","change_requests"],["⌂","Mis propiedades","properties"],["◌","Chat","chat"],["▤","Documentos","documents"]
- ];
+ const actions=role()==="employee"
+  ? [["▦","Calendario","calendar"],["◌","Chat","chat"],["▤","Documentos","documents"]]
+  : [
+    ["＋","Nuevo servicio ▾","newservice"],["▦","Calendario","calendar"],["⚡","Adelantar check-in","change_requests"],["⌂","Mis propiedades","properties"],["◌","Chat","chat"],["▤","Documentos","documents"]
+  ];
  let h='<div class="rpc-home">'+
  '<div class="rpc-home-top"><div class="rpc-home-welcome"><h1>'+esc(greeting())+', '+esc((d.name||"Usurio").split("@")[0])+' 😊</h1><p>Excelencia en cada detalle · ROMANO PROPERTY CARE</p></div><div class="rpc-home-meta"><div class="rpc-home-location">📍 '+esc(locationText)+'</div><div class="rpc-home-date">📅 '+esc(romanoMadridDateLabel())+'<strong>'+esc(romanoMadridTimeLabel())+'</strong></div><div class="rpc-notice-count">🔔 '+d.unread+'</div></div></div>'+
  '<div class="rpc-home-hero"><div class="rpc-home-hero-photo" style="background-image:url("'+esc(heroPhoto)+'")"></div><div class="rpc-home-hero-copy"><div class="rpc-home-brand">ROMANO<small>PROPERTY CARE · PARTNERS</small></div><div class="rpc-home-eyebrow">GESTIÓN PREMIUM · '+esc(roleLabel.toUpperCase())+'</div><h2>PROPIEDADES IMPECABLES<br>CLIENTE SATISFECHO</h2><p>Todo bajo control para que cada propiedad y cada servicio estén impecables.</p></div><div class="rpc-home-current"><small>Servicio actual</small><strong>'+esc(firstLabel)+'</strong><span>'+esc(first?.code||"—")+' · '+esc(statusNames[first?.status]||first?.status||"Programado")+'</span></div></div>'+
