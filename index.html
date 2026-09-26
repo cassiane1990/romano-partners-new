@@ -9,6 +9,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ROMANO">
+<script>
+(function(){
+  const h=String(location.hostname||"").toLowerCase();
+  if(/^[a-z0-9-]+\.romano-partners-new\.pages\.dev$/.test(h)){
+    const target="https://romano-partners-new.pages.dev"+location.pathname+location.search+location.hash;
+    location.replace(target);
+  }
+})();
+</script>
 <link rel="apple-touch-icon" href="/icon.svg">
 <title>ROMANO PARTNERS · Property Care</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2696,7 +2705,9 @@ async function registerRomanoServiceWorker(){
   if(!window.__romanoSWControllerWatch){
    window.__romanoSWControllerWatch=true;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(!window.__romanoAppReady||__authBusy||__romanoSWReloading)return;
     __romanoSWReloading=true;
+    window.location.reload();
    });
   }
   const reg=await navigator.serviceWorker.register("/sw.js",{scope:"/",updateViaCache:"none"});
@@ -2709,6 +2720,13 @@ async function registerRomanoServiceWorker(){
   return reg;
  }catch(e){console.warn("ROMANO Service Worker:",e);return null}
 }
+let __romanoSWUpdateTimer=null;
+function scheduleRomanoSWUpdates(){
+ if(__romanoSWUpdateTimer)clearInterval(__romanoSWUpdateTimer);
+ __romanoSWUpdateTimer=setInterval(()=>{registerRomanoServiceWorker().catch(()=>{})},300000);
+ document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")registerRomanoServiceWorker().catch(()=>{})},{passive:true});
+}
+scheduleRomanoSWUpdates();
 async function testBackgroundNotification(){
  const reg=window.__romanoSW||await registerRomanoServiceWorker();
  if(!reg){toast("Service Worker no disponible.");return}
@@ -2722,6 +2740,7 @@ async function testBackgroundNotification(){
 document.addEventListener("pointerdown",unlockNotificationAudio,{once:true,passive:true});document.addEventListener("keydown",unlockNotificationAudio,{once:true,passive:true});
 function doLogout(){sb.auth.signOut()}
 function showApp(){closeMobileMenu();
+ window.__romanoAppReady=true;
  $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";
  $("roleBadge").textContent=roleNames[role()]||role();
  const av=$("avatar");if(av){av.innerHTML=currentProfile?.avatar_display_url?'<img src="'+esc(currentProfile.avatar_display_url)+'" alt="Foto de perfil">':esc((currentProfile?.full_name||"R").charAt(0).toUpperCase());av.classList.toggle("has-photo",!!currentProfile?.avatar_display_url)}
@@ -3391,7 +3410,7 @@ async function newEmergency(){
  const clientField=currentRole==="client"
    ? '<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>'
    : '<select id="eClient"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>';
- openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="notice">Emergencia 24H está reservada para mantenimiento. Cliente, apartamento y dirección se identifican automáticamente a partir del servicio. El funcionario de mantenimiento se asigna aquí para recibir la incidencia.</div><div class="two"><div class="field"><label>Servicio de mantenimiento relacionado</label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div><div class="field"><label>Funcionario de mantenimiento</label><select id="eEmployee" required>'+employeeOptions+'</select></div></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Enviar emergencia 24H de mantenimiento</button></form>');
+ openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="notice">Emergencia 24H está reservada exclusivamente para incidencias urgentes de mantenimiento. Al seleccionar un servicio relacionado, cliente, apartamento y dirección se identifican automáticamente.</div><div class="two"><div class="field"><label>Servicio de mantenimiento relacionado</label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div><div class="field"><label>Funcionario de mantenimiento</label><select id="eEmployee" required>'+employeeOptions+'</select></div></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Enviar emergencia 24H de mantenimiento</button></form>');
 }
 function syncEmergencyFromService(serviceId){
  const sel=$("eService"),opt=sel?.options[sel.selectedIndex];if(!opt)return;
