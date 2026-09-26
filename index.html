@@ -1888,15 +1888,30 @@ async function approveCleaningService(serviceId){
 }
 function renderCleaningFlow(service,checklist,media){
  if(!isCleaningServiceType(service.service_type))return "";
- const own=role()==="employee"&&service.assigned_employee_id===currentUser.id,reviewer=["admin","supervisor"].includes(role());
- const checked=checklist.filter(i=>i.checked).length,photos=media.filter(m=>m.media_type==="photo"),reviewed=photos.filter(m=>m.review_opened_at).length;
+ const own=role()==="employee"&&service.assigned_employee_id===currentUser.id;
+ const reviewer=["admin","supervisor"].includes(role());
+ const checked=checklist.filter(i=>i.checked).length;
+ const photos=media.filter(m=>m.media_type==="photo");
+ const reviewed=photos.filter(m=>m.review_opened_at).length;
  const ready=checked===ROMANO_CLEANING_CHECKLIST.length&&photos.length>0;
- let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quarto, sala, baño, cocina, lixeiros, geladeira, forno, microondas, debajo de la cama, dentro de armarios y amenities.</div></div><span class="pill">'+checked+'/'+ROMANO_CLEANING_CHECKLIST.length+'</span></div>';
- h+=ROMANO_CLEANING_CHECKLIST.map(req=>{const row=checklist.find(i=>i.item_key===req.key);return '<label class="line-item" style="cursor:'+(own?'pointer':'default')+'"><span><input type="checkbox" '+(row?.checked?'checked ':'')+(own&&service.status!=="supervision_pending"&&service.status!=="completed"?' onchange="toggleServiceChecklist(\'+esc(row?.id||"")+'\\',this.checked,\'+esc(service.id)+'\\')"':' disabled')+'> '+esc(row?.item_label||req.label)+'</span><b>'+(row?.checked?'✓ OK':'Pendiente')+'</b></label>'}).join("");
- h+='<div class="notice" style="margin-top:10px"><b>Fotos:</b> '+photos.length+(reviewer?' · <b>Revisadas:</b> '+reviewed+'/'+photos.length:"")+'</div>';
- if(own){if(service.status==="supervision_pending")h+='<div class="notice">✓ Checklist y fotos enviados. Esperando revisión del Supervisor o Administrador.</div>';else if(service.status==="completed")h+='<div class="notice">✓ Limpieza aprobada por Supervisor/Administrador.</div>';else h+='<div class="actions" style="margin-top:10px"><button class="btn gold" '+(ready?'':'disabled')+' onclick="requestCleaningSupervision(\'+service.id+'\\')">✓ SOLICITAR SUPERVISIÓN</button></div>'}
- if(reviewer&&service.status==="supervision_pending")h+='<div class="notice" style="margin-top:10px"><b>Revisión obligatoria:</b> abra cada foto individualmente. El OK solo se habilita después de revisar todas.</div><div class="actions" style="margin-top:10px"><button class="btn gold" '+(photos.length>0&&reviewed===photos.length?'':'disabled')+' onclick="approveCleaningService(\'+service.id+'\\')">✓ DAR OK · FINALIZAR LIMPIEZA</button></div>';
- return h+'</div>';
+ let h=`<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quarto, sala, baño, cocina, lixeiros, geladeira, forno, microondas, debajo de la cama, dentro de armarios y amenities.</div></div><span class="pill">${checked}/${ROMANO_CLEANING_CHECKLIST.length}</span></div>`;
+ h+=ROMANO_CLEANING_CHECKLIST.map(req=>{
+   const row=checklist.find(i=>i.item_key===req.key);
+   const change=own&&service.status!=="supervision_pending"&&service.status!=="completed"&&row
+     ? ` onchange="toggleServiceChecklist('${row.id}',this.checked,'${service.id}')"`
+     : " disabled";
+   return `<label class="line-item" style="cursor:${own?"pointer":"default"}"><span><input type="checkbox" ${row?.checked?"checked ":""}${change}> ${esc(row?.item_label||req.label)}</span><b>${row?.checked?"✓ OK":"Pendiente"}</b></label>`;
+ }).join("");
+ h+=`<div class="notice" style="margin-top:10px"><b>Fotos:</b> ${photos.length}${reviewer?' · <b>Revisadas:</b> '+reviewed+'/'+photos.length:""}</div>`;
+ if(own){
+   if(service.status==="supervision_pending")h+=`<div class="notice">✓ Checklist y fotos enviados. Esperando revisión del Supervisor o Administrador.</div>`;
+   else if(service.status==="completed")h+=`<div class="notice">✓ Limpieza aprobada por Supervisor/Administrador.</div>`;
+   else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISIÓN</button></div>`;
+ }
+ if(reviewer&&service.status==="supervision_pending"){
+   h+=`<div class="notice" style="margin-top:10px"><b>Revisión obligatoria:</b> abra cada foto individualmente. El OK solo se habilita después de revisar todas.</div><div class="actions" style="margin-top:10px"><button class="btn gold" ${photos.length>0&&reviewed===photos.length?"":"disabled"} onclick="approveCleaningService('${service.id}')">✓ DAR OK · FINALIZAR LIMPIEZA</button></div>`;
+ }
+ return h+"</div>";
 }
 async function viewService(id){
  if(demoMode){
