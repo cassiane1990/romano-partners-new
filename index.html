@@ -836,7 +836,7 @@ function buildMasterNav(){
  const ok=romanoProfileMaster().allowed;
  let h="";
  groups.forEach(g=>{
-  const visible=g[1].filter(i=>ok.includes(i[0]) && !(role()==="supervisor" && i[0]==="service_history"));
+  const visible=g[1].filter(i=>ok.includes(i[0]) && !(["supervisor","maintenance_technician","employee"].includes(role()) && i[0]==="service_history"));
   if(!visible.length)return;
   h+='<div class="master-group">'+g[0]+'</div>';
   visible.forEach(i=>{
@@ -1344,7 +1344,7 @@ const ROMANO_PROFILE_MASTER=Object.freeze({
  admin:Object.freeze({key:"admin",label:"Administrador",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
  supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
  employee:Object.freeze({key:"employee",label:"Funcionario de Limpieza",allowed:["dashboard","service_journey","services","calendar","journey","materialsreq","locations","chat","documents","employee_documents","notifications","sync","profile"]}),
- maintenance_technician:Object.freeze({key:"maintenance_technician",label:"Técnico de Mantenimiento",allowed:["dashboard","service_journey","operations","services","calendar","journey","locations","materialsreq","stock","emergency","chat","notifications","employee_documents","sync","profile"]}),
+ maintenance_technician:Object.freeze({key:"maintenance_technician",label:"Técnico de Mantenimiento",allowed:["dashboard","service_journey","operations","services","newservice","calendar","journey","locations","materialsreq","stock","emergency","chat","notifications","employee_documents","sync","profile"]}),
  client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","locations","sync","profile"]})
 });
 function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
@@ -2337,7 +2337,7 @@ async function renderCalendar(){/* production deploy trigger: calendar only */
  if(demoMode){renderDemoCalendar(0);return}
  const currentRole=role();
  const isEmployee=currentRole==="employee";
- const canCreateService=["admin","supervisor","client"].includes(currentRole);
+ const canCreateService=["admin","supervisor","client","maintenance_technician"].includes(currentRole);
  if(!currentProfile?.company_id||!currentUser?.id){
    $("content").innerHTML='<div class="panel"><div class="msg">No se pudo identificar la sesión activa. Vuelva a iniciar sesión.</div></div>';
    return;
@@ -2421,7 +2421,7 @@ async function renderCalendar(){/* production deploy trigger: calendar only */
    .sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
 
  const monthLabel=first.toLocaleDateString("es-ES",{month:"long",year:"numeric"});
- let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" type="button" onclick="romanoCalendarMonthOffset(-1)">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" type="button" onclick="romanoCalendarMonthOffset(1)">›</button><button class="btn gold" type="button" onclick="romanoCalendarToday()">Hoy</button>'+(canCreateService?'<button class="btn dark" type="button" onclick="newServicePremium()">＋ Nuevo servicio ▾</button>':"")+'</div></div><div class="rpc-month-grid">';
+ let h='<div class="rpc-calendar"><div class="rpc-calendar-head"><div class="rpc-calendar-title"><div class="rpc-calendar-icon">▦</div><div><h2>'+esc(isEmployee?"Mi calendario":"Calendario de Servicios")+'</h2><p>'+esc(isEmployee?"Mes completo · seleccione un día para ver sus servicios asignados.":"Mes completo de servicios y operaciones")+'</p></div></div><div class="rpc-calendar-actions"><button class="btn" type="button" onclick="romanoCalendarMonthOffset(-1)">‹</button><span class="rpc-week-label">'+esc(monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1))+'</span><button class="btn" type="button" onclick="romanoCalendarMonthOffset(1)">›</button><button class="btn gold" type="button" onclick="romanoCalendarToday()">Hoy</button>'+(canCreateService?(currentRole==="maintenance_technician"?'<button class="btn dark" type="button" onclick="newMaintenanceServicePremium()">＋ Servicio mantenimiento</button>':'<button class="btn dark" type="button" onclick="newServicePremium()">＋ Nuevo servicio ▾</button>'):"")+'</div></div><div class="rpc-month-grid">';
  const weekday=["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
  weekday.forEach(d=>h+='<div class="rpc-month-weekday">'+d+'</div>');
  gridDays.forEach(d=>{
@@ -3180,7 +3180,7 @@ function showApp(){closeMobileMenu();
  try{initRomanoPullToRefresh()}catch(e){}
  openPage("dashboard")}
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
-async function openPage(key){window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
+async function openPage(key){if(currentProfile&&!romanoProfileCan(key)){toast("Este perfil no tiene acceso a esta área.");return}window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 let __authBusy=false,__authReadyId=null;
 async function enterAppFromSession(session){
  if(!session?.user){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}
