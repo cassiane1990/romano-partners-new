@@ -920,7 +920,7 @@ async function acceptAssignedService(serviceId){
 }
 async function openServiceAssignment(serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede designar.");return}
- const s=await sb.from("services").select("id,code,property_id,scheduled_at,status,assigned_employee_id").eq("id",serviceId).single();
+ const s=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,status,assigned_employee_id").eq("id",serviceId).single();
  if(s.error){toast(s.error.message);return}
  if(!["requested","scheduled"].includes(s.data.status)||s.data.assigned_employee_id){toast("El servicio debe estar programado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
