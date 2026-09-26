@@ -1851,6 +1851,86 @@ function renderServiceAudit(auditRows,actorNames){
   return '<div class="line"><span><strong>'+esc(label)+': '+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.metadata?.status||"")+'</small></span><span>'+esc(new Date(a.created_at).toLocaleString("es-ES"))+'</span></div>';
  }).join("");
 }
+const ROMANO_CLEANING_CHECKLIST=[
+ {key:"quartos",label:"Quartos"},
+ {key:"sala",label:"Sala"},
+ {key:"banheiros",label:"Banheiros"},
+ {key:"cozinha",label:"Cozinha"},
+ {key:"lixeiros",label:"Lixeiros / cubos de basura"},
+ {key:"geladeira",label:"Geladeira / nevera"},
+ {key:"forno",label:"Forno"},
+ {key:"microondas",label:"Microondas"},
+ {key:"debaixo_camas",label:"Debaixo das camas"},
+ {key:"dentro_armarios",label:"Dentro dos armários"},
+ {key:"amenities",label:"Amenities"}
+];
+function isCleaningServiceType(type){
+ return !/(manten|pint|electric|fontan|hydraulic|plumb|repar|silicon|montaj|instal)/i.test(String(type||""));
+}
+async function ensureCleaningChecklist(service){
+ if(!isCleaningServiceType(service?.service_type))return [];
+ const q=await sb.from("service_checklist_items").select("id,item_key").eq("service_id",service.id);
+ if(q.error)throw q.error;
+ const have=new Set((q.data||[]).map(x=>x.item_key));
+ if(role()==="employee"&&service.assigned_employee_id===currentUser.id){
+   const missing=ROMANO_CLEANING_CHECKLIST.filter(x=>!have.has(x.key)).map(x=>({
+     id:crypto.randomUUID(),company_id:currentProfile.company_id,service_id:service.id,
+     item_key:x.key,item_label:x.label,checked:false
+   }));
+   if(missing.length){
+     const ins=await sb.from("service_checklist_items").insert(missing);
+     if(ins.error && ins.error.code!=="23505")throw ins.error;
+   }
+ }
+ const final=await sb.from("service_checklist_items").select("id,item_key,item_label,checked,notes,checked_by,checked_at").eq("service_id",service.id);
+ if(final.error)throw final.error;
+ return final.data||[];
+}
+async function toggleServiceChecklist(itemId,checked,serviceId){
+ if(role()!=="employee"){toast("Solo el funcionario puede completar este checklist.");return}
+ const r=await sb.from("service_checklist_items").update({
+   checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()
+ }).eq("id",itemId).eq("service_id",serviceId);
+ if(r.error){toast(r.error.message);return}
+ viewService(serviceId);
+}
+async function requestCleaningSupervision(serviceId){
+ if(role()!=="employee"){toast("Solo el funcionario puede solicitar la supervisión.");return}
+ const r=await sb.rpc("request_cleaning_supervision",{p_service_id:serviceId});
+ if(r.error){
+   const m=String(r.error.message||"");
+   if(m.includes("CHECKLIST_INCOMPLETO"))toast("Complete todos los puntos del checklist antes de solicitar la supervisión.");
+   else if(m.includes("FOTOS_OBLIGATORIAS"))toast("Anexe al menos una foto de la limpieza antes de solicitar la supervisión.");
+   else toast(m);
+   return;
+ }
+ toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");
+ await viewService(serviceId);
+}
+async function reviewServiceMedia(mediaId,path,serviceId){
+ if(!["admin","supervisor"].includes(role())){await downloadServiceMedia(path);return}
+ const r=await sb.from("service_media").update({reviewed_at:new Date().toISOString(),reviewed_by:currentUser.id}).eq("id",mediaId).eq("service_id",serviceId);
+ if(r.error){toast(r.error.message);return}
+ const u=await sb.storage.from("service-media").createSignedUrl(path,300);
+ if(u.error){toast(u.error.message);return}
+ window.open(u.data.signedUrl,"_blank","noopener");
+ toast("✓ Evidencia abierta y registrada como revisada.");
+ setTimeout(()=>viewService(serviceId),350);
+}
+async function approveCleaningService(serviceId){
+ if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor y Administrador pueden dar el OK.");return}
+ const r=await sb.rpc("approve_cleaning_service",{p_service_id:serviceId});
+ if(r.error){
+   const m=String(r.error.message||"");
+   if(m.includes("ABRA_TODAS_LAS_FOTOS"))toast("Abra todas las fotos/evidencias una por una antes de dar el OK.");
+   else if(m.includes("CHECKLIST_INCOMPLETO"))toast("El checklist de limpieza está incompleto.");
+   else if(m.includes("FOTOS_OBLIGATORIAS"))toast("No hay fotos suficientes para aprobar la limpieza.");
+   else toast(m);
+   return;
+ }
+ toast("✓ Limpieza aprobada.");
+ await viewService(serviceId);
+}
 async function viewService(id){
  if(demoMode){
   const x=DEMO_SERVICES.find(s=>s.id===id);if(!x){toast("Servicio demo no encontrado");return}
