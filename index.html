@@ -4107,7 +4107,7 @@ function openNewServiceMenu(){
 }
 async function serviceEmployeeOptionsHtml(prefix,kind="cleaning"){
  const list=(window.__mpEmployees||[]).filter(x=>kind==="maintenance"?x.role==="maintenance_technician":x.role==="employee");
- return "<input id='"+prefix+"EmployeeSearch' class='field-search' placeholder='Buscar funcionario por nombre…' oninput="filterServiceEmployees('"+prefix+"')">"+
+ return "<input id='"+prefix+"EmployeeSearch' class='field-search' placeholder='Buscar funcionario por nombre…' oninput=\"filterServiceEmployees('"+prefix+"')\">"+
  "<select id='"+prefix+"Employee' size='4' style='min-height:110px'><option value=''>Sin asignar — designar después</option>"+list.map(x=>"<option value='"+x.id+"'>"+esc(x.full_name||x.email||"Funcionario")+"</option>").join("")+"</select>";
 }
 function filterServiceEmployees(prefix){
