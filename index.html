@@ -1866,72 +1866,50 @@ const ROMANO_CLEANING_CHECKLIST=[
  {key:"dentro_armarios",label:"Dentro dos armários"},
  {key:"amenities",label:"Amenities"}
 ];
-function isCleaningServiceType(type){
- return !/(manten|pint|electric|fontan|hydraulic|plumb|repar|silicon|montaj|instal)/i.test(String(type||""));
-}
+const ROMANO_CLEANING_CHECKLIST=[
+ {key:"quarto",label:"Quarto"},{key:"sala",label:"Sala"},{key:"banheiro",label:"Baño"},{key:"cozinha",label:"Cocina"},
+ {key:"lixeiros",label:"Lixeiros"},{key:"geladeira",label:"Geladeira / Nevera"},{key:"forno",label:"Forno"},
+ {key:"microondas",label:"Microondas"},{key:"debaixo_cama",label:"Debajo de la cama"},{key:"dentro_armarios",label:"Dentro de los armarios"},{key:"amenities",label:"Amenities"}
+];
+function isCleaningServiceType(type){const s=String(type||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return s.includes("limp")||s==="cleaning"}
 async function ensureCleaningChecklist(service){
- if(!isCleaningServiceType(service?.service_type))return [];
- const q=await sb.from("service_checklist_items").select("id,item_key").eq("service_id",service.id);
- if(q.error)throw q.error;
- const have=new Set((q.data||[]).map(x=>x.item_key));
- if(role()==="employee"&&service.assigned_employee_id===currentUser.id){
-   const missing=ROMANO_CLEANING_CHECKLIST.filter(x=>!have.has(x.key)).map(x=>({
-     id:crypto.randomUUID(),company_id:currentProfile.company_id,service_id:service.id,
-     item_key:x.key,item_label:x.label,checked:false
-   }));
-   if(missing.length){
-     const ins=await sb.from("service_checklist_items").insert(missing);
-     if(ins.error && ins.error.code!=="23505")throw ins.error;
-   }
- }
- const final=await sb.from("service_checklist_items").select("id,item_key,item_label,checked,notes,checked_by,checked_at").eq("service_id",service.id);
- if(final.error)throw final.error;
- return final.data||[];
+ if(!isCleaningServiceType(service?.service_type)||!["employee","admin","supervisor"].includes(role()))return [];
+ const r=await sb.rpc("ensure_cleaning_checklist",{p_service_id:service.id});if(r.error)throw r.error;
+ const q=await sb.from("service_checklist_items").select("id,item_key,item_label,checked,notes,checked_by,checked_at").eq("service_id",service.id).order("created_at",{ascending:true});
+ if(q.error)throw q.error;return q.data||[];
 }
 async function toggleServiceChecklist(itemId,checked,serviceId){
  if(role()!=="employee"){toast("Solo el funcionario puede completar este checklist.");return}
- const r=await sb.from("service_checklist_items").update({
-   checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()
- }).eq("id",itemId).eq("service_id",serviceId);
- if(r.error){toast(r.error.message);return}
- viewService(serviceId);
+ const r=await sb.from("service_checklist_items").update({checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",itemId).eq("service_id",serviceId);
+ if(r.error){toast(r.error.message);return} await viewService(serviceId);
 }
 async function requestCleaningSupervision(serviceId){
  if(role()!=="employee"){toast("Solo el funcionario puede solicitar la supervisión.");return}
- const r=await sb.rpc("request_cleaning_supervision",{p_service_id:serviceId});
- if(r.error){
-   const m=String(r.error.message||"");
-   if(m.includes("CHECKLIST_INCOMPLETO"))toast("Complete todos los puntos del checklist antes de solicitar la supervisión.");
-   else if(m.includes("FOTOS_OBLIGATORIAS"))toast("Anexe al menos una foto de la limpieza antes de solicitar la supervisión.");
-   else toast(m);
-   return;
- }
- toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");
- await viewService(serviceId);
+ const r=await sb.rpc("request_cleaning_supervision",{p_service_id:serviceId});if(r.error){toast(r.error.message);return}
+ toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");await viewService(serviceId);
 }
 async function reviewServiceMedia(mediaId,path,serviceId){
- if(!["admin","supervisor"].includes(role())){await downloadServiceMedia(path);return}
- const r=await sb.from("service_media").update({reviewed_at:new Date().toISOString(),reviewed_by:currentUser.id}).eq("id",mediaId).eq("service_id",serviceId);
- if(r.error){toast(r.error.message);return}
- const u=await sb.storage.from("service-media").createSignedUrl(path,300);
- if(u.error){toast(u.error.message);return}
- window.open(u.data.signedUrl,"_blank","noopener");
- toast("✓ Evidencia abierta y registrada como revisada.");
- setTimeout(()=>viewService(serviceId),350);
+ if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor o Administrador puede revisar las fotos.");return}
+ const r=await sb.rpc("review_cleaning_photo",{p_media_id:mediaId});if(r.error){toast(r.error.message);return}
+ const u=await sb.storage.from("service-media").createSignedUrl(path,300);if(u.error){toast(u.error.message);return}
+ window.open(u.data.signedUrl,"_blank","noopener");toast("✓ Foto abierta y registrada como revisada.");setTimeout(()=>viewService(serviceId),350);
 }
 async function approveCleaningService(serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor y Administrador pueden dar el OK.");return}
- const r=await sb.rpc("approve_cleaning_service",{p_service_id:serviceId});
- if(r.error){
-   const m=String(r.error.message||"");
-   if(m.includes("ABRA_TODAS_LAS_FOTOS"))toast("Abra todas las fotos/evidencias una por una antes de dar el OK.");
-   else if(m.includes("CHECKLIST_INCOMPLETO"))toast("El checklist de limpieza está incompleto.");
-   else if(m.includes("FOTOS_OBLIGATORIAS"))toast("No hay fotos suficientes para aprobar la limpieza.");
-   else toast(m);
-   return;
- }
- toast("✓ Limpieza aprobada.");
- await viewService(serviceId);
+ const r=await sb.rpc("approve_cleaning_supervision",{p_service_id:serviceId});if(r.error){toast(r.error.message);return}
+ toast("✓ Limpieza aprobada.");await viewService(serviceId);
+}
+function renderCleaningFlow(service,checklist,media){
+ if(!isCleaningServiceType(service.service_type))return "";
+ const own=role()==="employee"&&service.assigned_employee_id===currentUser.id,reviewer=["admin","supervisor"].includes(role());
+ const checked=checklist.filter(i=>i.checked).length,photos=media.filter(m=>m.media_type==="photo"),reviewed=photos.filter(m=>m.review_opened_at).length;
+ const ready=checked===ROMANO_CLEANING_CHECKLIST.length&&photos.length>0;
+ let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quarto, sala, baño, cocina, lixeiros, geladeira, forno, microondas, debajo de la cama, dentro de armarios y amenities.</div></div><span class="pill">'+checked+'/'+ROMANO_CLEANING_CHECKLIST.length+'</span></div>';
+ h+=ROMANO_CLEANING_CHECKLIST.map(req=>{const row=checklist.find(i=>i.item_key===req.key);return '<label class="line-item" style="cursor:'+(own?'pointer':'default')+'"><span><input type="checkbox" '+(row?.checked?'checked ':'')+(own&&service.status!=="supervision_pending"&&service.status!=="completed"?' onchange="toggleServiceChecklist(\\''+esc(row?.id||"")+'\\',this.checked,\\''+esc(service.id)+'\\')"':' disabled')+'> '+esc(row?.item_label||req.label)+'</span><b>'+(row?.checked?'✓ OK':'Pendiente')+'</b></label>'}).join("");
+ h+='<div class="notice" style="margin-top:10px"><b>Fotos:</b> '+photos.length+(reviewer?' · <b>Revisadas:</b> '+reviewed+'/'+photos.length:"")+'</div>';
+ if(own){if(service.status==="supervision_pending")h+='<div class="notice">✓ Checklist y fotos enviados. Esperando revisión del Supervisor o Administrador.</div>';else if(service.status==="completed")h+='<div class="notice">✓ Limpieza aprobada por Supervisor/Administrador.</div>';else h+='<div class="actions" style="margin-top:10px"><button class="btn gold" '+(ready?'':'disabled')+' onclick="requestCleaningSupervision(\\''+service.id+'\\')">✓ SOLICITAR SUPERVISIÓN</button></div>'}
+ if(reviewer&&service.status==="supervision_pending")h+='<div class="notice" style="margin-top:10px"><b>Revisión obligatoria:</b> abra cada foto individualmente. El OK solo se habilita después de revisar todas.</div><div class="actions" style="margin-top:10px"><button class="btn gold" '+(photos.length>0&&reviewed===photos.length?'':'disabled')+' onclick="approveCleaningService(\\''+service.id+'\\')">✓ DAR OK · FINALIZAR LIMPIEZA</button></div>';
+ return h+'</div>';
 }
 async function viewService(id){
  if(demoMode){
@@ -1953,7 +1931,7 @@ async function viewService(id){
  const x=r.data;window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
  const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
-  sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,reviewed_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
+  sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
   sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
   sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle(),
@@ -1970,16 +1948,7 @@ async function viewService(id){
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
  const checklistChecked=checklist.filter(i=>i.checked).length;
  const cleaningReady=isCleaningServiceType(x.service_type)&&checklistChecked>=ROMANO_CLEANING_CHECKLIST.length&&(media.data||[]).some(m=>m.media_type==="photo");
- const cleaningFlowHtml=isCleaningServiceType(x.service_type)
-  ? '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quartos, sala, banheiros, cozinha, lixeiros, geladeira, forno, microondas, debaixo das camas, armários e amenities.</div></div><span class="pill">'+checklistChecked+'/'+ROMANO_CLEANING_CHECKLIST.length+'</span></div>'+
-    ROMANO_CLEANING_CHECKLIST.map(req=>{const row=checklist.find(i=>i.item_key===req.key);const own=role()==="employee"&&x.assigned_employee_id===currentUser.id;return '<label class="line-item" style="cursor:'+(own?'pointer':'default')+'"><span><input type="checkbox" '+(row?.checked?'checked':'')+' '+(own&&x.status!=="approved"?'':'disabled')+' onchange="toggleServiceChecklist(\''+esc(row?.id||"")+'\',this.checked,\''+esc(x.id)+'\')"> '+esc(row?.item_label||req.label)+'</span><b>'+(row?.checked?'✓':'Pendiente')+'</b></label>'}).join("")+'</div>'+
-    (role()==="employee"&&x.assigned_employee_id===currentUser.id
-      ? '<div class="notice" style="margin-top:12px"><strong>Antes de enviar à supervisão:</strong> complete 100% do checklist e anexe as fotos deste apartamento.</div><div class="actions" style="margin-top:10px"><button class="btn gold" '+(cleaningReady?'':'disabled')+' onclick="requestCleaningSupervision(\''+x.id+'\')">✓ SOLICITAR SUPERVISIÓN</button></div>'
-      : '')+
-    (["admin","supervisor"].includes(role())&&x.status==="supervised"
-      ? '<div class="notice" style="margin-top:12px"><strong>Revisión de limpieza</strong><br>Abra cada foto/evidencia una por una. El OK permanece bloqueado hasta que todas estén revisadas.</div><div class="actions" style="margin-top:10px"><button class="btn gold" onclick="approveCleaningService(\''+x.id+'\')">✓ DAR OK A LA LIMPIEZA</button></div>'
-      : '')
-  : '';
+ const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]);
  openModal(isPendingAdmin?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':"")+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
