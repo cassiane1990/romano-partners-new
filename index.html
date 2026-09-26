@@ -3158,14 +3158,16 @@ function roleAvatarUrl(roleValue){return roleAvatarSvg(roleValue,96);}
 function showApp(){closeMobileMenu();
  window.__romanoAppReady=true;
  $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";
- $("roleBadge").textContent=roleNames[role()]||role();
- const roleAvatar=roleAvatarUrl(role());
- const av=$("avatar");if(av){av.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';av.classList.add("has-role-avatar")}
- const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[role()]||role())+'">';sf.classList.add("has-role-avatar")}
+ const currentRole=role();$("roleBadge").textContent=roleNames[currentRole]||currentRole;
+ try{const roleAvatar=roleAvatarUrl(currentRole);const av=$("avatar");if(av){av.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[currentRole]||currentRole)+'">';av.classList.add("has-role-avatar")}const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[currentRole]||currentRole)+'">';sf.classList.add("has-role-avatar")}}catch(e){}
  if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usurio";
- if($("sideUserRole"))$("sideUserRole").textContent=roleNames[role()]||role();
- buildMasterNav();startRealtime();initOfflineSync();startRomanoMadridClock();initRomanoPullToRefresh();openPage("dashboard")
-}
+ if($("sideUserRole"))$("sideUserRole").textContent=roleNames[currentRole]||currentRole;
+ try{buildMasterNav()}catch(e){}
+ try{startRealtime()}catch(e){}
+ try{initOfflineSync()}catch(e){}
+ try{startRomanoMadridClock()}catch(e){}
+ try{initRomanoPullToRefresh()}catch(e){}
+ openPage("dashboard")}
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 let __authBusy=false,__authReadyId=null;
