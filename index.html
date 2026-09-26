@@ -899,7 +899,7 @@ async function acceptServiceRequest(id){
  await renderServicesMaster();
 }
 async function acceptAssignedService(serviceId){
- if(role()!=="employee"){toast("Solo el funcionario puede aceptar.");return}
+ if(!["employee","maintenance_technician"].includes(role())){toast("Solo el funcionario puede aceptar.");return}
  const r=await sb.rpc("employee_accept_service_assignment",{p_service_id:serviceId});
  if(r.error){toast("No se pudo aceptar: "+r.error.message);return}
  toast("✓ Servicio aceptado. Estado: A camino.");
@@ -949,7 +949,7 @@ function romanoMadridDateLabel(date=new Date()){return new Intl.DateTimeFormat("
 function romanoMadridTimeLabel(date=new Date()){const d=romanoMadridValidDate(date);return d?new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,hour:"2-digit",minute:"2-digit"}).format(d):"—"}
 function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta",urgent:"Urgente"})[v]||v||"—"}
 async function loadEmployeeOperationalServices(){
- if(role()!=="employee")return [];
+ if(!["employee","maintenance_technician"].includes(role()))return [];
  const base=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
  if(base.error)throw base.error;
  const own=base.data||[];
@@ -968,10 +968,10 @@ async function renderServicesMaster(){
      if(own.error){r.data=[];r.error=own.error}
      else if(own.data?.id)q=q.eq("client_id",own.data.id);
      else{r.data=[];r.error=null}
-   }else if(role()==="employee"){
+   }else if(["employee","maintenance_technician"].includes(role())){
      q=q.eq("assigned_employee_id",currentUser.id);
    }
-   if(!r.error){const qr=await q;r.data=qr.data;r.error=qr.error;if(!r.error&&role()==="employee"){try{r.data=await loadEmployeeOperationalServices()}catch(e){r.data=[];r.error=e}}}
+   if(!r.error){const qr=await q;r.data=qr.data;r.error=qr.error;if(!r.error&&["employee","maintenance_technician"].includes(role())){try{r.data=await loadEmployeeOperationalServices()}catch(e){r.data=[];r.error=e}}}
  }
  let fin={};
  if(canSeeFinance()&&r.data?.length){
@@ -1008,7 +1008,7 @@ async function renderServicesMaster(){
    const visibleProperty=p?.name||p?.code||"—";
    const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
    const actions='<button class="btn" onclick="'+(x.__relatedCleaning?"viewRelatedCleaning":"viewService")+'(\''+x.id+'\')">Ver '+(x.__relatedCleaning?"seguimiento":"detalle")+'</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
-     (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
+     (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       ["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())&&x.status==="scheduled"?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
@@ -1026,7 +1026,7 @@ async function renderServicesMaster(){
      '<div class="service-card-actions">'+actions+'</div>'+
    '</article>';
  }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
- $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div>'+(role()==="employee"?"":"<button class=\"btn gold\" onclick=\"openPage('newservice')\">＋ Nuevo servicio ▾</button>")+'</div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
+ $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div>'+(["employee","maintenance_technician"].includes(role())?"":"<button class=\"btn gold\" onclick=\"openPage('newservice')\">＋ Nuevo servicio ▾</button>")+'</div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
 }
 async function renderCleaningCatalog(){
  const q=demoMode?{data:window.__DEMO_CLEANING_CATALOG||[],error:null}:await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active,updated_at").eq("category","cleaning").order("name");
@@ -1125,7 +1125,7 @@ async function renderServiceJourneyBoard(){
   const startDay=day+"T00:00:00",endDay=day+"T23:59:59.999";let q;
   const fields="id,code,property_id,client_id,assigned_employee_id,service_type,typology,status,scheduled_at,priority";
   if(role()==="client"){const cr=await sb.from("clients").select("id").eq("profile_id",currentUser.id).single();if(cr.error||!cr.data){$("content").innerHTML='<div class="panel"><div class="msg">No se encontró el cliente asociado.</div></div>';return}q=await sb.from("services").select(fields).eq("client_id",cr.data.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
-  }else if(role()==="employee")q=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }else if(["employee","maintenance_technician"].includes(role()))q=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   else if(role()==="supervisor")q=await sb.from("services").select(fields).eq("assigned_supervisor_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   else q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
@@ -1147,7 +1147,7 @@ async function renderServiceJourneyBoard(){
  const cleaning=services.filter(s=>!isMaint(s)).length,maintenance=services.length-cleaning;
  const active=services.filter(s=>["on_the_way","in_progress","paused","supervision_pending"].includes(s.status)).length;
  const cards=services.map(s=>{
-  const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{},own=role()==="employee"&&s.assigned_employee_id===currentUser.id;
+  const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{},own=["employee","maintenance_technician"].includes(role())&&s.assigned_employee_id===currentUser.id;
   const action=journeyActionsForService(s),terminal=["supervision_pending","supervised","completed","approved","cancelled","rejected","returned"].includes(s.status);
   const stageText=terminal?"Estado bloqueado":s.status==="scheduled"?"Próximo paso: aceptar":s.status==="on_the_way"?"Próximo paso: iniciar":s.status==="in_progress"?"Trabajo en curso":s.status==="paused"?"Próximo paso: continuar":"Estado";
   const stages=["scheduled","on_the_way","in_progress","paused","supervision_pending","completed"];
@@ -1164,12 +1164,12 @@ async function renderJourneyMaster(){
  if(demoMode){journal={data:[{work_date:"2026-09-23",check_in_at:"2026-09-23T07:55:00+02:00",check_out_at:null,status:"open",profile_id:"demo-e1"}],error:null};assigned={data:(DEMO_SERVICES||[]).filter(x=>x.assigned_employee_id==="demo-e1").slice(0,10),error:null};}
  else{
   journal=await sb.from("work_journal_entries").select("work_date,check_in_at,check_out_at,status,profile_id").eq("profile_id",currentUser.id).order("work_date",{ascending:false}).limit(100);
-  if(role()==="employee")assigned=await sb.from("services").select("id,code,property_id,client_id,service_type,status,scheduled_at,assigned_employee_id,priority").eq("assigned_employee_id",currentUser.id).in("status",["scheduled","on_the_way","in_progress","paused","supervision_pending"]).order("scheduled_at",{ascending:true}).limit(50);
+  if(["employee","maintenance_technician"].includes(role()))assigned=await sb.from("services").select("id,code,property_id,client_id,service_type,status,scheduled_at,assigned_employee_id,priority").eq("assigned_employee_id",currentUser.id).in("status",["scheduled","on_the_way","in_progress","paused","supervision_pending"]).order("scheduled_at",{ascending:true}).limit(50);
  }
  const rows=assigned.data||[],pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],cids=[...new Set(rows.map(x=>x.client_id).filter(Boolean))],pm={},cm={};
  if(pids.length&&!demoMode){const q=await sb.from("properties").select("id,name,code,address,city").in("id",pids);(q.data||[]).forEach(p=>pm[p.id]=p)}
  if(cids.length&&!demoMode){const q=await sb.from("clients").select("id,name").in("id",cids);(q.data||[]).forEach(x=>cm[x.id]=x)}
- const jobs=role()==="employee"?'<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios asignados</h3><div class="muted">Acepta aquí tu servicio y continúa con la siguiente acción.</div></div><span class="pill">'+rows.length+'</span></div>'+(rows.length?rows.map(s=>{
+ const jobs=["employee","maintenance_technician"].includes(role())?'<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios asignados</h3><div class="muted">Acepta aquí tu servicio y continúa con la siguiente acción.</div></div><span class="pill">'+rows.length+'</span></div>'+(rows.length?rows.map(s=>{
    const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},maint=/manten|electric|plumb|pint|repar|silicon|montaj|instal/i.test(String(s.service_type||""));
    let action="";
    if(s.status==="scheduled")action='<button class="btn gold" data-job-action="accept" data-service-id="'+esc(s.id)+'">✓ ACEPTAR</button>';
@@ -1192,7 +1192,7 @@ async function masterClockIn(){const pos=await masterGeo();const r=await sb.from
 async function masterClockOut(){const pos=await masterGeo();const r=await sb.from("work_journal_entries").update({check_out_at:new Date().toISOString(),check_out_lat:pos?.lat||null,check_out_lng:pos?.lng||null,status:"closed"}).eq("profile_id",currentUser.id).eq("status","open");if(r.error)toast(r.error.message);else{toast("Salida registrada");renderJourneyMaster()}}
 function masterGeo(){return new Promise(resolve=>{if(!navigator.geolocation)return resolve(null);navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),()=>resolve(null),{enableHighAccuracy:true,timeout:7000})})}
 async function renderEmployeeWorkPanel(){
- if(role()!=="employee")return "";
+ if(!["employee","maintenance_technician"].includes(role()))return "";
  let rows=[];
  try{rows=await loadEmployeeOperationalServices()}catch(e){return '<div class="panel"><div class="msg">'+esc(e.message||"No se pudieron cargar sus trabajos.")+'</div></div>'}
  const pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
@@ -1207,7 +1207,7 @@ async function renderEmployeeWorkPanel(){
  return '<div class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3>Mis trabajos</h3><div class="muted">Mantenimiento asignado y, para funcionarios de mantenimiento, el estado de la limpieza relacionada.</div></div><span class="pill">'+rows.length+'</span></div>'+body+'</div>';
 }
 async function renderLocationsMaster(){
- const work=role()==="employee"?await renderEmployeeWorkPanel():"";
+ const work=["employee","maintenance_technician"].includes(role())?await renderEmployeeWorkPanel():"";
  $("content").innerHTML=work+'<div class="master-cols"><div class="panel"><div class="panel-head"><h3>Geolocalización / Radar</h3><button class="btn" onclick="openPage(\'locations\')">Actualizar</button></div><div id="radarMap" class="master-map"></div></div><div class="panel"><h3>Dispatch</h3><p class="muted">Proximidade real + disponibilidade + conflitos + escopo + elegibilidade.</p><div class="notice">Se um funcionario no aceptar dentro do prazo do pedido, o sistema registra a rejeição/expiração e o próximo candidato elegível pode ser acionado.</div></div></div>';
  if(window.L){const m=L.map("radarMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);if(demoMode){[[40.4168,-3.7038,"👩🏻‍🧹 Ana Silva · En camino · Alehost"],[40.421,-3.69,"👩🏻‍💼 Carla Santos · Supervisado"],[40.405,-3.72,"👨🏻‍🎨 Pedro Costa · Pintura · En curso"],[40.43,-3.71,"👨🏻‍🔧 João Martins · Finalizado"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]))}else{const r=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").order("recorded_at",{ascending:false}).limit(50);const seen={};(r.data||[]).forEach(x=>{if(seen[x.profile_id])return;seen[x.profile_id]=1;L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Precisão: "+(x.accuracy_m||"—")+" m")})}}
 }
@@ -1238,7 +1238,7 @@ const ROMANO_PROFILE_MASTER=Object.freeze({
 function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
 function romanoProfileCan(page,roleKey=role()){return romanoProfileMaster(roleKey).allowed.includes(page)}
 function isMaintenanceTechnician(){return role()==="maintenance_technician"}
-function isCleaningEmployee(){return role()==="employee"}
+function isCleaningEmployee(){return ["employee","maintenance_technician"].includes(role())}
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 const DEMO_CLIENTS=[{id:"demo-c1",name:"Alehost",email:"operaciones@alehost.demo",phone:"+34 600 100 201",created_at:"2026-09-20T09:00:00Z"},{id:"demo-c2",name:"Booking Premium Madrid",email:"madrid@booking.demo",phone:"+34 600 100 202",created_at:"2026-09-19T10:00:00Z"},{id:"demo-c3",name:"Málaga Luxury Stays",email:"malaga@luxury.demo",phone:"+34 600 100 203",created_at:"2026-09-18T11:00:00Z"},{id:"demo-c4",name:"Clínica Retiro",email:"contacto@clinica.demo",phone:"+34 600 100 204",created_at:"2026-09-17T12:00:00Z"},{id:"demo-c5",name:"Hotel Boutique Salamanca",email:"hotel@boutique.demo",phone:"+34 600 100 205",created_at:"2026-09-16T13:00:00Z"}];
 const DEMO_PROPERTIES=[{id:"demo-p1",code:"ALE-T2-001",name:"Apartamento Alehost · Serrano",property_type:"T2",beds_single:0,beds_double:0,address:"Calle de Serrano 42",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p2",code:"ALE-T1-002",name:"Apartamento Alehost · Retiro",property_type:"T1",beds_single:0,beds_double:0,address:"Calle de Alcalá 118",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p3",code:"BKG-T4-003",name:"Villa Premium · Marbella",property_type:"T4",beds_single:0,beds_double:0,address:"Nueva Andalucía",city:"Marbella",country:"España",client_id:"demo-c2",status:"En servicio"},{id:"demo-p4",code:"MLS-T3-004",name:"Luxury Stay · Málaga Centro",property_type:"T3",beds_single:0,beds_double:0,address:"Calle Larios 18",city:"Málaga",country:"España",client_id:"demo-c3",status:"Activo"},{id:"demo-p5",code:"CLI-T2-005",name:"Clínica Retiro",property_type:"T2",beds_single:0,beds_double:0,address:"Calle Ibiza 11",city:"Madrid",country:"España",client_id:"demo-c4",status:"Mantenimiento"}];
@@ -1340,7 +1340,7 @@ async function renderPremiumDashboard(){
  const firstProp=first?propertyMap[first.property_id]:d.properties[0]; const heroPhoto=premiumDashboardPropertyPhoto(firstProp)||"https://images.unsplash.com/photo-1776876648949-63ccabf63b10?auto=format&fit=crop&fm=jpg&q=82&w=2200";
  const locationText=firstProp?[firstProp.name,firstProp.city].filter(Boolean).join(" · "):"Sin propiedad activa";
  const firstLabel=first?((first.service_type||"Servicio")+" · "+(first.typology||"")):"Sin servicio en curso";
- const actions=role()==="employee"
+ const actions=["employee","maintenance_technician"].includes(role())
   ? [["▦","Calendario","calendar"],["◌","Chat","chat"],["▤","Documentos","documents"]]
   : [
     ["＋","Nuevo servicio ▾","newservice"],["▦","Calendario","calendar"],["⚡","Adelantar check-in","change_requests"],["⌂","Mis propiedades","properties"],["◌","Chat","chat"],["▤","Documentos","documents"]
@@ -1354,7 +1354,7 @@ async function renderPremiumDashboard(){
  $("content").innerHTML=h;
 }
 async function renderEmployeeDocumentsPage(){
- if(role()!=="employee"){toast("Esta sección es exclusiva del funcionario.");return}
+ if(!["employee","maintenance_technician"].includes(role())){toast("Esta sección es exclusiva del funcionario.");return}
  const ep=await sb.from("employee_profiles").select("id,full_name,employee_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(ep.error||!ep.data){$("content").innerHTML='<div class="panel"><div class="msg">No se encontró su ficha de funcionario. Contacte con Administración.</div></div>';return}
  $("content").innerHTML='<div class="rpc-profile-page"><div class="panel"><div class="panel-head"><div><h2 style="margin:0;font:25px Georgia,serif">Mis documentos</h2><div class="muted">Envíe aquí sus documentos para que Administración pueda incorporarlos y gestionarlos en su ficha.</div></div><span class="pill">Ficha '+esc(ep.data.employee_code||"")+'</span></div><div class="notice">Puede subir contrato, identificación, recibos, certificados u otros documentos. Los archivos quedan privados y vinculados a su ficha de funcionario.</div><div id="employeeSelfDocs" class="panel" style="margin-top:12px"><div class="muted">Cargando documentos…</div></div></div></div>';
@@ -1815,7 +1815,7 @@ async function uploadPropertyPhoto(file,propertyId){if(!file)return{error:null};
 async function savePropertyEdit(e,id){e.preventDefault();const photo=$("epPhoto")?.files?.[0]||null,data={name:$("epName").value.trim(),property_type:$("epType").value,beds_single:Math.max(0,Number($("epBedsSingle").value||0)),beds_double:Math.max(0,Number($("epBedsDouble").value||0)),address:$("epAddress").value.trim(),city:$("epCity").value.trim(),country:$("epCountry").value.trim(),latitude:$("epLat").value?Number($("epLat").value):null,longitude:$("epLon").value?Number($("epLon").value):null,client_id:$("epClient").value,status:$("epStatus").value};if(!data.client_id){toast("Seleccione el cliente asociado.");return}if(demoMode){const x=demoFindProperty(id);if(!x){toast("Propiedad demo no encontrada");return}if(photo)demoSavePropertyPhoto(id,await readDemoPhoto("epPhoto"));Object.assign(x,data);closeModal();toast("Propiedad ficticia guardada");renderProperties();return}const realData=Object.assign({},data);const r=await sb.from("properties").update(realData).eq("id",id);if(r.error){toast(r.error.message);return}if(photo){const up=await uploadPropertyPhoto(photo,id);if(up.error){toast(up.error.message);return}}closeModal();toast("Propiedad actualizada");renderProperties()}
 async function renderServices(){const r=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,assigned_employee_id,assigned_supervisor_id").order("created_at",{ascending:false}).limit(100);let h='<div class="panel"><div class="panel-head"><h3>Servicios</h3><div class="actions"><button class="btn" onclick="reloadCurrentPage()">Actualizar</button><button class="btn gold" onclick="openNewServiceMenu()">+ Nuevo servicio ▾</button></div></div>';h+=r.error?'<div class="msg">'+esc(r.error.message)+'</div>':r.data?.length?'<table class="table"><thead><tr><th>Código</th><th>Servicio</th><th>Tipología</th><th>Prioridad</th><th>Fecha / hora de llegada</th><th>Estado</th><th>Acción</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.service_type)+'</td><td>'+esc(x.typology||"—")+'</td><td>'+esc(x.priority)+'</td><td><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></td><td>'+statusAction(x)+(canManage()?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay servicios.</div>';$("content").innerHTML=h+"</div>"}
 function formatMadridDateTime(v){if(!v)return"—";try{return new Intl.DateTimeFormat("es-ES",{timeZone:"Europe/Madrid",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(v))}catch{return"—"}}
-function statusAction(x){if(!["admin","supervisor","employee"].includes(role()))return"—";const allowed=role()==="employee"?["on_the_way","in_progress","paused","supervision_pending"]:["scheduled","on_the_way","in_progress","paused","supervision_pending","supervised","completed","approved","rejected"];return'<select class="btn" onchange="changeStatus(\''+x.id+'\',this.value)"><option value="">Cambiar estado</option>'+allowed.map(s=>'<option value="'+s+'">'+statusNames[s]+'</option>').join("")+'</select>'}
+function statusAction(x){if(!["admin","supervisor","employee"].includes(role()))return"—";const allowed=["employee","maintenance_technician"].includes(role())?["on_the_way","in_progress","paused","supervision_pending"]:["scheduled","on_the_way","in_progress","paused","supervision_pending","supervised","completed","approved","rejected"];return'<select class="btn" onchange="changeStatus(\''+x.id+'\',this.value)"><option value="">Cambiar estado</option>'+allowed.map(s=>'<option value="'+s+'">'+statusNames[s]+'</option>').join("")+'</select>'}
 async function changeStatus(id,status){if(!status)return;const r=await sb.from("services").update({status}).eq("id",id);if(r.error)toast(r.error.message);else{toast("Estado actualizado");renderServices()}}
 async function newService(){
   // Compatibilidad interna: cualquier llamada antigua queda redirigida
@@ -1936,12 +1936,12 @@ async function ensureCleaningChecklist(service){
  if(q.error)throw q.error;return q.data||[];
 }
 async function toggleServiceChecklist(itemId,checked,serviceId){
- if(role()!=="employee"){toast("Solo el funcionario puede completar este checklist.");return}
+ if(!["employee","maintenance_technician"].includes(role())){toast("Solo el funcionario puede completar este checklist.");return}
  const r=await sb.from("service_checklist_items").update({checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",itemId).eq("service_id",serviceId);
  if(r.error){toast(r.error.message);return} await viewService(serviceId);
 }
 async function requestCleaningSupervision(serviceId){
- if(role()!=="employee"){toast("Solo el funcionario puede solicitar la supervisión.");return}
+ if(!["employee","maintenance_technician"].includes(role())){toast("Solo el funcionario puede solicitar la supervisión.");return}
  const r=await sb.rpc("request_cleaning_supervision",{p_service_id:serviceId});if(r.error){toast(r.error.message);return}
  toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");await viewService(serviceId);
 }
@@ -1958,7 +1958,7 @@ async function approveCleaningService(serviceId){
 }
 function renderCleaningFlow(service,checklist,media){
  if(!isCleaningServiceType(service.service_type))return "";
- const own=role()==="employee"&&service.assigned_employee_id===currentUser.id;
+ const own=["employee","maintenance_technician"].includes(role())&&service.assigned_employee_id===currentUser.id;
  const reviewer=["admin","supervisor"].includes(role());
  const checked=checklist.filter(i=>i.checked).length;
  const photos=media.filter(m=>m.media_type==="photo");
@@ -1984,7 +1984,7 @@ function renderCleaningFlow(service,checklist,media){
  return h+"</div>";
 }
 function renderMaintenanceEmployeeFlow(x){
- if(role()!=="employee"||x.assigned_employee_id!==currentUser.id||isCleaningServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
+ if(!["employee","maintenance_technician"].includes(role())||x.assigned_employee_id!==currentUser.id||isCleaningServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
  let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Trabajo de mantenimiento</h3><div class="muted">Acepte la designación, inicie el trabajo y adjunte fotos o vídeos del resultado.</div></div><span class="pill">'+esc(serviceTypeLabel(x.service_type))+'</span></div>';
  if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
  if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ INICIAR MANTENIMIENTO</button></div>';
@@ -1994,7 +1994,7 @@ function renderMaintenanceEmployeeFlow(x){
  return h;
 }
 async function viewRelatedCleaning(id){
- if(role()!=="employee"){toast("Esta visualización es exclusiva del flujo interno.");return}
+ if(!["employee","maintenance_technician"].includes(role())){toast("Esta visualización es exclusiva del flujo interno.");return}
  const q=await sb.rpc("maintenance_employee_cleaning_context");
  if(q.error){toast(q.error.message);return}
  const x=(q.data||[]).find(s=>s.id===id);
@@ -2023,7 +2023,7 @@ async function viewService(id){
   const prop=DEMO_PROPERTIES.find(p=>p.id===x.property_id),client=DEMO_CLIENTS.find(cl=>cl.id===x.client_id);
   let note={};try{note=JSON.parse(x.notes||"{}")}catch(e){}
   const items=x.requested_items||[];
-  const itemHtml=items.length?items.map(i=>role()==="employee"?"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span></div>":"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span><b>"+masterMoney((i.unit_price||0)*(i.quantity||1))+"</b></div>").join(""):"<div class='empty'>Sin adicionales.</div>";
+  const itemHtml=items.length?items.map(i=>["employee","maintenance_technician"].includes(role())?"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span></div>":"<div class='line-item'><span>"+esc(i.name)+" × "+esc(i.quantity||1)+"</span><b>"+masterMoney((i.unit_price||0)*(i.quantity||1))+"</b></div>").join(""):"<div class='empty'>Sin adicionales.</div>";
   const demoAdvanceButton=x.status!=="completed"&&x.status!=="cancelled"?("<div class=\"notice\" style=\"margin-top:12px\"><strong>⚡ Solicitud de adelanto</strong><br>Puede probar aquí el flujo de check-in adelantado.</div><div class=\"actions\"><button class=\"btn gold\" onclick=\"requestServiceAdvance('"+x.id+"')\">⚡ Cambiar horario de check-in</button></div>"):"";
   openModal("Ficha del servicio · DEMOSTRACIÓN",
    "<div class='demo-flag'>DATOS FICTICIOS · NO PRODUCCIÓN</div><div class='master-hero'><h1>"+esc(x.code)+"</h1><p>"+esc(client?.name||"")+" · "+esc(prop?.name||"")+"</p><div class='master-sign'>"+esc(x.service_type)+" · "+esc(x.typology)+" · "+esc(statusNames[x.status]||x.status)+"</div></div>"+
@@ -2033,11 +2033,11 @@ async function viewService(id){
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sin observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
- const r=role()==="employee"
+ const r=["employee","maintenance_technician"].includes(role())
   ? await sb.rpc("employee_service_detail",{p_service_id:id})
   : await sb.from("services").select("*").eq("id",id).single();
  if(r.error){toast(r.error.message);return}
- const x=role()==="employee"?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
+ const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
  const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
@@ -2062,8 +2062,8 @@ async function viewService(id){
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
   '<div class="field"><label>Descrição / observações</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
   (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+clientAdvanceButton+cleaningFlowHtml+maintenanceFlowHtml+
-  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],role()==="employee")+'</div></div>'+
-  (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"&&isCleaningServiceType(x.service_type)?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
+  '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],["employee","maintenance_technician"].includes(role()))+'</div></div>'+
+  (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"&&isCleaningServiceType(x.service_type)?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
  renderServiceStatusActions(x)+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+((dispatch.data||[]).map(d=>'<div class="line"><span>'+esc(d.employee_id||"—")+'<br><small>'+esc(d.response)+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)" '+(["admin","supervisor","employee"].includes(role())?"":"style=\'display:none\'")+'>'+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div>');
 }
@@ -2076,16 +2076,16 @@ async function setServiceStatusPremium(id,status){
  }
  if(status==="completed"){
    if(isCleaningServiceType(sr.data.service_type)){
-     if(role()==="employee"){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
+     if(["employee","maintenance_technician"].includes(role())){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
      if(["admin","supervisor"].includes(role())){await approveCleaningService(id);return}
-   }else if(role()==="employee"&&sr.data.assigned_employee_id===currentUser.id){
+   }else if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id){
      const done=await sb.rpc("employee_finish_maintenance_service",{p_service_id:id});
      if(done.error){toast(String(done.error.message||"No se pudo finalizar el mantenimiento"));return}
      toast("✓ Mantenimiento finalizado. El cliente ha sido notificado y podrá ver las evidencias.");
      closeModal();await renderServicesMaster();return;
    }
  }
- if(role()==="employee"&&sr.data.assigned_employee_id===currentUser.id&&["on_the_way","in_progress","paused"].includes(status)){
+ if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id&&["on_the_way","in_progress","paused"].includes(status)){
    const r=await sb.rpc("employee_transition_service_status",{p_service_id:id,p_next_status:status});
    if(r.error){toast("No se pudo actualizar el estado: "+String(r.error.message||""));return}
    toast("✓ Estado actualizado: "+(statusNames[status]||status));
@@ -2400,7 +2400,7 @@ async function loadEmployeeDocuments(id){
  const q=await sb.from("employee_documents").select("id,document_type,title,file_name,storage_path,expires_at,created_at,employee_profile_id,employee_id,review_status,reviewed_at,review_notes").eq("employee_profile_id",id).order("created_at",{ascending:false});
  if(q.error){box.innerHTML='<div class="msg">'+esc(q.error.message)+'</div>';return}
  const canManageDocs=role()==="admin"||role()==="supervisor";
- const canDelete=canManageDocs||(role()==="employee"&&(q.data||[]).some(d=>d.employee_id===currentUser?.id));
+ const canDelete=canManageDocs||(["employee","maintenance_technician"].includes(role())&&(q.data||[]).some(d=>d.employee_id===currentUser?.id));
  box.innerHTML='<div class="panel-head"><div><h3>Documentos del funcionario</h3><div class="muted">'+(q.data?.length||0)+' documentos · el funcionario puede enviarlos desde su perfil</div></div></div><div class="field"><label>Añadir documento</label><input id="docFile_'+id+'" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"><small class="muted">PDF, imágenes y documentos · máximo 25 MB.</small></div>'+(q.data?.length?q.data.map(d=>'<div class="line-item"><span><b>'+esc(d.title||d.file_name)+'</b><small class="muted" style="display:block">'+esc(d.document_type||"documento")+' · '+esc(d.file_name||"")+(d.expires_at?" · Vence "+esc(d.expires_at):"")+' · '+(d.review_status==="verified"?"✓ Verificado":d.review_status==="needs_correction"?"⚠ Corregir":"⏳ Pendiente")+(d.review_notes?" · "+esc(d.review_notes):"")+'</small></span><span class="actions"><button class="btn" type="button" onclick="openEmployeeDocument(\''+esc(d.storage_path)+'\')">Abrir</button>'+(canDelete?'<button class="btn" type="button" onclick="deleteEmployeeDocument(\''+esc(d.id)+'\',\''+esc(d.storage_path)+'\',\''+esc(id)+'\')">Eliminar</button>':"")+(canManageDocs&&d.review_status!=="verified"?'<button class="btn gold" type="button" onclick="reviewEmployeeDocument(\''+esc(d.id)+'\',\'verified\')">✓ Verificar</button><button class="btn" type="button" onclick="reviewEmployeeDocument(\''+esc(d.id)+'\',\'needs_correction\')">↻ Corregir</button>':"")+'</span></div>').join(""):'<div class="empty">Sin documentos todavía.</div>')+'<button class="btn gold" type="button" style="margin-top:8px" onclick="uploadEmployeeDocumentFromInput(\''+id+'\')">＋ Guardar documento</button>';
 }
 async function reviewEmployeeDocument(id,status){
@@ -2416,7 +2416,7 @@ async function reviewEmployeeDocument(id,status){
 async function deleteEmployeeDocument(docId,path,employeeProfileId){
  const q=await sb.from("employee_documents").select("employee_id").eq("id",docId).eq("employee_profile_id",employeeProfileId).eq("company_id",currentProfile.company_id).maybeSingle();
  if(q.error||!q.data){toast(q.error?.message||"Documento no encontrado.");return}
- if(!(role()==="admin"||role()==="supervisor"||(role()==="employee"&&q.data.employee_id===currentUser?.id))){toast("No tiene permisos para eliminar este documento.");return}
+ if(!(role()==="admin"||role()==="supervisor"||(["employee","maintenance_technician"].includes(role())&&q.data.employee_id===currentUser?.id))){toast("No tiene permisos para eliminar este documento.");return}
  if(!confirm("¿Eliminar este documento?"))return;
  const d=await sb.from("employee_documents").delete().eq("id",docId).eq("employee_profile_id",employeeProfileId).eq("company_id",currentProfile.company_id);
  if(d.error){toast(d.error.message);return}
@@ -2429,8 +2429,8 @@ async function uploadEmployeeDocument(employeeProfileId,file,type="documento",ti
  const ep=await sb.from("employee_profiles").select("id,profile_id").eq("id",employeeProfileId).eq("company_id",currentProfile.company_id).maybeSingle();
  if(ep.error||!ep.data){toast(ep.error?.message||"Ficha del funcionario no encontrada.");return}
  const employeeId=ep.data.profile_id||null;
- if(role()==="employee"&&employeeId!==currentUser.id){toast("Solo puede enviar documentos de su propia ficha.");return}
- const storageOwner=role()==="employee"?currentUser.id:employeeProfileId;
+ if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("Solo puede enviar documentos de su propia ficha.");return}
+ const storageOwner=["employee","maintenance_technician"].includes(role())?currentUser.id:employeeProfileId;
  const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"_"),path=currentProfile.company_id+"/employees/"+storageOwner+"/"+crypto.randomUUID()+"-"+safe;
  const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||undefined});
  if(up.error){toast("No se pudo subir el documento: "+up.error.message);return}
@@ -2865,7 +2865,7 @@ async function notificationAction(id,title,body){
    if(opened){await markNotificationRead(id,false);return}
  }
  await markNotificationRead(id,false);
- if(role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
+ if(["employee","maintenance_technician"].includes(role())&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
    const m=b.match(/SRV-[A-Z0-9-]+/i);
    if(m){
     const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",m[0]).maybeSingle();
@@ -2916,7 +2916,7 @@ async function renderNotifications(){
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Centro de alertas</h3><div class="muted">'+unread+' sin leer · '+rows.length+' en historial</div></div><div class="actions" style="width:100%;justify-content:flex-end"><span class="pill">'+(unread?"🔴 "+unread+" nuevas":"✓ Todo leído")+'</span><button class="btn gold" onclick="enableBrowserNotifications()">🔔 Activar notificaciones</button></div><div class="actions" style="width:100%;justify-content:flex-end;margin-top:8px"><button class="btn" style="min-height:42px;font-weight:700;border-color:#c59643;background:#fffaf1" onclick="deleteReadNotifications()">🗑️ Eliminar notificaciones leídas'+(readCount?" ("+readCount+")":"")+'</button></div></div>'+(rows.length?rows.map(x=>{
    const t=String(x.title||"").toLowerCase();
    const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
-   const isEmployeeAssignment=role()==="employee"&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
+   const isEmployeeAssignment=["employee","maintenance_technician"].includes(role())&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
    const action=(isMessage||isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
    const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
    return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
@@ -3722,7 +3722,7 @@ async function saveEmergency(e){
    const type=String(s.data.service_type||"").toLowerCase();
    if(!(type.includes("manten")||type.includes("pint")||type.includes("electric")||type.includes("fontan")||type.includes("hydraulic"))){toast("La emergencia 24H solo admite servicios de mantenimiento.");return}
    if(s.data.property_id!==propertyId){toast("El servicio seleccionado no pertenece a ese apartamento.");return}
-   if(role()==="employee"&&s.data.assigned_employee_id!==currentUser.id){toast("Solo puede registrar la emergencia del mantenimiento que tiene asignado.");return}
+   if(["employee","maintenance_technician"].includes(role())&&s.data.assigned_employee_id!==currentUser.id){toast("Solo puede registrar la emergencia del mantenimiento que tiene asignado.");return}
    const relatedType=String(s.data.service_type||"").toLowerCase();
    if(serviceType!=="mantenimiento" && !relatedType.includes(serviceType.replace("fontaneria","fontan").replace("hidraulica","hydraulic"))){toast("El tipo de servicio no coincide con el servicio relacionado.");return}
  }
@@ -3731,7 +3731,7 @@ async function saveEmergency(e){
  const clientId=pr.data.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(selectedClientId&&selectedClientId!==clientId){toast("El apartamento seleccionado no pertenece al cliente elegido.");return}
- if(role()==="employee"&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
+ if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
  const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,service_type:serviceType,category:"maintenance",priority,description,status:"open"};
  if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · emergencia guardada para sincronizar");return}
  const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload});
@@ -3971,7 +3971,7 @@ async function loadServiceCreationContext(){
 }
 function openNewServiceMenu(){
  if(!romanoProfileCan("newservice")){toast("Este perfil no puede crear servicios.");return}
- const employeeOnly=role()==="employee";
+ const employeeOnly=["employee","maintenance_technician"].includes(role());
  const buttons=employeeOnly
   ? "<button type='button' class='btn gold' style='min-height:110px;font-size:15px' onclick='closeModal();newMaintenanceServicePremium()'>🔧<br><strong>Servicio mantenimiento</strong><small style='display:block;margin-top:6px'>Crear mantenimiento para cualquier cliente y apartamento</small></button>"
   : "<div class='two' style='gap:14px'><button type='button' class='btn gold' style='min-height:100px;font-size:15px' onclick='closeModal();newServicePremium()'>🧹<br><strong>Servicio limpieza</strong><small style='display:block;margin-top:6px'>Limpieza, ropa, lavandería y adicionales</small></button><button type='button' class='btn' style='min-height:100px;font-size:15px' onclick='closeModal();newMaintenanceServicePremium()'>🔧<br><strong>Servicio mantenimiento</strong><small style='display:block;margin-top:6px'>Mantenimiento, pintura, electricidad, fontanería y tarifas</small></button></div>";
@@ -4034,7 +4034,7 @@ async function saveMaintenanceService(){
  const prop=$("msProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
  const title=$("msTitle")?.value.trim();if(!title){toast("Indique el título del trabajo.");return}
  const date=new Date($("msDate")?.value||"");if(Number.isNaN(date.getTime())){toast("Seleccione una fecha y hora válidas.");return}
- const category=$("msCategory")?.value||"maintenance",rateKey=$("msRate")?.value||"normal",hours=Math.max(1,Number($("msHours")?.value||1)),other=Math.max(0,Number($("msOther")?.value||0)),catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",base=rateKey==="other"?other:maintenanceServicePrice(rateKey,hours,other),vat=Number($("msVat")?.value||21)/100,gross=base+(catalogIsGross?catalogPrice:catalogPrice*(1+vat)),subtotal=gross/(1+vat),tax=gross-subtotal,employeeId=role()==="employee"?currentUser.id:($("msEmployee")?.value||null),code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor","employee"].includes(role());
+ const category=$("msCategory")?.value||"maintenance",rateKey=$("msRate")?.value||"normal",hours=Math.max(1,Number($("msHours")?.value||1)),other=Math.max(0,Number($("msOther")?.value||0)),catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",base=rateKey==="other"?other:maintenanceServicePrice(rateKey,hours,other),vat=Number($("msVat")?.value||21)/100,gross=base+(catalogIsGross?catalogPrice:catalogPrice*(1+vat)),subtotal=gross/(1+vat),tax=gross-subtotal,employeeId=["employee","maintenance_technician"].includes(role())?currentUser.id:($("msEmployee")?.value||null),code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor","employee"].includes(role());
  const propRow=(window.__mpProps||[]).find(x=>x.id===prop);const clientId=$("msClient")?.value||propRow?.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",clientId).eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).single();if(own.error||!own.data){toast("Este apartamento no pertenece a su cuenta de cliente.");return}}
@@ -4043,7 +4043,7 @@ async function saveMaintenanceService(){
  const created=await sb.from("services").insert(payload).select("id").single();
  if(created.error){toast("No se pudo crear el servicio de mantenimiento: "+created.error.message);return}
  await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:created.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{service_kind:"maintenance",pricing_source:"maintenance_catalog"}});
- if(employeeId&&internal&&role()!=="employee"){
+ if(employeeId&&internal&&!["employee","maintenance_technician"].includes(role())){
    const asg=await sb.rpc("assign_service_employee",{p_service_id:created.data.id,p_employee_id:employeeId,p_force:false});
    if(asg.error){closeModal();toast("Servicio creado, pero no se pudo designar: "+asg.error.message);renderServicesMaster();return}
  }
@@ -4221,7 +4221,7 @@ async function selectRoleChat(targetRole){
    thread=__chatRoleThreads[targetRole]||await findOrCreateRoleThread(targetRole);
    if(!thread)return;
    __chatRoleThreads[targetRole]=thread;
- }else if(role()==="admin"||role()==="supervisor"||role()==="employee"){
+ }else if(role()==="admin"||role()==="supervisor"||["employee","maintenance_technician"].includes(role())){
    const target=await sb.from("profiles").select("id,full_name,role").eq("company_id",currentProfile.company_id).eq("role",targetRole).eq("active",true).neq("id",currentUser.id).order("full_name").limit(1).maybeSingle();
    if(target.error||!target.data){toast("Destinatario no disponible.");return}
    const c=await sb.rpc("create_staff_chat",{target_profile_id:target.data.id});
