@@ -3588,7 +3588,7 @@ function clientMonthBounds(value){
  const [y,m]=String(value||"").split("-").map(Number),start=new Date(y,m-1,1),end=new Date(y,m,1);
  return {start,end};
 }
-async async function renderServiceHistoryPremium(){
+async function renderServiceHistoryPremium(){
  if(role()==="client"){return renderClientServiceHistoryPremium()}
  if(role()!=="admin"){toast("El histórico completo está reservado a Administración.");openPage("dashboard");return}
  const p=romanoMadridParts(),defaultDay=p.year+"-"+p.month+"-"+p.day;
