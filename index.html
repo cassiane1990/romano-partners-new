@@ -3653,7 +3653,7 @@ async function loadServiceCreationContext(){
    props=(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).order("name")).data||[];
  }
  const employees=internalCreation&&!demoMode?((await sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name")).data||[]):[];
- window.__mpProps=props;window.__mpEmployees=employees;window.__mpEmployeeMode=employeeMode;
+ window.__mpProps=props;window.__mpEmployees=employees;window.__mpClients=clients;window.__mpEmployeeMode=employeeMode;
  return {clientMode,employeeMode,internalCreation,ownClient,clients,props,employees};
 }
 function openNewServiceMenu(){
@@ -3685,7 +3685,7 @@ function maintenanceServicePrice(rateKey,hours,customValue=0){
  return rate.rate;
 }
 async function newMaintenanceServicePremium(){
- const {clientMode,internalCreation,ownClient,clients}=await loadServiceCreationContext();
+ const {clientMode,employeeMode,internalCreation,ownClient,clients,props}=await loadServiceCreationContext();
  let catalog=[];
  if(!demoMode){const q=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active").eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name");if(!q.error)catalog=q.data||[]}
  const clientOptions=clients.map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
@@ -3693,13 +3693,20 @@ async function newMaintenanceServicePremium(){
  const typeOptions=MAINTENANCE_TYPES.map(x=>"<option value='"+x[0]+"'>"+x[1]+"</option>").join("");
  const rateOptions=Object.entries(MAINTENANCE_RATES).map(([k,v])=>"<option value='"+k+"'>"+esc(v.label)+"</option>").join("")+"<option value='other'>Valor personalizado · indicar importe</option>";
  openModal("Nuevo servicio · mantenimiento","<div class='wizard-grid'><div><div class='step'><b>1</b><strong>Cliente → apartamento</strong></div><div class='two'><div class='field'><label>Cliente</label>"+(clientMode?"<input value='"+esc(ownClient?.name||currentProfile?.full_name||"Cliente")+"' disabled><input id='msClient' type='hidden' value='"+(ownClient?.id||"")+"'>":"<select id='msClient' onchange='maintenanceServiceFilterProperties()'>"+clientOptions+"</select>")+"</div><div class='field'><label>Apartamento / propiedad</label><select id='msProperty'></select></div></div><div class='step'><b>2</b><strong>Datos del mantenimiento</strong></div><div class='two'><div class='field'><label>Tipo</label><select id='msCategory' onchange='maintenanceServiceRecalc()'>"+typeOptions+"</select></div><div class='field'><label>Prioridad</label><select id='msPriority'><option value='normal'>Normal</option><option value='low'>Baja</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div><div class='field'><label>Título / trabajo</label><input id='msTitle' placeholder='Ej. Reparación de fuga en baño' required></div><div class='field'><label>Descripción</label><textarea id='msDescription' placeholder='Detalle completo del trabajo a realizar'></textarea></div><div class='two'><div class='field'><label>Fecha y hora</label><input id='msDate' type='datetime-local'></div><div class='field'><label>Tarifa de mantenimiento</label><select id='msRate' onchange='maintenanceServiceRecalc()'>"+rateOptions+"</select></div></div><div class='two'><div class='field'><label>Horas</label><select id='msHours' onchange='maintenanceServiceRecalc()'>"+qtyOptions(1,7)+"</select></div><div class='field'><label>Valor personalizado / otros (€)</label><input id='msOther' type='number' min='0' step='0.01' value='0' oninput='maintenanceServiceRecalc()'></div></div><div class='field'><label>Servicio del catálogo de mantenimiento</label><select id='msCatalog' onchange='maintenanceServiceRecalc()'><option value=''>Sin línea de catálogo</option>"+catalogOptions+"</select></div>"+(internalCreation?"<div class='step'><b>3</b><strong>Designar funcionario</strong></div><div class='field'><label>Buscar por nombre</label>"+await serviceEmployeeOptionsHtml("ms")+"</div><div class='notice'>El funcionario recibirá una alerta y deberá aceptar el servicio.</div>":"")+"<div class='step'><b>4</b><strong>Costes y notas</strong></div><div class='two'><div class='field'><label>Coste estimado (€)</label><input id='msEstimated' type='number' min='0' step='0.01' value='0'></div><div class='field'><label>Coste real (€)</label><input id='msActual' type='number' min='0' step='0.01' value='0'></div></div><div class='field'><label>Notas</label><textarea id='msNotes'></textarea></div></div><div><div class='panel'><div class='panel-head'><h3>Resumen mantenimiento</h3><span class='pill'>Mantenimiento</span></div><div class='field'><label>País fiscal</label><select id='msVat' onchange='maintenanceServiceRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='msLines'></div><div class='line-item'><span>Subtotal SIN IVA</span><b id='msSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='msTax'>0,00 €</b></div><div class='line-item'><span>TOTAL CON IVA</span><b id='msTotal' class='big-total'>0,00 €</b></div><button type='button' class='primary' onclick='saveMaintenanceService()'>Crear servicio de mantenimiento</button></div></div></div>");
- const d=new Date(Date.now()+3600000);$("msDate").value=d.toISOString().slice(0,16);maintenanceServiceFilterProperties();maintenanceServiceRecalc();
+ const d=new Date(Date.now()+3600000);$("msDate").value=d.toISOString().slice(0,16);maintenanceServiceFilterProperties();if(employeeMode&&props.length===1)$("msProperty").value=props[0].id;maintenanceServiceSyncClient();maintenanceServiceRecalc();
 }
 function maintenanceServiceFilterProperties(){
  const cid=$("msClient")?.value,sel=$("msProperty");if(!sel)return;
  const rows=(window.__mpProps||[]).filter(p=>!cid||p.client_id===cid);
  sel.innerHTML=rows.map(p=>"<option value='"+p.id+"'>"+esc(p.name)+" · "+esc(p.code||"")+" · "+esc([p.address,p.city].filter(Boolean).join(", "))+"</option>").join("");
+ if(rows.length&&!sel.value)sel.value=rows[0].id;
 }
+function maintenanceServiceSyncClient(){
+ const prop=$("msProperty")?.value,row=(window.__mpProps||[]).find(p=>p.id===prop);if(!row)return;
+ const client=(window.__mpClients||[]).find(c=>c.id===row.client_id);
+ if(client&&$("msClient")){$("msClient").value=client.id;const n=$("msClientName");if(n)n.value=client.name;}
+}
+
 function maintenanceServiceRecalc(){
  const rateKey=$("msRate")?.value||"normal",hours=Math.max(1,Number($("msHours")?.value||1)),custom=Math.max(0,Number($("msOther")?.value||0)),catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogTax=catalogOpt?.dataset?.tax==="1",base=rateKey==="other"?custom:maintenanceServicePrice(rateKey,hours,custom),catGross=catalogPrice,vat=Number($("msVat")?.value||21)/100;
  const catalogIsGross=catalogOpt?.dataset?.tax==="1",catalogNet=catalogIsGross?catGross:catGross,baseGross=base,gross=catalogIsGross?baseGross+catGross:baseGross+catGross*(1+vat),net=(baseGross/(1+vat))+catalogNet,tax=gross-net;
@@ -3710,7 +3717,7 @@ async function saveMaintenanceService(){
  const prop=$("msProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
  const title=$("msTitle")?.value.trim();if(!title){toast("Indique el título del trabajo.");return}
  const date=new Date($("msDate")?.value||"");if(Number.isNaN(date.getTime())){toast("Seleccione una fecha y hora válidas.");return}
- const category=$("msCategory")?.value||"maintenance",rateKey=$("msRate")?.value||"normal",hours=Math.max(1,Number($("msHours")?.value||1)),other=Math.max(0,Number($("msOther")?.value||0)),catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",base=rateKey==="other"?other:maintenanceServicePrice(rateKey,hours,other),vat=Number($("msVat")?.value||21)/100,gross=base+(catalogIsGross?catalogPrice:catalogPrice*(1+vat)),subtotal=gross/(1+vat),tax=gross-subtotal,employeeId=$("msEmployee")?.value||null,code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor"].includes(role());
+ const category=$("msCategory")?.value||"maintenance",rateKey=$("msRate")?.value||"normal",hours=Math.max(1,Number($("msHours")?.value||1)),other=Math.max(0,Number($("msOther")?.value||0)),catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",base=rateKey==="other"?other:maintenanceServicePrice(rateKey,hours,other),vat=Number($("msVat")?.value||21)/100,gross=base+(catalogIsGross?catalogPrice:catalogPrice*(1+vat)),subtotal=gross/(1+vat),tax=gross-subtotal,employeeId=role()==="employee"?currentUser.id:($("msEmployee")?.value||null),code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor","employee"].includes(role());
  const propRow=(window.__mpProps||[]).find(x=>x.id===prop);const clientId=$("msClient")?.value||propRow?.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",clientId).eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).single();if(own.error||!own.data){toast("Este apartamento no pertenece a su cuenta de cliente.");return}}
@@ -3719,7 +3726,7 @@ async function saveMaintenanceService(){
  const created=await sb.from("services").insert(payload).select("id").single();
  if(created.error){toast("No se pudo crear el servicio de mantenimiento: "+created.error.message);return}
  await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:created.data.id,actor_id:currentUser.id,event_type:"requested",metadata:{service_kind:"maintenance",pricing_source:"maintenance_catalog"}});
- if(employeeId&&internal){
+ if(employeeId&&internal&&role()!=="employee"){
    const asg=await sb.rpc("assign_service_employee",{p_service_id:created.data.id,p_employee_id:employeeId,p_force:false});
    if(asg.error){closeModal();toast("Servicio creado, pero no se pudo designar: "+asg.error.message);renderServicesMaster();return}
  }
