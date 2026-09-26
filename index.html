@@ -903,7 +903,7 @@ async function acceptAssignedService(serviceId){
  const r=await sb.rpc("employee_accept_service_assignment",{p_service_id:serviceId});
  if(r.error){toast("No se pudo aceptar: "+r.error.message);return}
  toast("✓ Servicio aceptado. Estado: A camino.");
- await renderServicesMaster();
+ if(window.__romanoCurrentPage==="service_journey")await renderServiceJourneyBoard();else if(window.__romanoCurrentPage==="journey")await renderJourneyMaster();else await renderServicesMaster();
 }
 async function openServiceAssignment(serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede designar.");return}
@@ -2094,7 +2094,7 @@ async function setServiceStatusPremium(id,status){
    const r=await sb.rpc("employee_transition_service_status",{p_service_id:id,p_next_status:status});
    if(r.error){toast("No se pudo actualizar el estado: "+String(r.error.message||""));return}
    toast("✓ Estado actualizado: "+(statusNames[status]||status));
-   closeModal();await renderServicesMaster();updateOfflineIndicator();return;
+   closeModal();if(window.__romanoCurrentPage==="service_journey")await renderServiceJourneyBoard();else if(window.__romanoCurrentPage==="journey")await renderJourneyMaster();else await renderServicesMaster();updateOfflineIndicator();return;
  }
  const now=new Date().toISOString(),patch={status,updated_at:now,updated_by:currentUser.id,updated_by_at:now};
  const cachedBase=window.__romanoServiceVersions?.[id]||null;
@@ -3020,7 +3020,7 @@ function showApp(){closeMobileMenu();
  buildMasterNav();startRealtime();initOfflineSync();startRomanoMadridClock();initRomanoPullToRefresh();openPage("dashboard")
 }
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
-async function openPage(key){closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
+async function openPage(key){window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 let __authBusy=false,__authReadyId=null;
 async function enterAppFromSession(session){
  if(!session?.user){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}
