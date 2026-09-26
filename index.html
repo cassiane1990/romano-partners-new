@@ -1897,7 +1897,11 @@ const ROMANO_CLEANING_CHECKLIST=[
  {key:"lixeiros",label:"Lixeiros"},{key:"geladeira",label:"Geladeira / Nevera"},{key:"forno",label:"Forno"},
  {key:"microondas",label:"Microondas"},{key:"debaixo_cama",label:"Debajo de la cama"},{key:"dentro_armarios",label:"Dentro de los armarios"},{key:"amenities",label:"Amenities"}
 ];
-function isCleaningServiceType(type){const s=String(type||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return s.includes("limp")||s==="cleaning"}
+function isCleaningServiceType(type){
+ const s=String(type||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+ if(/manten|maintenance|electric|plumb|pint|silicone|assembly|installation|hydraulic|repar/.test(s))return false;
+ return s.includes("limp")||s==="cleaning"||s==="airbnb"||s.includes("hotel")||s.includes("housekeeping")||s.includes("alojamiento");
+}
 async function ensureCleaningChecklist(service){
  if(!isCleaningServiceType(service?.service_type)||!["employee","admin","supervisor"].includes(role()))return [];
  const r=await sb.rpc("ensure_cleaning_checklist",{p_service_id:service.id});if(r.error)throw r.error;
