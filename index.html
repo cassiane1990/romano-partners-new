@@ -3635,13 +3635,26 @@ function masterUpdateMaintenance(){const type=$("mpMaintenance")?.value||"none",
 
 function masterLoadPropertyBeds(){const id=$("mpProperty")?.value,p=(demoMode?DEMO_PROPERTIES:((window.__mpProps||[]))).find(x=>x.id===id);if(!p)return;const s=document.querySelector("[data-qty='LINEN_SINGLE']"),d=document.querySelector("[data-qty='LINEN_KING']");if(s)s.value=String(Math.max(0,Number(p.beds_single||0)));if(d)d.value=String(Math.max(0,Number(p.beds_double||0)));masterRecalc()}
 async function loadServiceCreationContext(){
- const clientMode=role()==="client",internalCreation=["admin","supervisor"].includes(role());
+ const currentRole=role(),clientMode=currentRole==="client",employeeMode=currentRole==="employee",internalCreation=["admin","supervisor"].includes(currentRole);
  const ownClient=clientMode&&!demoMode?(await sb.from("clients").select("id,name").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle()).data:null;
- const clients=demoMode?DEMO_CLIENTS:(clientMode?(ownClient?[ownClient]:[]):((await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name")).data||[]));
- const props=demoMode?DEMO_PROPERTIES:(clientMode?((await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("client_id",ownClient?.id||"00000000-0000-0000-0000-000000000000").order("name")).data||[]):((await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).order("name")).data||[]));
+ let clients=[],props=[];
+ if(demoMode){clients=DEMO_CLIENTS;props=DEMO_PROPERTIES;}
+ else if(clientMode){
+   clients=ownClient?[ownClient]:[];
+   props=(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("client_id",ownClient?.id||"00000000-0000-0000-0000-000000000000").order("name")).data||[];
+ }else if(employeeMode){
+   const assigned=(await sb.from("services").select("property_id,client_id").eq("company_id",currentProfile.company_id).eq("assigned_employee_id",currentUser.id)).data||[];
+   const propertyIds=[...new Set(assigned.map(x=>x.property_id).filter(Boolean))];
+   const clientIds=[...new Set(assigned.map(x=>x.client_id).filter(Boolean))];
+   props=propertyIds.length?(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).in("id",propertyIds).order("name")).data||:[];
+   clients=clientIds.length?(await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).in("id",clientIds).order("name")).data||:[];
+ }else{
+   clients=(await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name")).data||[];
+   props=(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).order("name")).data||[];
+ }
  const employees=internalCreation&&!demoMode?((await sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("role","employee").eq("active",true).order("full_name")).data||[]):[];
- window.__mpProps=props;window.__mpEmployees=employees;
- return {clientMode,internalCreation,ownClient,clients,props,employees};
+ window.__mpProps=props;window.__mpEmployees=employees;window.__mpEmployeeMode=employeeMode;
+ return {clientMode,employeeMode,internalCreation,ownClient,clients,props,employees};
 }
 function openNewServiceMenu(){
  if(!romanoProfileCan("newservice")){toast("Este perfil no puede crear servicios.");return}
