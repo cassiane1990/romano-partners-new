@@ -941,6 +941,7 @@ async function assignServiceEmployee(serviceId,employeeId,force=false){
  }
  closeModal();toast(r.data?.extra?"✓ Designación EXTRA enviada. El funcionario verá o conflito e decidirá se pode aceitar.":"✓ Funcionario designado. Aguardando aceitação dele.");await renderServicesMaster();
 }
+function privateMaintenanceServiceType(v){return /manten|pint|electric|fontan|hidraulic|hydraulic|silic|monta|instal|repar/i.test(String(v||""))}
 function serviceTypeLabel(v){
  const m={limpieza_alojamiento:"Limpieza alojamiento",limpieza_hotel_5_estrellas:"Limpieza hotel 5★",oficina:"Limpieza oficina",clinica:"Limpieza clínica",mantenimiento:"Mantenimiento",pintura:"Pintura",fontaneria:"Fontanería",electricidad:"Electricidad",lavanderia:"Lavandería",airbnb:"Limpieza Airbnb",hotel:"Limpieza hotel 5★"};
  return m[v]||String(v||"Servicio").replaceAll("_"," ");
@@ -953,6 +954,7 @@ async function loadEmployeeOperationalServices(){
  const base=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
  if(base.error)throw base.error;
  const own=base.data||[];
+ if(isMaintenanceTechnician()) return own.filter(x=>privateMaintenanceServiceType(x.service_type));
  const related=await sb.rpc("maintenance_employee_cleaning_context");
  if(related.error)throw related.error;
  const ownIds=new Set(own.map(x=>x.id));
@@ -1102,13 +1104,13 @@ async function renderCatalogMaster(){
 }
 
 function journeyActionsForService(s){
- const r=role(),own=r==="employee"&&s.assigned_employee_id===currentUser.id;
+ const r=role(),own=["employee","maintenance_technician"].includes(r)&&s.assigned_employee_id===currentUser.id;
  if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(s.status))return "";
  const maint=/manten|electric|plumb|pint|repar/i.test(String(s.service_type||""));
  const sid=JSON.stringify(s.id);
  const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium('+sid+','+JSON.stringify(status)+')">'+label+'</button>';
- if(r==="employee"&&!own)return "";
- if(s.status==="scheduled")return r==="employee"?'<button type="button" class="btn gold" onclick="event.stopPropagation();acceptAssignedService('+sid+')">✓ ACEPTAR</button>':"";
+ if((r==="employee"||r==="maintenance_technician")&&!own)return "";
+ if(s.status==="scheduled")return ["employee","maintenance_technician"].includes(r)?'<button type="button" class="btn gold" onclick="event.stopPropagation();acceptAssignedService('+sid+')">✓ ACEPTAR</button>':"";
  if(s.status==="on_the_way")return btn("▶ Iniciar","in_progress",true);
  if(s.status==="in_progress")return btn("Ⅱ Pausar","paused",false)+(maint&&r!=="employee"?btn("✓ Finalizar","completed",true):"");
  if(s.status==="paused")return btn("▶ Continuar","in_progress",true)+(maint&&r!=="employee"?btn("✓ Finalizar","completed",true):"");
@@ -1129,7 +1131,7 @@ async function renderServiceJourneyBoard(){
   else if(role()==="supervisor")q=await sb.from("services").select(fields).eq("assigned_supervisor_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   else q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
-  services=q.data||[];
+  services=q.data||[]; if(role()==="maintenance_technician")services=services.filter(s=>privateMaintenanceServiceType(s.service_type));
   const ids=[...new Set(services.map(s=>s.property_id).filter(Boolean))],cids=[...new Set(services.map(s=>s.client_id).filter(Boolean))],eids=[...new Set(services.map(s=>s.assigned_employee_id).filter(Boolean))];
   const [pr,cr,er]=await Promise.all([
    ids.length?sb.from("properties").select("id,code,name,address,city,country,photo_url,property_type,client_id").in("id",ids):Promise.resolve({data:[]}),
@@ -1143,7 +1145,7 @@ async function renderServiceJourneyBoard(){
  const photos={};if(!demoMode)await Promise.all(props.filter(p=>p.photo_url).map(async p=>{const u=await sb.storage.from("property-media").createSignedUrl(p.photo_url,900);if(!u.error)photos[p.id]=u.data.signedUrl}));
  const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervision_pending:"Esperando supervisión",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
  const statusIcon={requested:"○",scheduled:"◷",on_the_way:"🚗",in_progress:"▶",paused:"Ⅱ",supervision_pending:"🔎",supervised:"✓",completed:"✓",approved:"✓",rejected:"×",returned:"↩",cancelled:"×"};
- const isMaint=s=>/manten|electric|plumb|pint|repar/i.test(String(s.service_type||""));
+ const isMaint=s=>privateMaintenanceServiceType(s.service_type);
  const cleaning=services.filter(s=>!isMaint(s)).length,maintenance=services.length-cleaning;
  const active=services.filter(s=>["on_the_way","in_progress","paused","supervision_pending"].includes(s.status)).length;
  const cards=services.map(s=>{
@@ -3640,7 +3642,7 @@ async function saveQualityChecklist(e){
  closeModal();toast("Checklist guardado");quality();updateOfflineIndicator();
 }
 async function emergency(){
- const r=await sb.from("occurrences").select("id,service_id,property_id,service_type,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100),rows=r.data||[];const canWrite=["admin","supervisor","employee","client"].includes(role());let props=[],services=[],clients=[];
+ const r=await sb.from("occurrences").select("id,service_id,property_id,service_type,category,priority,description,status,resolution,created_at,resolved_at").order("created_at",{ascending:false}).limit(100),rows=r.data||[];const canWrite=["admin","supervisor","employee","maintenance_technician","client"].includes(role());let props=[],services=[],clients=[];
  if(rows.length){const pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],sids=[...new Set(rows.map(x=>x.service_id).filter(Boolean))];const [pr,sv]=await Promise.all([pids.length?sb.from("properties").select("id,name,code,address,city,client_id").in("id",pids):Promise.resolve({data:[]}),sids.length?sb.from("services").select("id,code,client_id,property_id").in("id",sids):Promise.resolve({data:[]})]);props=pr.data||[];services=sv.data||[];const cids=[...new Set([...props.map(x=>x.client_id),...services.map(x=>x.client_id)].filter(Boolean))];if(cids.length)clients=(await sb.from("clients").select("id,name,email,phone,client_code").in("id",cids)).data||[]}
  const pm=new Map(props.map(x=>[x.id,x])),sm=new Map(services.map(x=>[x.id,x])),cm=new Map(clients.map(x=>[x.id,x]));let h='<div class="panel"><div class="panel-head"><div><h3>Emergencia 24H · Incidencias</h3><div class="muted">Identificada por cliente, apartamento, dirección y contacto. El código es solo referencia.</div></div>'+(canWrite?'<button class="btn gold" onclick="newEmergency()">＋ Registrar incidencia</button>':'')+'</div>';
  h+=(r.error?'<div class="msg">'+esc(r.error.message)+'</div>':rows.length?rows.map(x=>{const p=pm.get(x.property_id),s=sm.get(x.service_id),cl=cm.get(p?.client_id||s?.client_id);return '<div class="panel" style="margin-top:10px"><div class="panel-head"><div><strong>'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+'</strong><div class="muted">'+esc(p?.address||"Dirección no registrada")+(p?.city?" · "+esc(p.city):"")+'</div></div><span class="status '+(x.status==="open"?"urgent":"approved")+'">'+esc(x.status==="open"?"Pendiente de aceptación":x.status==="accepted"?"Recibido":"Resuelta")+'</span></div><div class="two"><div><small class="muted">Contacto cliente</small><div>'+esc(cl?.phone||"—")+' · '+esc(cl?.email||"—")+'</div></div><div><small class="muted">Referencia</small><div>'+esc(s?.code||"Sin servicio")+' · '+esc(x.service_type||x.category||"General")+' · '+esc(x.priority||"normal")+'</div></div></div><div style="margin-top:10px"><b>Problema</b><div>'+esc(x.description)+'</div></div><div class="muted" style="margin-top:8px">Creada: '+esc(new Date(x.created_at).toLocaleString("es-ES"))+(x.resolution?" · Resolución: "+esc(x.resolution):"")+'</div>'+(canManage()&&x.status==="open"?'<div class="actions" style="margin-top:8px"><button class="btn gold" onclick="acceptOccurrence(\''+x.id+'\')">✓ Aceptar como recibido</button></div>':"")+'</div>'}).join(""):'<div class="empty">No hay incidencias.</div>');h+='</div>';$("content").innerHTML=h;
@@ -3658,6 +3660,14 @@ async function newEmergency(){
    const sr=await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300);
    if(sr.error){toast(sr.error.message);return}
    services=(sr.data||[]).filter(x=>/manten|pint|electric|fontan|hydraulic|plumb/i.test(String(x.service_type||"").toLowerCase()));
+ else if(currentRole==="maintenance_technician"){
+   const [pr,cr,sr]=await Promise.all([
+     sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name"),
+     sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name"),
+     sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300)
+   ]);
+   if(pr.error||cr.error||sr.error){toast(pr.error?.message||cr.error?.message||sr.error?.message||"No se pudo cargar la emergencia.");return}
+   props=pr.data||[];clients=cr.data||[];services=(sr.data||[]).filter(x=>privateMaintenanceServiceType(x.service_type));
  }else{
    props=(await sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name")).data||[];
    clients=(await sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name")).data||[];
@@ -3671,7 +3681,7 @@ async function newEmergency(){
  const propertyOptions=props.map(p=>'<option value="'+p.id+'" data-client="'+esc(p.client_id||"")+'">'+esc(p.name||"Apartamento")+' · '+esc(p.code||"")+' · '+esc(p.address||"Sin dirección")+(p.city?" · "+esc(p.city):"")+'</option>').join("");
  const maintenanceServices=services.filter(x=>String(x.service_type||"").toLowerCase().includes("manten")||String(x.service_type||"").toLowerCase().includes("pint")||String(x.service_type||"").toLowerCase().includes("electric")||String(x.service_type||"").toLowerCase().includes("fontan")||String(x.service_type||"").toLowerCase().includes("hydraulic"));
  const serviceOptions=maintenanceServices.map(x=>{const p=props.find(v=>v.id===x.property_id),cl=clients.find(v=>v.id===x.client_id)||clients.find(v=>v.id===p?.client_id);return '<option value="'+x.id+'" data-property="'+esc(x.property_id||"")+'" data-client="'+esc((x.client_id||p?.client_id)||"")+'">'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+' · '+esc(p?.address||"Sin dirección")+' · '+esc(x.code||"Servicio")+'</option>'}).join("");
- const employeeOptions=currentRole==="employee"
+ const employeeOptions=["employee","maintenance_technician"].includes(currentRole)
    ? '<option value="'+esc(currentUser.id)+'">'+esc(currentProfile?.full_name||"Yo mismo")+' · Mantenimiento</option>'
    : '<option value="">Seleccione el funcionario de mantenimiento</option>'+maintenanceEmployees.map(x=>'<option value="'+x.id+'">'+esc(x.full_name||x.email||"Funcionario")+' · '+esc(x.function_title||"Mantenimiento")+'</option>').join("");
  const clientField=currentRole==="client"
