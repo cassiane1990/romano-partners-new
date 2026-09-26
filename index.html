@@ -3411,6 +3411,11 @@ async function newEmergency(){
    ? '<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>'
    : '<select id="eClient"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>';
  openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="saveEmergency(event)"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="notice">Emergencia 24H está reservada exclusivamente para incidencias urgentes de mantenimiento. Al seleccionar un servicio relacionado, cliente, apartamento y dirección se identifican automáticamente.</div><div class="two"><div class="field"><label>Servicio de mantenimiento relacionado</label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div><div class="field"><label>Funcionario de mantenimiento</label><select id="eEmployee" required>'+employeeOptions+'</select></div></div><div class="field"><label>Prioridad</label><select id="ePriority"><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option></select></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><button class="primary">Enviar emergencia 24H de mantenimiento</button></form>');
+ const emergencyServiceSelect=$("eService");
+ if(emergencyServiceSelect&&maintenanceServices.length){
+   emergencyServiceSelect.value=maintenanceServices[0].id;
+   syncEmergencyFromService(emergencyServiceSelect.value);
+ }
 }
 function syncEmergencyFromService(serviceId){
  const sel=$("eService"),opt=sel?.options[sel.selectedIndex];if(!opt)return;
