@@ -3661,7 +3661,7 @@ async function newEmergency(){
    const sr=await sb.from("services").select("id,code,property_id,client_id,service_type,scheduled_at,assigned_employee_id").eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(300);
    if(sr.error){toast(sr.error.message);return}
    services=(sr.data||[]).filter(x=>/manten|pint|electric|fontan|hydraulic|plumb/i.test(String(x.service_type||"").toLowerCase()));
- else if(currentRole==="maintenance_technician"){
+ }else if(currentRole==="maintenance_technician"){
    const [pr,cr,sr]=await Promise.all([
      sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).order("name"),
      sb.from("clients").select("id,name,email,phone,client_code").eq("company_id",currentProfile.company_id).order("name"),
