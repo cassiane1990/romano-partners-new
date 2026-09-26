@@ -1206,7 +1206,7 @@ const ROMANO_PROFILE_MASTER=Object.freeze({
  client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","sync","profile"]})
 });
 function romanoProfileMaster(roleKey=role()){return ROMANO_PROFILE_MASTER[roleKey]||ROMANO_PROFILE_MASTER.client}
-function romanoProfileCan(page,roleKey=role()){return romanoProfileMaster(roleKey).allowed.includes(page)}
+function romanoProfileCan(page,roleKey=role()){if(roleKey==="employee"&&page==="operations")return /manuten|manten|maintenance/i.test(String(currentProfile?.employee_function_title||""));return romanoProfileMaster(roleKey).allowed.includes(page)}
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 const DEMO_CLIENTS=[{id:"demo-c1",name:"Alehost",email:"operaciones@alehost.demo",phone:"+34 600 100 201",created_at:"2026-09-20T09:00:00Z"},{id:"demo-c2",name:"Booking Premium Madrid",email:"madrid@booking.demo",phone:"+34 600 100 202",created_at:"2026-09-19T10:00:00Z"},{id:"demo-c3",name:"Málaga Luxury Stays",email:"malaga@luxury.demo",phone:"+34 600 100 203",created_at:"2026-09-18T11:00:00Z"},{id:"demo-c4",name:"Clínica Retiro",email:"contacto@clinica.demo",phone:"+34 600 100 204",created_at:"2026-09-17T12:00:00Z"},{id:"demo-c5",name:"Hotel Boutique Salamanca",email:"hotel@boutique.demo",phone:"+34 600 100 205",created_at:"2026-09-16T13:00:00Z"}];
 const DEMO_PROPERTIES=[{id:"demo-p1",code:"ALE-T2-001",name:"Apartamento Alehost · Serrano",property_type:"T2",beds_single:0,beds_double:0,address:"Calle de Serrano 42",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p2",code:"ALE-T1-002",name:"Apartamento Alehost · Retiro",property_type:"T1",beds_single:0,beds_double:0,address:"Calle de Alcalá 118",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p3",code:"BKG-T4-003",name:"Villa Premium · Marbella",property_type:"T4",beds_single:0,beds_double:0,address:"Nueva Andalucía",city:"Marbella",country:"España",client_id:"demo-c2",status:"En servicio"},{id:"demo-p4",code:"MLS-T3-004",name:"Luxury Stay · Málaga Centro",property_type:"T3",beds_single:0,beds_double:0,address:"Calle Larios 18",city:"Málaga",country:"España",client_id:"demo-c3",status:"Activo"},{id:"demo-p5",code:"CLI-T2-005",name:"Clínica Retiro",property_type:"T2",beds_single:0,beds_double:0,address:"Calle Ibiza 11",city:"Madrid",country:"España",client_id:"demo-c4",status:"Mantenimiento"}];
@@ -1609,6 +1609,8 @@ async function profileLoad(){
  const {data,error}=await sb.from("profiles").select("id,company_id,full_name,email,avatar_url,role,active").eq("id",currentUser.id).maybeSingle();
  if(error||!data)throw error||new Error("Perfil no encontrado.");
  currentProfile=data;
+ currentProfile.employee_function_title="";
+ if(data.role==="employee"){const ep=await sb.from("employee_profiles").select("function_title").eq("profile_id",currentUser.id).eq("company_id",data.company_id).maybeSingle();currentProfile.employee_function_title=ep.data?.function_title||"";}
  currentProfile.avatar_display_url="";
  if(data.avatar_url){
   if(/^https?:\/\//i.test(data.avatar_url)) currentProfile.avatar_display_url=data.avatar_url;
