@@ -1675,12 +1675,6 @@ async function renderSyncPremium(){
 }
 window.addEventListener("online",()=>{updateOfflineIndicator();syncOfflineQueue()});
 window.addEventListener("offline",()=>updateOfflineIndicator());
-async function runAdminFinancialAlerts(){
- if(role()!=="admin")return;
- const r=await sb.rpc("notify_admin_financial_alerts");
- if(r.error)console.warn("Financial alerts:",r.error.message);
-}
-if(role()==="admin"){runAdminFinancialAlerts().catch(()=>{})}
 async function initOfflineSync(){if(__offlineListenersReady)return;__offlineListenersReady=true;await updateOfflineIndicator();if(navigator.onLine)syncOfflineQueue()}
 
 function toast(t){$("toast").textContent=t;$("toast").classList.remove("hidden");setTimeout(()=>$("toast").classList.add("hidden"),3000)}
