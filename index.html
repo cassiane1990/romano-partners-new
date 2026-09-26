@@ -2690,7 +2690,7 @@ async function installRomanoApp(){
  toast(/iPhone|iPad|iPod/i.test(navigator.userAgent)?"En iPhone/iPad: Safari → Compartir → Añadir a pantalla de inicio.":"El navegador no ofrece la instalación en este momento. Abra ROMANO PARTNERS desde Chrome o Edge para instalarlo.");
 }
 async let __romanoSWReloading=false;
-function registerRomanoServiceWorker(){
+async function registerRomanoServiceWorker(){
  try{
   if(!("serviceWorker" in navigator))return null;
   if(!window.__romanoSWControllerWatch){
