@@ -2689,16 +2689,14 @@ async function installRomanoApp(){
  if(__romanoInstallPrompt){__romanoInstallPrompt.prompt();const r=await __romanoInstallPrompt.userChoice;__romanoInstallPrompt=null;const b=$("installAppBtn");if(b)b.style.display="none";return}
  toast(/iPhone|iPad|iPod/i.test(navigator.userAgent)?"En iPhone/iPad: Safari → Compartir → Añadir a pantalla de inicio.":"El navegador no ofrece la instalación en este momento. Abra ROMANO PARTNERS desde Chrome o Edge para instalarlo.");
 }
-async let __romanoSWReloading=false;
+let __romanoSWReloading=false;
 async function registerRomanoServiceWorker(){
  try{
   if(!("serviceWorker" in navigator))return null;
   if(!window.__romanoSWControllerWatch){
    window.__romanoSWControllerWatch=true;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
-    if(__romanoSWReloading)return;
     __romanoSWReloading=true;
-    window.location.reload();
    });
   }
   const reg=await navigator.serviceWorker.register("/sw.js",{scope:"/",updateViaCache:"none"});
