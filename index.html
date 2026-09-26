@@ -1007,7 +1007,7 @@ async function renderServicesMaster(){
    const visibleClient=role()==="client"?clientName:(c?.name||fallbackClient?.name||"—");
    const visibleProperty=p?.name||p?.code||"—";
    const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
-   const actions='<button class="btn" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
+   const actions='<button class="btn" onclick="'+(x.__relatedCleaning?"viewRelatedCleaning":"viewService")+'(\''+x.id+'\')">Ver '+(x.__relatedCleaning?"seguimiento":"detalle")+'</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (role()==="employee"&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
       ["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       ["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id&&["admin","supervisor"].includes(role())&&x.status==="scheduled"?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
@@ -1173,7 +1173,7 @@ async function renderEmployeeWorkPanel(){
  if(cids.length){const q=await sb.from("clients").select("id,name").in("id",cids).eq("company_id",currentProfile.company_id);(q.data||[]).forEach(x=>cm[x.id]=x)}
  const body=rows.length?rows.map(x=>{
    const p=pm[x.property_id],cl=cm[x.client_id],related=!!x.__relatedCleaning;
-   return '<div class="line-item" style="align-items:flex-start;gap:12px"><span style="flex:1"><b>'+esc(related?"🧹 Limpieza · seguimiento":"🔧 "+serviceTypeLabel(x.service_type))+'</b><small style="display:block;margin-top:3px">'+esc(x.code||"—")+' · '+esc(cl?.name||"Cliente")+'</small><small style="display:block">'+esc(p?.name||p?.code||"Apartamento")+(p?.address?" · "+esc(p.address):"")+'</small></span><span style="text-align:right"><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span><small style="display:block;margin-top:5px">'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin horario")+'</small><button class="btn" style="margin-top:6px" onclick="viewService(\''+x.id+'\')">Ver</button></span></div>';
+   return '<div class="line-item" style="align-items:flex-start;gap:12px"><span style="flex:1"><b>'+esc(related?"🧹 Limpieza · seguimiento":"🔧 "+serviceTypeLabel(x.service_type))+'</b><small style="display:block;margin-top:3px">'+esc(x.code||"—")+' · '+esc(cl?.name||"Cliente")+'</small><small style="display:block">'+esc(p?.name||p?.code||"Apartamento")+(p?.address?" · "+esc(p.address):"")+'</small></span><span style="text-align:right"><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span><small style="display:block;margin-top:5px">'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin horario")+'</small><button class="btn" style="margin-top:6px" onclick="'+(related?"viewRelatedCleaning":"viewService")+'(\''+x.id+'\')">'+(related?"Seguimiento":"Ver")+'</button></span></div>';
  }).join(""):'<div class="empty">No tiene trabajos asignados.</div>';
  return '<div class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3>Mis trabajos</h3><div class="muted">Mantenimiento asignado y, para funcionarios de mantenimiento, el estado de la limpieza relacionada.</div></div><span class="pill">'+rows.length+'</span></div>'+body+'</div>';
 }
@@ -1953,6 +1953,19 @@ function renderMaintenanceEmployeeFlow(x){
  if(x.status==="paused")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ CONTINUAR</button><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
  h+='<div class="notice" style="margin-top:10px">Antes de finalizar, debe existir al menos una foto o vídeo del trabajo realizado. Al finalizar, el cliente recibirá una notificación y podrá abrir las evidencias.</div></div>';
  return h;
+}
+async function viewRelatedCleaning(id){
+ if(role()!=="employee"){toast("Esta visualización es exclusiva del flujo interno.");return}
+ const q=await sb.rpc("maintenance_employee_cleaning_context");
+ if(q.error){toast(q.error.message);return}
+ const x=(q.data||[]).find(s=>s.id===id);
+ if(!x){toast("La limpieza relacionada ya no está disponible.");return}
+ const p=await sb.from("properties").select("name,code,address,city").eq("id",x.property_id).maybeSingle();
+ const cl=await sb.from("clients").select("name").eq("id",x.client_id).maybeSingle();
+ openModal("Seguimiento de limpieza · "+esc(x.code),
+   '<div class="notice"><strong>Esta es una visualización de seguimiento.</strong><br>El funcionario de mantenimiento puede acompanhar el estado de la limpieza del mismo apartamento, sin assumir a execução da limpeza.</div>'+
+   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(cl.data?.name||"—")+'</strong></p></div><div><small class="muted">Apartamento</small><p>'+esc(p.data?.name||p.data?.code||"—")+'</p></div><div><small class="muted">Dirección</small><p>'+esc([p.data?.address,p.data?.city].filter(Boolean).join(" · ")||"—")+'</p></div><div><small class="muted">Estado de limpieza</small><p><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div><div><small class="muted">Fecha / hora</small><p>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"—")+'</p></div></div>'
+ );
 }
 async function viewService(id){
  if(demoMode){
