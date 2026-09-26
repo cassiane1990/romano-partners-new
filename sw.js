@@ -1,4 +1,4 @@
-const CACHE="romano-pwa-v18";
+const CACHE="romano-pwa-v21";
 const CORE=["/","/index.html","/manifest.json","/icon.svg"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
@@ -20,12 +20,18 @@ self.addEventListener("push",event=>{
  try{data=event.data?.json()||{}}catch(e){data={body:event.data?.text()||"Nueva alerta"}}
  const n=data.notification||data;
  const title=n.title||data.title||"ROMANO PROPERTY CARE";
- const options={body:n.body||data.body||"Nueva alerta",icon:n.icon||data.icon||"/icon.svg",badge:n.badge||data.badge||"/icon.svg",tag:n.tag||data.tag||"romano-alert",renotify:true,data:{url:n.navigate||data.url||"/"},silent:n.silent===true,vibrate:[200,100,200]};
+ const serviceId=n.service_id||data.service_id||null;
+ const options={body:n.body||data.body||"Nueva alerta",icon:n.icon||data.icon||"/icon.svg",badge:n.badge||data.badge||"/icon.svg",tag:n.tag||data.tag||"romano-alert",renotify:true,requireInteraction:!!serviceId,data:{url:n.navigate||data.url||"/",service_id:serviceId},actions:serviceId?[{action:"accept_service",title:"✓ Aceptar"},{action:"open_service",title:"Ver servicio"}]:[],silent:n.silent===true,vibrate:[200,100,200]};
  event.waitUntil(self.registration.showNotification(title,options));
 });
 self.addEventListener("notificationclick",event=>{
  event.notification.close();
- const target=new URL(event.notification.data?.url||"/",self.location.origin).href;
+ const base=new URL(event.notification.data?.url||"/",self.location.origin);
+ const serviceId=event.notification.data?.service_id||null;
+ if(event.action==="accept_service"&&serviceId){
+   base.searchParams.set("acceptService",serviceId);
+ }
+ const target=base.href;
  event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then(list=>{
    const existing=list.find(c=>c.url.startsWith(self.location.origin));
    if(existing){existing.focus();existing.navigate(target);return}
