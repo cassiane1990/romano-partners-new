@@ -1854,19 +1854,6 @@ function renderServiceAudit(auditRows,actorNames){
  }).join("");
 }
 const ROMANO_CLEANING_CHECKLIST=[
- {key:"quartos",label:"Quartos"},
- {key:"sala",label:"Sala"},
- {key:"banheiros",label:"Banheiros"},
- {key:"cozinha",label:"Cozinha"},
- {key:"lixeiros",label:"Lixeiros / cubos de basura"},
- {key:"geladeira",label:"Geladeira / nevera"},
- {key:"forno",label:"Forno"},
- {key:"microondas",label:"Microondas"},
- {key:"debaixo_camas",label:"Debaixo das camas"},
- {key:"dentro_armarios",label:"Dentro dos armários"},
- {key:"amenities",label:"Amenities"}
-];
-const ROMANO_CLEANING_CHECKLIST=[
  {key:"quarto",label:"Quarto"},{key:"sala",label:"Sala"},{key:"banheiro",label:"Baño"},{key:"cozinha",label:"Cocina"},
  {key:"lixeiros",label:"Lixeiros"},{key:"geladeira",label:"Geladeira / Nevera"},{key:"forno",label:"Forno"},
  {key:"microondas",label:"Microondas"},{key:"debaixo_cama",label:"Debajo de la cama"},{key:"dentro_armarios",label:"Dentro de los armarios"},{key:"amenities",label:"Amenities"}
@@ -1946,8 +1933,6 @@ async function viewService(id){
  const isPendingAdmin=["admin","supervisor"].includes(role())&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- const checklistChecked=checklist.filter(i=>i.checked).length;
- const cleaningReady=isCleaningServiceType(x.service_type)&&checklistChecked>=ROMANO_CLEANING_CHECKLIST.length&&(media.data||[]).some(m=>m.media_type==="photo");
  const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]);
  openModal(isPendingAdmin?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':"")+
