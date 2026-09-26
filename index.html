@@ -3643,8 +3643,10 @@ async function loadServiceCreationContext(){
    clients=ownClient?[ownClient]:[];
    props=(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("client_id",ownClient?.id||"00000000-0000-0000-0000-000000000000").order("name")).data||[];
  }else if(employeeMode){
-   clients=(await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name")).data||[];
-   props=(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).order("name")).data||[];
+   const ctx=await sb.rpc("employee_service_creation_context");
+   if(ctx.error){toast("No se pudo cargar la lista de clientes y apartamentos: "+ctx.error.message);return {clientMode,employeeMode,internalCreation,ownClient,clients:[],props:[],employees:[]}}
+   clients=Array.isArray(ctx.data?.clients)?ctx.data.clients:[];
+   props=Array.isArray(ctx.data?.properties)?ctx.data.properties:[];
  }else{
    clients=(await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name")).data||[];
    props=(await sb.from("properties").select("id,name,code,client_id,property_type,beds_single,beds_double,address,city").eq("company_id",currentProfile.company_id).order("name")).data||[];
