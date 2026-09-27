@@ -1612,27 +1612,16 @@ async function renderPrepostosPremium(){
   const rows=window.__DEMO_PREPOSTOS||[];
   return renderPrepostosRows(rows,[]);
  }
- let clientId=null;
- if(role()==="client"){
-  const own=await sb.from("clients").select("id,name,client_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
-  if(own.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(own.error.message)+'</div></div>';return}
-  clientId=own.data?.id||null;
-  if(!clientId){$("content").innerHTML='<div class="panel"><div class="empty">No se encontró el cliente asociado.</div></div>';return}
- }
  const [pr,cr]=await Promise.all([
-  clientId
-   ? sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").eq("client_id",clientId).order("created_at",{ascending:false})
-   : sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").order("created_at",{ascending:false}),
-  clientId
-   ? sb.from("clients").select("id,name,client_code").eq("id",clientId)
-   : sb.from("clients").select("id,name,client_code").order("name")
+  sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").order("created_at",{ascending:false}),
+  sb.from("clients").select("id,name,client_code").order("name")
  ]);
  if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}
  return renderPrepostosRows(pr.data||[],cr.data||[]);
 }
 function renderPrepostosRows(rows,clients){
  const cm=new Map((clients||[]).map(x=>[x.id,x]));
- const canWrite=demoMode||canManage()||role()==="client";
+ const canWrite=demoMode||canManage();
  const body=(rows||[]).map(x=>{
   const cl=cm.get(x.client_id);
   return '<tr><td><b>'+esc(x.name)+'</b><small class="muted" style="display:block">'+esc(x.role_title||"Representante")+'</small></td><td>'+esc(cl?.name||"—")+'</td><td>'+esc(x.email||"—")+'</td><td>'+esc(x.phone||"—")+'</td><td>'+esc(x.address||"—")+'</td><td><span class="status '+(x.active?"approved":"urgent")+'">'+(x.active?"Activo":"Inactivo")+'</span></td><td><div class="actions">'+(canWrite?'<button class="btn" onclick="editPreposto(\''+esc(x.id)+'\')">Editar</button><button class="btn" onclick="deletePreposto(\''+esc(x.id)+'\')">Eliminar</button>':'<button class="btn" onclick="viewPreposto(\''+esc(x.id)+'\')">Ver</button>')+'</div></td></tr>';
@@ -1647,35 +1636,22 @@ async function prepostoClientsOptions(selected=""){
  return (q.data||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===selected?"selected":"")+'>'+esc(x.name||"Cliente")+' · '+esc(x.client_code||"")+'</option>').join("");
 }
 async function newPreposto(){
- if(!canManage()&&role()!=="client"){toast("No tiene permisos para crear representantes.");return}
+ if(!canManage()){toast("Solo Admin/Supervisor puede crear prepostos.");return}
  openModal("Nuevo preposto",await prepostoFormHtml({active:true}));
 }
 async function editPreposto(id){
- if(!canManage()&&role()!=="client"){return viewPreposto(id)}
+ if(!canManage()){return viewPreposto(id)}
  const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).single();
  if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
  openModal("Editar preposto",await prepostoFormHtml(q.data));
 }
 async function prepostoFormHtml(x={}){
  let opts=await prepostoClientsOptions(x.client_id||"");
- if(role()==="client"&&!demoMode){
-  const own=await sb.from("clients").select("id,name,client_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
-  if(own.data) opts='<option value="'+esc(own.data.id)+'" selected>'+esc(own.data.name||"Cliente")+' · '+esc(own.data.client_code||"")+'</option>';
- }
- return '<form onsubmit="savePreposto(event,'+JSON.stringify(x.id||null)+')"><div class="field"><label>Cliente</label><select id="ppClient">'+opts+'</select></div><div class="two"><div class="field"><label>Nombre *</label><input id="ppName" value="'+esc(x.name||"")+'" required></div><div class="field"><label>Cargo / función</label><input id="ppRole" value="'+esc(x.role_title||"")+'"></div></div><div class="two"><div class="field"><label>Email</label><input id="ppEmail" type="email" value="'+esc(x.email||"")+'"></div><div class="field"><label>Teléfono</label><input id="ppPhone" value="'+esc(x.phone||"")+'"></div></div><div class="field"><label>Dirección</label><input id="ppAddress" value="'+esc(x.address||"")+'"></div><div class="field"><label>Observaciones</label><textarea id="ppNotes">'+esc(x.notes||"")+'</textarea></div><div class="field"><label>Estado</label><select id="ppActive"><option value="true" '+(x.active!==false?"selected":"")+'>Activo</option><option value="false" '+(x.active===false?"selected":"")+'>Inactivo</option></select></div><div class="actions"><button class="primary" type="submit">Guardar preposto</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>';
+ return '<form onsubmit="savePreposto(event,'+JSON.stringify(x.id||null)+')"><div class="field"><label>Cliente</label><select id="ppClient"><option value="">— Sin cliente —</option>'+opts+'</select></div><div class="two"><div class="field"><label>Nombre *</label><input id="ppName" value="'+esc(x.name||"")+'" required></div><div class="field"><label>Cargo / función</label><input id="ppRole" value="'+esc(x.role_title||"")+'"></div></div><div class="two"><div class="field"><label>Email</label><input id="ppEmail" type="email" value="'+esc(x.email||"")+'"></div><div class="field"><label>Teléfono</label><input id="ppPhone" value="'+esc(x.phone||"")+'"></div></div><div class="field"><label>Dirección</label><input id="ppAddress" value="'+esc(x.address||"")+'"></div><div class="field"><label>Observaciones</label><textarea id="ppNotes">'+esc(x.notes||"")+'</textarea></div><div class="field"><label>Estado</label><select id="ppActive"><option value="true" '+(x.active!==false?"selected":"")+'>Activo</option><option value="false" '+(x.active===false?"selected":"")+'>Inactivo</option></select></div><div class="actions"><button class="primary" type="submit">Guardar preposto</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>';
 }
 async function savePreposto(e,id=null){
  e.preventDefault();
- if(!canManage()&&role()!=="client"){toast("No tiene permisos para guardar representantes.");return}
- if(role()==="client"&&!demoMode){
-  const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
-  if(own.error||!own.data){toast("No se encontró el cliente asociado.");return}
-  $("ppClient").value=own.data.id;
-  if(id){
-   const check=await sb.from("prepostos").select("id").eq("id",id).eq("client_id",own.data.id).maybeSingle();
-   if(check.error||!check.data){toast("No puede editar este representante.");return}
-  }
- }
+ if(!canManage()){toast("Solo Admin/Supervisor puede guardar prepostos.");return}
  const data={client_id:$("ppClient")?.value||null,name:$("ppName")?.value.trim(),role_title:$("ppRole")?.value.trim()||null,email:$("ppEmail")?.value.trim()||null,phone:$("ppPhone")?.value.trim()||null,address:$("ppAddress")?.value.trim()||null,notes:$("ppNotes")?.value.trim()||null,active:$("ppActive")?.value==="true",updated_at:new Date().toISOString()};
  if(!data.name){toast("El nombre es obligatorio.");return}
  if(demoMode){
