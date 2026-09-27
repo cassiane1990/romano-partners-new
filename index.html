@@ -2134,13 +2134,13 @@ function renderMaintenanceEmployeeFlow(x,media=[]){
  const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
  const canFinish=evidenceCount>0;
  const finishButton=canFinish
-  ? '<button class="btn gold" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'completed\\')">✓ FINALIZAR MANTENIMIENTO</button>'
+  ? '<button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button>'
   : '<button class="btn" type="button" disabled title="Adjunte al menos una foto o vídeo para habilitar la finalización" style="opacity:.55;cursor:not-allowed">✓ FINALIZAR · FALTA FOTO</button>';
  let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Trabajo de mantenimiento</h3><div class="muted">Acepte la designación, inicie el trabajo y adjunte fotos o vídeos del resultado.</div></div><span class="pill">'+esc(serviceTypeLabel(x.service_type))+'</span></div>';
- if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\\''+x.id+'\\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
- if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'in_progress\\')">▶ INICIAR MANTENIMIENTO</button></div>';
- if(x.status==="in_progress")h+='<div class="actions"><button class="btn" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'paused\\')">Ⅱ PAUSAR</button>'+finishButton+'</div>';
- if(x.status==="paused")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'in_progress\\')">▶ CONTINUAR</button>'+finishButton+'</div>';
+ if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
+ if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ INICIAR MANTENIMIENTO</button></div>';
+ if(x.status==="in_progress")h+='<div class="actions"><button class="btn" onclick="setServiceStatusPremium(\''+x.id+'\',\'paused\')">Ⅱ PAUSAR</button>'+finishButton+'</div>';
+ if(x.status==="paused")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ CONTINUAR</button>'+finishButton+'</div>';
  h+='<div class="notice" style="margin-top:10px">'+(canFinish?'✓ Evidencias anexadas: '+evidenceCount+'. Ya puede finalizar la mantenimiento.':'⚠️ Para finalizar, adjunte al menos una foto o vídeo de la mantenimiento.')+' Al finalizar, el cliente recibirá una notificación y podrá abrir las evidencias.</div></div>';
  return h;
 }
