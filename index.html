@@ -1906,11 +1906,27 @@ async function deleteEmployee(id){
  toast("Funcionario eliminado.");await renderEmployees();
 }
 async function deleteService(id){
- if(!canManage()||!id)return;
- if(!confirm("¿Eliminar este servicio y sus registros operativos asociados? Esta acción no se puede deshacer."))return;
- for(const pair of [["chat_threads","service_id"],["employee_locations","service_id"],["laundry_orders","service_id"],["material_requests","service_id"],["occurrences","service_id"]]){const b=await sb.from(pair[0]).delete().eq(pair[1],id);if(b.error){toast("No se puede eliminar el servicio: "+b.error.message);return}}
- const r=await sb.from("services").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar este servicio: "+r.error.message);return}
- toast("Servicio eliminado.");await renderServicesMaster();
+ if(!["admin","supervisor"].includes(role())||!id)return;
+ if(!confirm("¿Eliminar este servicio y todos sus registros operativos de prueba? Esta acción no se puede deshacer."))return;
+ const childTables=[
+  ["service_events","service_id"],["service_media","service_id"],["service_items","service_id"],
+  ["service_financials","service_id"],["service_costs","service_id"],["service_dispatch_attempts","service_id"],
+  ["service_checklist_media","service_id"],["service_checklist_items","service_id"],["quality_checklists","service_id"],
+  ["service_change_requests","service_id"],["work_journal_events","service_id"],["chat_threads","service_id"],
+  ["employee_locations","service_id"],["laundry_orders","service_id"],["material_requests","service_id"],
+  ["occurrences","service_id"]
+ ];
+ for(const [table,col] of childTables){
+   const q=await sb.from(table).delete().eq(col,id);
+   if(q.error){toast("No se puede eliminar el servicio: "+q.error.message);return}
+ }
+ const inv=await sb.from("invoices").delete().eq("service_id",id);
+ if(inv.error&&inv.error.code!=="PGRST116"){toast("No se puede eliminar las facturas del servicio: "+inv.error.message);return}
+ const r=await sb.from("services").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("No se puede eliminar este servicio: "+r.error.message);return}
+ await sb.from("audit_logs").delete().eq("object_type","service").eq("object_id",id);
+ toast("Servicio eliminado.");
+ await renderServicesMaster();
 }
 function newClient(){
  openModal("Nuevo cliente",'<form onsubmit="saveClient(event)"><div class="demo-flag">MODO DEMOSTRACIÓN · CLIENTE FICTICIO</div><div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="cPhotoPreview">'+photoBox("","Cliente",false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de perfil</label><input id="cPhoto" type="file" accept="image/*" onchange="photoPreview(\'cPhoto\',\'cPhotoPreview\',\'Cliente\')"><small class="muted">JPG/PNG · se redimensiona para la prueba</small></div></div><div class="two"><div class="field"><label>Nombre</label><input id="cName" required></div><div class="field"><label>Email</label><input id="cEmail" type="email"></div></div><div class="field"><label>Teléfono</label><input id="cPhone"></div><div class="field"><label>Notas</label><textarea id="cNotes"></textarea></div><div class="panel" style="margin:14px 0"><div class="panel-head"><div><h3>Acceso a ROMANO PARTNERS</h3><div class="muted">Envíe una invitación para que el cliente cree su propia contraseña.</div></div></div><label><input id="cSendInvite" type="checkbox" checked> Enviar invitación por e-mail al crear</label></div><button class="primary">Guardar cliente</button></form>')
