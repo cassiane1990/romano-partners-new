@@ -1486,17 +1486,32 @@ function romanoRequiredHour(serviceType){
  return kind==="checkin"?15:kind==="checkout"?11:null;
 }
 function romanoValidateServiceTime(serviceType,iso){
- const hour=romanoRequiredHour(serviceType);
- if(hour==null||!iso)return null;
- const d=new Date(iso);
- const madridHour=Number(romanoMadridParts(d).hour),madridMinute=Number(romanoMadridParts(d).minute);
- const ok=madridHour===hour&&madridMinute===0;
- return ok?null:(romanoServiceScheduleKind(serviceType)==="checkin"?"El check-in debe programarse a las 15:00.":"El check-out debe programarse a las 11:00.");
+ // 15:00 (check-in) y 11:00 (check-out) son horarios iniciales estándar,
+ // pero el horario queda editable para todos los perfiles.
+ return null;
+}
+function romanoDefaultScheduleDate(serviceType,baseDate){
+ const kind=romanoServiceScheduleKind(serviceType);
+ const hour=kind==="checkout"?11:15;
+ const now=new Date();
+ const parts=romanoMadridParts(baseDate||now);
+ let y=Number(parts.year),m=Number(parts.month),d=Number(parts.day);
+ const todayInput=String(y).padStart(4,"0")+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")+"T"+String(hour).padStart(2,"0")+":00";
+ let candidate=romanoMadridInputToDate(todayInput);
+ if(!candidate||candidate<=now){
+   const next=new Date(Date.UTC(y,m-1,d)+86400000);
+   const np=romanoMadridParts(next);
+   const nextInput=String(np.year).padStart(4,"0")+"-"+String(np.month).padStart(2,"0")+"-"+String(np.day).padStart(2,"0")+"T"+String(hour).padStart(2,"0")+":00";
+   candidate=romanoMadridInputToDate(nextInput);
+ }
+ return candidate;
 }
 function romanoAdvanceDefault(scheduledAt){
- const now=new Date(),scheduled=scheduledAt?new Date(scheduledAt):null;
- if(!scheduled||Number.isNaN(scheduled.getTime())||scheduled<=now)return {scheduled,desired:null};
- const desired=new Date(scheduled.getTime()-60*60000);
+ const scheduled=scheduledAt?new Date(scheduledAt):null;
+ if(!scheduled||Number.isNaN(scheduled.getTime()))return {scheduled,desired:null};
+ const parts=romanoMadridParts(scheduled),kind="checkin",hour=15;
+ const sameDay=String(parts.year).padStart(4,"0")+"-"+String(parts.month).padStart(2,"0")+"-"+String(parts.day).padStart(2,"0")+"T"+String(hour).padStart(2,"0")+":00";
+ const desired=romanoMadridInputToDate(sameDay);
  return {scheduled,desired};
 }
 const DEMO_CHANGE_REQUESTS=[];
@@ -4244,13 +4259,13 @@ async function requestServiceAdvance(serviceId){
  if(!scheduled||Number.isNaN(scheduled.getTime())){toast("Este servicio no tiene una hora válida.");return}
  if(window.__advanceClockTimer){clearInterval(window.__advanceClockTimer);window.__advanceClockTimer=null}
  window.__advanceArrivalInstant=scheduled;
- const defaultDesired=scheduled.getTime()>now.getTime()?new Date(scheduled.getTime()-60*60000):new Date(now.getTime()+60*60000);
+ const defaultDesired=romanoAdvanceDefault(scheduled).desired||new Date(now.getTime()+60*60000);
  const updateClock=()=>{const el=$("advSpainClock");if(el)el.textContent=romanoMadridLabel(new Date())+" · España (Europe/Madrid)"};
  openModal("Solicitar cambio de horario",
   '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)">'+
   '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>La hora se calcula siempre con Europe/Madrid, independientemente del reloj del iPad/iPhone.</small></div>'+
   '<div class="notice" style="margin-top:12px"><strong>Horario actual del servicio:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
-  '<div class="field"><label>Hora de entrada del huésped</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" required><small class="muted">Indique únicamente la hora en que el huésped desea entrar. El horario se interpreta siempre como hora de España.</small></div>'+
+  '<div class="field"><label>Hora de entrada del huésped</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" required><small class="muted">El horario estándar de check-in es a las 15:00. Puede solicitar una hora anterior o diferente; la solicitud será revisada por Administración/Supervisión. La hora se interpreta siempre como hora de España.</small></div>'+
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
   '<div class="field"><label>Motivo</label><textarea id="advReason" required placeholder="Explique por qué necesita cambiar el horario..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
@@ -4461,7 +4476,7 @@ async function newServicePremium(){
  const {clientMode,internalCreation,ownClient,clients,props}=await loadServiceCreationContext();
  const clientOptions=clients.map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
  openModal("Nuevo servicio · limpieza","<div class='wizard-grid'><div><div class='step'><b>1</b><strong>Cliente → apartamento</strong></div><div class='two'><div class='field'><label>Cliente</label>"+(clientMode?"<input id='mpClientName' value='"+esc(ownClient?.name||currentProfile?.full_name||"Cliente")+"' disabled><input id='mpClient' type='hidden' value='"+(ownClient?.id||"")+"'>":"<select id='mpClient' onchange='masterFilterProperties()'>"+clientOptions+"</select>")+"</div><div class='field'><label>Apartamento / propiedad</label><select id='mpProperty' onchange='masterLoadPropertyBeds()'></select></div></div><div class='step'><b>2</b><strong>Servicio limpieza</strong></div><div class='two'><div class='field'><label>Tipo de limpieza</label><select id='mpCleaningType' onchange='masterUpdateCleaningMode()'><option value='airbnb'>Limpieza Airbnb</option><option value='hotel'>Limpieza hotel 5★</option><option value='office'>Limpieza de oficina</option><option value='postobra'>Limpieza post-obra</option><option value='clinic'>Limpieza de clínica</option></select></div><div class='field'><label>Tipología / tarifa</label><select id='mpCleaning' onchange='masterCleaningOptionChanged()'></select></div></div><div class='two'><div class='field'><label id='mpCleaningQtyLabel'>Cantidad</label><select id='mpCleaningQty' onchange='masterRecalc()'>"+qtyOptions(1,50)+"</select></div><div class='field'><label>Valor original</label><input id='mpCleaningPrice' type='number' min='0' step='0.01' oninput='masterRecalc()'><small id='mpCleaningPriceNote' class='muted'>Valor original · SIN IVA</small></div></div><div class='two'><div class='field'><label>Fecha y hora</label><input id='mpDate' type='datetime-local'></div><div class='field'><label>Prioridad</label><select id='mpPriority'><option value='normal'>Normal</option><option value='high'>Alta</option><option value='urgent'>Urgente</option></select></div></div>"+(internalCreation?"<div class='step'><b>3</b><strong>Designar funcionario</strong></div><div class='field'><label>Buscar por nombre</label>"+await serviceEmployeeOptionsHtml("mp","cleaning")+"</div><div class='notice'>El funcionario designado recibirá una alerta y deberá aceptar el servicio. Puede dejarlo sin asignar y designarlo después.</div>":"")+"<div class='step'><b>4</b><strong>Alquiler de ropa</strong></div><div class='two'><div class='field'><label>Cama individual · cantidad</label><select data-qty='LINEN_SINGLE' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select></div><div class='field'><label>Cama doble / King · cantidad</label><select data-qty='LINEN_KING' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select></div></div><div class='two'><div class='field'><label>Sofá-cama</label><select id='mpSofaType' onchange='masterRecalc()'><option value='none'>No</option><option value='single'>Sofá-cama individual · 15,57 € SIN IVA</option><option value='double'>Sofá-cama doble / casal · 16,87 € SIN IVA</option></select></div><div class='field'><label>Sofá-cama · cantidad</label><select data-qty='SOFA_BED' onchange='masterRecalc()'>"+qtyOptions(0,10)+"</select></div></div><div class='notice'>Las cantidades de ropa se cargan automáticamente desde la composición de camas guardada en la propiedad.</div><div class='step'><b>5</b><strong>Lavandería</strong></div><div class='field'><label>¿Lavandería?</label><select id='mpLaundry' onchange='masterRecalc()'><option value='no'>No</option><option value='yes'>Sí</option></select></div><div class='step'><b>6</b><strong>Amenities</strong></div><div class='two'><div class='field'><label>Kit bienvenida · cantidad</label><select data-qty='KITCHEN' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select><small class='muted'>2,50 € · IVA incluido</small></div><div class='field'><label>Kit shampoo + jabón · cantidad</label><select data-qty='SHAMPOO' onchange='masterRecalc()'>"+qtyOptions(0,20)+"</select><small class='muted'>1,50 € · IVA incluido</small></div></div><div class='step'><b>7</b><strong>Adicionales</strong></div><div id='mpAdditionalList'></div><button type='button' class='btn' onclick='addServiceAdditionalRow()'>＋ Adicionar adicional</button><div class='step'><b>8</b><strong>Observaciones</strong></div><div class='field'><label>Observaciones del servicio</label><textarea id='mpNotes' placeholder='Instrucciones, detalles del apartamento, entrada, salida, limpieza especial...'></textarea></div></div><div><div class='panel'><div class='panel-head'><h3>Resumen del servicio</h3><span class='pill'>Limpieza</span></div><div class='field'><label>País fiscal</label><select id='mpVat' onchange='masterRecalc()'><option value='21'>España · IVA 21%</option><option value='23'>Portugal · IVA 23%</option></select></div><div id='mpLines'></div><div class='line-item'><span>Subtotal SIN IVA</span><b id='mpSub'>0,00 €</b></div><div class='line-item'><span>IVA</span><b id='mpTax'>0,00 €</b></div><div class='line-item'><span>TOTAL CON IVA</span><b id='mpTotal' class='big-total'>0,00 €</b></div><div class='notice'>El servicio de limpieza ya no contiene campos de mantenimiento. Mantenimiento se crea desde su propio botón.</div><button type='button' class='primary' onclick='savePremiumService()'>Crear servicio de limpieza</button></div></div></div>");
- const mpDefault=new Date(Date.now()+3600000);$("mpDate").value=mpDefault.toISOString().slice(0,16);masterFilterProperties();masterUpdateCleaningMode();masterRecalc();
+ const mpDefault=romanoDefaultScheduleDate("checkin");$("mpDate").value=romanoMadridInputValue(mpDefault||new Date());masterFilterProperties();masterUpdateCleaningMode();masterRecalc();
 }
 function maintenanceServicePrice(rateKey,hours,customValue=0){
  const rate=MAINTENANCE_RATES[rateKey]||MAINTENANCE_RATES.normal;
