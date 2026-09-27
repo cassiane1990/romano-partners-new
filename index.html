@@ -1067,8 +1067,9 @@ async function renderServicesMaster(){
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      serviceContext+
      '<div class="service-card-meta">'+
+       '<div><small>Creado</small><strong>'+esc(x.created_at?romanoMadridLabel(x.created_at):"—")+'</strong></div>'+
+       '<div><small>Check-in / limpieza</small><strong>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar")+'</strong></div>'+
        '<div><small>Tipo</small><strong>'+esc(serviceTypologyLabel(x.typology,x.service_type))+'</strong></div>'+
-       '<div><small>Fecha</small><strong>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar")+'</strong></div>'+
        '<div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div>'+
      '</div>'+
      (canSeeFinance()?'<div class="service-card-finance"><div><small>Sin IVA</small><b>'+masterMoney(f?.subtotal||0)+'</b></div><div><small>IVA</small><b>'+masterMoney(f?.tax_amount||0)+'</b></div><div><small>Total</small><b>'+masterMoney(f?.total||0)+'</b></div></div>':'')+
@@ -4264,8 +4265,8 @@ async function requestServiceAdvance(serviceId){
  openModal("Solicitar cambio de horario",
   '<form onsubmit="saveServiceAdvance(event,&#39;'+esc(serviceId)+'&#39;)">'+
   '<div class="notice"><strong>Hora actual de España</strong><div id="advSpainClock" style="font-size:20px;font-weight:800;margin-top:5px">'+esc(romanoMadridLabel(now))+' · España (Europe/Madrid)</div><small>La hora se calcula siempre con Europe/Madrid, independientemente del reloj del iPad/iPhone.</small></div>'+
-  '<div class="notice" style="margin-top:12px"><strong>Horario actual del servicio:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
-  '<div class="field"><label>Hora de entrada del huésped</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" required><small class="muted">El horario estándar de check-in es a las 15:00. Puede solicitar una hora anterior o diferente; la solicitud será revisada por Administración/Supervisión. La hora se interpreta siempre como hora de España.</small></div>'+
+  '<div class="notice" style="margin-top:12px"><strong>Servicio creado:</strong> '+esc(romanoMadridLabel(s?.created_at||now))+'<br><strong>Fecha y hora de check-in / limpieza:</strong> '+esc(romanoMadridLabel(scheduled))+'<br><strong>Apartamento:</strong> '+esc(p?.name||p?.code||"—")+'<br><strong>Servicio:</strong> '+esc(s?.code||"—")+' · '+esc(s?.service_type||"—")+'</div>'+
+  '<div class="field"><label>Nuevo día y hora de check-in / limpieza</label><input id="advRequestedFor" type="datetime-local" value="'+romanoMadridInputValue(defaultDesired)+'" required><small class="muted">El horario estándar de check-in es a las 15:00. Puede solicitar una hora anterior o posterior al horario actual del servicio. La solicitud será revisada por Administración/Supervisión. La hora se interpreta siempre como hora de España.</small></div>'+
   '<div class="field"><label>Urgencia</label><select id="advPriority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></div>'+
   '<div class="field"><label>Motivo</label><textarea id="advReason" required placeholder="Explique por qué necesita cambiar el horario..."></textarea></div>'+
   '<div class="field"><label>Foto / vídeo / áudio (opcional)</label><input id="advFiles" type="file" accept="image/*,video/*,audio/*" multiple><small class="muted">Hasta 5 archivos. Se guardan de forma privada vinculados al servicio.</small></div>'+
@@ -4319,7 +4320,6 @@ async function saveServiceAdvance(e,serviceId){
  const scheduledFor=service?.scheduled_at?new Date(service.scheduled_at):null,now=new Date();
  if(!scheduledFor||Number.isNaN(scheduledFor.getTime())){toast("Este servicio no tiene una hora válida.");return}
  if(["completed","cancelled"].includes(service.status)){toast("Este servicio ya no admite cambios de horario.");return}
- if(requestedFor.getTime()<=now.getTime()){toast("El nuevo horario debe ser futuro según la hora de España.");return}
  if(requestedFor.getTime()===scheduledFor.getTime()){toast("El nuevo horario debe ser diferente al horario actual.");return}
  if(files.length>5){toast("Puede adjuntar hasta 5 archivos.");return}
  if(demoMode){
