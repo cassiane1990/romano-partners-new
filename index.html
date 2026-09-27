@@ -4256,7 +4256,8 @@ async function saveEmergency(e){
    payload.service_id=emergencyServiceId;
  }
  if(emergencyServiceId){
-   const us=await sb.from("services").update({priority:"urgent",pricing:sb.rpc?"undefined":undefined}).eq("id",emergencyServiceId);
+   const us=await sb.from("services").update({priority:"urgent"}).eq("id",emergencyServiceId);
+   if(us.error){toast("La emergencia se creó, pero no se pudo marcar el servicio como urgente: "+us.error.message);return}
  }
  const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload}).select("id").single();
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · emergencia puesta en cola")}else toast(r.error.message);return}
