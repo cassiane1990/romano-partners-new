@@ -2311,7 +2311,7 @@ async function viewService(id){
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const adminDirectAssignmentButton=isPendingAdminDirect?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">DESIGNAR FUNCIONARIO</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
+ const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[])+renderMaintenanceSupervisorFlow(x,media.data||[]); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||journey?.client_name||"—")+'</strong></p></div><div><small class="muted">Supervisor</small><p><strong>'+esc(journey?.supervisor_name||"—")+'</strong></p></div><div><small class="muted">Técnico / funcionário</small><p>'+esc(journey?.employee_name||"—")+'</p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipo</small><p>'+esc(serviceTypologyLabel(x.typology,x.service_type))+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora programada</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado atual</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
@@ -4798,4 +4798,17 @@ async function sendChatPremium(e){
 if("serviceWorker" in navigator){
   registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
 }
-</script></body></html>
+</script></body></html
+function renderMaintenanceSupervisorFlow(x,media=[]){
+ if(role()!=="supervisor"||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
+ const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
+ const canFinish=evidenceCount>0;
+ let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Finalización del mantenimiento</h3><div class="muted">El Supervisor puede revisar el mantenimiento, adjuntar fotos o vídeos y finalizarlo.</div></div><span class="pill">Mantenimiento · Por tiempo</span></div>';
+ h+='<div class="notice">'+(canFinish?'✓ Evidencias anexadas: '+evidenceCount+'. El mantenimiento puede finalizarse.':'⚠️ Para finalizar el mantenimiento debe anexar al menos una foto o vídeo.')+'</div>';
+ if(["on_the_way","in_progress","paused"].includes(x.status)){
+   h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
+ }
+ h+='</div>';
+ return h;
+}
+>
