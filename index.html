@@ -4798,7 +4798,6 @@ async function sendChatPremium(e){
 if("serviceWorker" in navigator){
   registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
 }
-</script></body></html
 function renderMaintenanceSupervisorFlow(x,media=[]){
  if(role()!=="supervisor"||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
  const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
@@ -4812,3 +4811,4 @@ function renderMaintenanceSupervisorFlow(x,media=[]){
  return h;
 }
 >
+</script></body></html
