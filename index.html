@@ -2182,6 +2182,20 @@ function renderServiceStatusActions(x){
  if(x.status==="paused")return '<div class="actions" style="margin-top:12px"><span class="muted" style="align-self:center">Siguiente estado:</span>'+btn("▶ Continuar","in_progress",true)+(maint?btn("✓ Finalizar","completed",true):"")+'</div>';
  return "";
 }
+function renderMaintenanceJourneyTimeline(j){
+ const ev=Array.isArray(j?.events)?j.events:[],seen=new Set(),rows=[];
+ const add=(key,label,iso)=>{if(!iso||seen.has(key))return;seen.add(key);rows.push({key,label,iso})};
+ add("accepted","Aceitou o serviço",j.accepted_at);
+ ev.forEach(e=>{const to=e.to_status;const label=to==="on_the_way"?"A caminho":to==="in_progress"?"Iniciado":to==="paused"?"Pausado":to==="completed"?"Finalizado":(e.event_type==="accepted"?"Aceitou o serviço":"");if(label)add(to+"@"+e.created_at,label,e.created_at)});
+ add("finished","Finalização",j.finished_at);
+ const fmt=iso=>iso?new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
+ const duration=Number(j.worked_minutes||0),durationText=duration?Math.floor(duration/60)+" h "+Math.round(duration%60)+" min":"—";
+ const canSeeMoney=["admin","supervisor","client"].includes(role());
+ const total=canSeeMoney&&Number(j.total||0)>0?masterMoney(Number(j.total)):"";
+ return '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>⏱ Jornada e contabilização do mantenimiento</h3><div class="muted">O relógio começa quando o técnico coloca o serviço em <b>A caminho</b> e termina ao finalizar.</div></div><span class="pill">'+esc(durationText)+'</span></div>'+
+ '<div class="two"><div><small class="muted">Aceite</small><p><strong>'+esc(fmt(j.accepted_at))+'</strong></p></div><div><small class="muted">Início da contabilização · A caminho</small><p><strong>'+esc(fmt(j.started_at))+'</strong></p></div><div><small class="muted">Final da manutenção</small><p><strong>'+esc(fmt(j.finished_at))+'</strong></p></div><div><small class="muted">Tempo contabilizado</small><p><strong>'+esc(durationText)+'</strong></p></div>'+(total?'<div><small class="muted">Valor calculado conforme tabela</small><p><strong>'+esc(total)+'</strong></p></div>':"")+'</div>'+
+ '<div style="margin-top:12px"><small class="muted">Linha do tempo</small>'+((rows.length?rows.map(r=>'<div class="line"><span><b>'+esc(r.label)+'</b></span><span>'+esc(fmt(r.iso))+'</span></div>').join(""):'<div class="empty">Aguardando eventos da jornada.</div>'))+'</div></div>';
+}
 async function viewService(id){
  if(demoMode){
   const x=DEMO_SERVICES.find(s=>s.id===id);if(!x){toast("Servicio demo no encontrado");return}
@@ -2205,14 +2219,16 @@ async function viewService(id){
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
- const [media,dispatch,clientQ,propQ,auditQ]=await Promise.all([
+ const [media,dispatch,clientQ,propQ,auditQ,journeyQ]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
   sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
   sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle(),
-  sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30)
+  sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30),
+  privateMaintenanceServiceType(x.service_type)?sb.rpc("service_journey_detail",{p_service_id:id}):Promise.resolve({data:null,error:null})
  ]);
  const client=clientQ.data,prop=propQ.data;
+ const journey=journeyQ?.data||null;
  const auditRows=auditQ?.data||[];
  const actorIds=[...new Set(auditRows.map(a=>a.actor_id).filter(Boolean))];
  let actorNames={};
@@ -2226,7 +2242,8 @@ async function viewService(id){
  const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
-  '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
+  '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||journey?.client_name||"—")+'</strong></p></div><div><small class="muted">Supervisor</small><p><strong>'+esc(journey?.supervisor_name||"—")+'</strong></p></div><div><small class="muted">Técnico / funcionário</small><p>'+esc(journey?.employee_name||"—")+'</p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora programada</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado atual</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
+  (journey&&privateMaintenanceServiceType(x.service_type)?renderMaintenanceJourneyTimeline(journey):"")+
   '<div class="field"><label>Descrição / observações</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
   (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+adminDirectAssignmentButton+clientAdvanceButton+cleaningFlowHtml+maintenanceFlowHtml+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],["employee","maintenance_technician"].includes(role()))+'</div></div>'+
