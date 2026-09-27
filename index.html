@@ -1,5 +1,4 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
-<!-- ROMANO production rebuild 2026-09-27 · emergency flow audit -->
 <!doctype html>
 <html lang="es">
 <head>
@@ -1613,16 +1612,27 @@ async function renderPrepostosPremium(){
   const rows=window.__DEMO_PREPOSTOS||[];
   return renderPrepostosRows(rows,[]);
  }
+ let clientId=null;
+ if(role()==="client"){
+  const own=await sb.from("clients").select("id,name,client_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(own.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(own.error.message)+'</div></div>';return}
+  clientId=own.data?.id||null;
+  if(!clientId){$("content").innerHTML='<div class="panel"><div class="empty">No se encontró el cliente asociado.</div></div>';return}
+ }
  const [pr,cr]=await Promise.all([
-  sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").order("created_at",{ascending:false}),
-  sb.from("clients").select("id,name,client_code").order("name")
+  clientId
+   ? sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").eq("client_id",clientId).order("created_at",{ascending:false})
+   : sb.from("prepostos").select("id,client_id,name,role_title,phone,email,address,notes,active,created_at").order("created_at",{ascending:false}),
+  clientId
+   ? sb.from("clients").select("id,name,client_code").eq("id",clientId)
+   : sb.from("clients").select("id,name,client_code").order("name")
  ]);
  if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}
  return renderPrepostosRows(pr.data||[],cr.data||[]);
 }
 function renderPrepostosRows(rows,clients){
  const cm=new Map((clients||[]).map(x=>[x.id,x]));
- const canWrite=demoMode||canManage();
+ const canWrite=demoMode||canManage()||role()==="client";
  const body=(rows||[]).map(x=>{
   const cl=cm.get(x.client_id);
   return '<tr><td><b>'+esc(x.name)+'</b><small class="muted" style="display:block">'+esc(x.role_title||"Representante")+'</small></td><td>'+esc(cl?.name||"—")+'</td><td>'+esc(x.email||"—")+'</td><td>'+esc(x.phone||"—")+'</td><td>'+esc(x.address||"—")+'</td><td><span class="status '+(x.active?"approved":"urgent")+'">'+(x.active?"Activo":"Inactivo")+'</span></td><td><div class="actions">'+(canWrite?'<button class="btn" onclick="editPreposto(\''+esc(x.id)+'\')">Editar</button><button class="btn" onclick="deletePreposto(\''+esc(x.id)+'\')">Eliminar</button>':'<button class="btn" onclick="viewPreposto(\''+esc(x.id)+'\')">Ver</button>')+'</div></td></tr>';
@@ -1637,11 +1647,11 @@ async function prepostoClientsOptions(selected=""){
  return (q.data||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===selected?"selected":"")+'>'+esc(x.name||"Cliente")+' · '+esc(x.client_code||"")+'</option>').join("");
 }
 async function newPreposto(){
- if(!canManage()){toast("Solo Admin/Supervisor puede crear prepostos.");return}
+ if(!canManage()&&role()!=="client"){toast("No tiene permisos para crear representantes.");return}
  openModal("Nuevo preposto",await prepostoFormHtml({active:true}));
 }
 async function editPreposto(id){
- if(!canManage()){return viewPreposto(id)}
+ if(!canManage()&&role()!=="client"){return viewPreposto(id)}
  const q=demoMode?{data:(window.__DEMO_PREPOSTOS||[]).find(x=>x.id===id),error:null}:await sb.from("prepostos").select("*").eq("id",id).single();
  if(q.error||!q.data){toast(q.error?.message||"Preposto no encontrado.");return}
  openModal("Editar preposto",await prepostoFormHtml(q.data));
@@ -1652,7 +1662,16 @@ async function prepostoFormHtml(x={}){
 }
 async function savePreposto(e,id=null){
  e.preventDefault();
- if(!canManage()){toast("Solo Admin/Supervisor puede guardar prepostos.");return}
+ if(!canManage()&&role()!=="client"){toast("No tiene permisos para guardar representantes.");return}
+ if(role()==="client"&&!demoMode){
+  const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(own.error||!own.data){toast("No se encontró el cliente asociado.");return}
+  $("ppClient").value=own.data.id;
+  if(id){
+   const check=await sb.from("prepostos").select("id").eq("id",id).eq("client_id",own.data.id).maybeSingle();
+   if(check.error||!check.data){toast("No puede editar este representante.");return}
+  }
+ }
  const data={client_id:$("ppClient")?.value||null,name:$("ppName")?.value.trim(),role_title:$("ppRole")?.value.trim()||null,email:$("ppEmail")?.value.trim()||null,phone:$("ppPhone")?.value.trim()||null,address:$("ppAddress")?.value.trim()||null,notes:$("ppNotes")?.value.trim()||null,active:$("ppActive")?.value==="true",updated_at:new Date().toISOString()};
  if(!data.name){toast("El nombre es obligatorio.");return}
  if(demoMode){
@@ -2393,7 +2412,7 @@ async function viewService(id){
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
  const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[])+renderMaintenanceSupervisorFlow(x,media.data||[]); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
-  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+(privateMaintenanceServiceType(x.service_type)&&!['completed','cancelled'].includes(x.status)&&['client','admin','supervisor'].includes(role())?'<div class="notice" style="margin-top:12px"><strong>🚨 ¿Necesita una limpieza urgente?</strong><br>Puede crear una limpieza independiente y marcarla como urgente.</div><div class="actions"><button class="btn gold" onclick="createUrgentCleaningFromService(\''+x.id+'\')">🚨 CREAR LIMPIEZA URGENTE</button></div>':'')+
+  (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+(privateMaintenanceServiceType(x.service_type)&&!['completed','cancelled'].includes(x.status)&&['client','admin','supervisor'].includes(role())?'<div class="notice" style="margin-top:12px"><strong>🚨 ¿Necesita una limpieza urgente?</strong><br>Puede crear una limpieza independiente y marcarla como urgente.</div><div class="actions"><button class="btn gold" onclick="createUrgentCleaningFromService(\\''+x.id+'\\')">🚨 CREAR LIMPIEZA URGENTE</button></div>':'')+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||journey?.client_name||"—")+'</strong></p></div><div><small class="muted">Supervisor</small><p><strong>'+esc(journey?.supervisor_name||"—")+'</strong></p></div><div><small class="muted">Técnico / funcionário</small><p>'+esc(journey?.employee_name||"—")+'</p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipo</small><p>'+esc(serviceTypologyLabel(x.typology,x.service_type))+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora programada</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado atual</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
   (journey&&privateMaintenanceServiceType(x.service_type)?renderMaintenanceJourneyTimeline(journey):"")+
   '<div class="field"><label>Descrição / observações</label><textarea readonly>'+esc(x.instructions||"—")+'</textarea></div>'+
@@ -4933,4 +4952,4 @@ async function sendChatPremium(e){
 if("serviceWorker" in navigator){
   registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
 }
-</script></body></html>
+</script></body></html
