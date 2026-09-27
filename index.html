@@ -906,9 +906,9 @@ async function rejectServiceRequest(id){
  toast("Pedido rechazado.");await renderServicesMaster();
 }
 async function acceptServiceRequest(id){
- if(role()!=="supervisor"){toast("Solo el Supervisor puede aceptar solicitudes de servicio.");return}
+ if(!["admin","supervisor"].includes(role())){toast("Solo Administración o Supervisión puede aceptar solicitudes de servicio.");return}
  if(!id)return;
- if(!confirm("Aceptar esta solicitud de servicio?"))return;
+ if(!confirm("¿Aceptar esta solicitud de servicio?"))return;
  const q=await sb.rpc("admin_accept_service_request",{p_service_id:id});
  if(q.error){toast("No se pudo aceptar: "+q.error.message);return}
  toast("✓ Solicitud aceptada. Ahora queda pendiente de designación.");
