@@ -2334,7 +2334,7 @@ async function setServiceStatusPremium(id,status){
    if(isCleaningServiceType(sr.data.service_type)){
      if(["employee","maintenance_technician"].includes(role())){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
      if(["admin","supervisor"].includes(role())){await approveCleaningService(id);return}
-   }else if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id){
+   }else if((["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id)||role()==="supervisor"){
      const evidence=await sb.from("service_media").select("id").eq("service_id",id).in("media_type",["photo","video"]).limit(1);
      if(evidence.error){toast("No se pudieron verificar las fotos del mantenimiento: "+evidence.error.message);return}
      if(!evidence.data?.length){toast("⚠️ Para finalizar el mantenimiento, primero debe anexar al menos una foto o vídeo del trabajo.");return}
