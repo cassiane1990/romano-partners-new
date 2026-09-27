@@ -928,7 +928,7 @@ async function openServiceAssignment(serviceId){
  if(!["requested","scheduled"].includes(s.data.status)||s.data.assigned_employee_id){toast("El servicio debe estar programado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
    sb.from("properties").select("id,name,code,latitude,longitude").eq("id",s.data.property_id).maybeSingle(),
-   sb.from("profiles").select("id,full_name,email,role,active").eq("company_id",currentProfile.company_id).in("role",["employee","maintenance_technician"]).order("full_name"),
+   sb.rpc("list_assignable_workers",{p_service_id:serviceId}),
    sb.from("employee_locations").select("profile_id,latitude,longitude,recorded_at").eq("company_id",currentProfile.company_id).order("recorded_at",{ascending:false}).limit(500)
  ]);
  if(er.error){toast(er.error.message);return}
