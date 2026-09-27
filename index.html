@@ -1007,7 +1007,7 @@ async function loadEmployeeOperationalServices(){
  const relatedRows=(related.data||[]).filter(x=>!ownIds.has(x.id)).map(x=>({...x,__relatedCleaning:true}));
  return own.concat(relatedRows);
 }
-async function romanoIsEmergencyService(s){return String(s?.priority||"").toLowerCase()==="urgent"||String(s?.service_type||"").toLowerCase().includes("emerg");}
+async function romanoIsEmergencyService(s){return !!s?.__emergency24||String(s?.priority||"").toLowerCase()==="urgent"||String(s?.service_type||"").toLowerCase().includes("emerg");}
 function romanoEmergencySound(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C(),o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.35)}catch(e){}}
 function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
@@ -1033,6 +1033,10 @@ function renderServicesMaster(){
    return;
  }
  const rows=r.data||[];
+ if(!demoMode&&rows.length){
+   const oq=await sb.from("occurrences").select("service_id,priority,status").eq("company_id",currentProfile.company_id).in("service_id",rows.map(x=>x.id)).in("status",["open","assigned"]);
+   if(!oq.error)(oq.data||[]).filter(o=>String(o.priority||"").toLowerCase()==="urgent").forEach(o=>{const s=rows.find(x=>x.id===o.service_id);if(s)s.__emergency24=true});
+ }
  let propertiesMap={},clientsMap={};
  if(rows.length&&!demoMode){
    const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
