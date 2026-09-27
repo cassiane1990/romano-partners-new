@@ -1070,7 +1070,7 @@ function renderServicesMaster(){
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card '+(romanoIsEmergencyService(x)?'emergency-service-card':'')+'">'+
-     (romanoIsEmergencyService(x)?'<div class="service-emergency-alert">🚨 EMERGENCIA 24H · PRIORIDAD URGENTE</div>':'')+
+     (romanoIsEmergencyService(x)?'<div class="service-emergency-alert" style="margin:-4px -4px 10px;padding:10px 12px;border:2px solid #b42318;border-radius:12px;background:#fff1f0;color:#b42318;font-weight:800;text-align:center">🚨 EMERGENCIA 24H · PRIORIDAD URGENTE</div>':'')+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      serviceContext+
      '<div class="service-card-meta">'+
