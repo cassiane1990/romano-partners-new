@@ -2217,10 +2217,21 @@ function renderMaintenanceJourneyTimeline(j){
  const liveMinutes=j.finished_at?rawMinutes:billableMinutes();
  const effectiveMinutes=Math.max(0,liveMinutes);
  const billable=Math.max(30,effectiveMinutes);
+ const h1=Math.min(billable,60),h2=Math.max(Math.min(billable-60,60),0),h3=Math.max(Math.min(billable-120,60),0),h4=Math.max(Math.min(billable-180,60),0),h5=Math.max(Math.min(billable-240,60),0),h6=Math.max(Math.min(billable-300,60),0),h7=Math.max(billable-360,0);
+ const firstHour=h1/60*45;
+ const additional=h2/60*40+h3/60*32+h4/60*30+h5/60*29+h6/60*28+h7/60*27;
+ const calculatedTotal=firstHour+additional;
  const appliedRate=billable<=60?45:billable<=120?40:billable<=180?32:billable<=240?30:billable<=300?29:billable<=360?28:27;
- const calculatedTotal=billable/60*appliedRate;
- const firstHour=billable<=60?calculatedTotal:0;
- const additional= billable>60?calculatedTotal:0;
+ const additionalMinutes=Math.max(0,billable-60);
+ const marginalRate=appliedRate;
+ const rateRows=[
+   ["30 min","50% de 45 €","22,50 €"],["45 min","75% de 45 €","33,75 €"],["1 h","45 €","45,00 €"],
+   ["1 h 15","45 € + 15 min × 40 €/h","55,00 €"],["1 h 30","45 € + 30 min × 40 €/h","65,00 €"],["1 h 45","45 € + 45 min × 40 €/h","75,00 €"],
+   ["2 h","45 € + 40 €","85,00 €"],["2 h 15","85 € + 15 min × 32 €/h","93,00 €"],["2 h 30","85 € + 30 min × 32 €/h","101,00 €"],["2 h 45","85 € + 45 min × 32 €/h","109,00 €"],
+   ["3 h","45 + 40 + 32","117,00 €"],["3 h 30","117 € + 30 min × 30 €/h","132,00 €"],["4 h","117 + 30","147,00 €"],
+   ["4 h 30","147 € + 30 min × 29 €/h","161,50 €"],["5 h","147 + 29","176,00 €"],["5 h 30","176 € + 30 min × 28 €/h","190,00 €"],
+   ["6 h","176 + 28","204,00 €"],["6 h 30","204 € + 30 min × 27 €/h","217,50 €"],["7 h","204 + 27","231,00 €"]
+ ];
  const durationText=effectiveMinutes?Math.floor(effectiveMinutes/60)+" h "+Math.round(effectiveMinutes%60)+" min":"—";
  const additionalMinutes=Math.max(0,billable-60);
  const marginalRate=appliedRate;
