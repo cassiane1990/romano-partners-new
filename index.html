@@ -815,7 +815,7 @@ const MASTER_PRICES={
 };
 function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}function serviceUrgencyBadge(x){
  const isMaint=privateMaintenanceServiceType(x?.service_type);
- const is24=isMaint && (String(x?.pricing?.rate_key||"") === "emergency" || x?.priority==="urgent");
+ const is24=isMaint && String(x?.pricing?.rate_key||"") === "emergency";
  const isUrgentCleaning=!isMaint && x?.priority==="urgent";
  if(!is24&&!isUrgentCleaning)return "";
  const label=is24?"URGENCIA 24H":"LIMPIEZA URGENTE";
@@ -977,7 +977,7 @@ function romanoMadridTimeLabel(date=new Date()){const d=romanoMadridValidDate(da
 function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta",urgent:"Urgente"})[v]||v||"—"}
 async function loadEmployeeOperationalServices(){
  if(!["employee","maintenance_technician"].includes(role()))return [];
- const base=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
+ const base=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id,pricing").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
  if(base.error)throw base.error;
  const own=base.data||[];
  if(isMaintenanceTechnician()) return own.filter(x=>privateMaintenanceServiceType(x.service_type));
@@ -1044,7 +1044,7 @@ async function renderServicesMaster(){
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card">'+
-     '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
+     '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      serviceContext+
      '<div class="service-card-meta">'+
        '<div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div>'+
