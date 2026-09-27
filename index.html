@@ -815,7 +815,7 @@ const MASTER_PRICES={
 };
 function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}
 const SERVICE_CLEANING_CATALOG={
- airbnb:{label:"Limpieza Airbnb / Alojamiento Local",basis:"tipologia",tax:false,options:[{code:"T1-1B",name:"T1 · 1 baño",price:24},{code:"T2-1B",name:"T2 · 1 baño",price:28},{code:"T2-2B",name:"T2 · 2 baños",price:30},{code:"T3-2B",name:"T3 · 2 baños",price:34},{code:"T3-3B",name:"T3 · 3 baños",price:36},{code:"T4-2B",name:"T4 · 2 baños",price:38},{code:"T4-3B",name:"T4 · 3 baños",price:40},{code:"T4-4B",name:"T4 · 4 baños",price:45},{code:"T5",name:"T5 · según propiedad",price:60}]},
+ airbnb:{label:"Limpieza Airbnb / Alojamiento Local",basis:"tipologia",tax:false,options:[{code:"T1-1B",name:"T1 · 1 dormitorio + 1 baño",price:24},{code:"T2-1B",name:"T2 · 1 baño",price:28},{code:"T2-2B",name:"T2 · 2 baños",price:30},{code:"T3-2B",name:"T3 · 2 baños",price:34},{code:"T3-3B",name:"T3 · 3 baños",price:36},{code:"T4-2B",name:"T4 · 2 baños",price:38},{code:"T4-3B",name:"T4 · 3 baños",price:40},{code:"T4-4B",name:"T4 · 4 baños",price:45},{code:"T5",name:"T5 · según propiedad",price:60}]},
  hotel:{label:"Limpieza hotel 5 estrellas",basis:"consultar",tax:false,options:[{code:"HOTEL-CONSULTA",name:"Hotel 5 estrellas · tarifa a confirmar",price:null}]},
  office:{label:"Limpieza de oficina",basis:"mixto",tax:false,options:[{code:"OFF-PRO",name:"Limpieza profesional de oficina · 18 €/hora",price:18,unit:"hora"},{code:"OFF-REC",name:"Limpieza estándar recurrente · 16 €/hora",price:16,unit:"hora"},{code:"OFF-DEEP",name:"Limpieza profunda · 20 €/hora",price:20,unit:"hora"},{code:"OFF-SPECIAL",name:"Servicio especial / fuera de horario · 22 €/hora",price:22,unit:"hora"},{code:"OFF-DES",name:"Desinfección reforzada · desde 20 €/hora",price:20,unit:"hora"},{code:"OFF-GLASS",name:"Cristales · 5 €/m²",price:5,unit:"m²"},{code:"OFF-INITIAL",name:"Limpieza profunda inicial · 1,50–2,50 €/m²",price:1.5,maxPrice:2.5,unit:"m²",range:true}]},
  postobra:{label:"Limpieza post-obra",basis:"m2",tax:false,options:[{code:"POST-LIGHT",name:"Post-obra ligera · 4,50 €/m²",price:4.5,unit:"m²"},{code:"POST-STANDARD",name:"Post-obra estándar · 5,50 €/m²",price:5.5,unit:"m²"},{code:"POST-INTENSIVE",name:"Post-obra intensiva · 7,00 €/m²",price:7,unit:"m²"},{code:"POST-SPECIAL",name:"Post-obra especial · 8,00–10,00 €/m²",price:8,maxPrice:10,unit:"m²",range:true},{code:"POST-GLASS",name:"Cristales y ventanas post-obra · 3,00–6,00 €/m²",price:3,maxPrice:6,unit:"m²",range:true},{code:"POST-PAINT",name:"Restos de pintura / adhesivo · desde 4,00 €/m²",price:4,unit:"m²"},{code:"POST-CEMENT",name:"Restos de cemento / mortero · desde 5,00 €/m²",price:5,unit:"m²"}]},
@@ -1007,7 +1007,9 @@ async function loadEmployeeOperationalServices(){
  const relatedRows=(related.data||[]).filter(x=>!ownIds.has(x.id)).map(x=>({...x,__relatedCleaning:true}));
  return own.concat(relatedRows);
 }
-async function renderServicesMaster(){
+async function romanoIsEmergencyService(s){return String(s?.priority||"").toLowerCase()==="urgent"||String(s?.service_type||"").toLowerCase().includes("emerg");}
+function romanoEmergencySound(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C(),o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.35)}catch(e){}}
+function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
    let q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").order("created_at",{ascending:false}).limit(100);
@@ -1063,7 +1065,8 @@ async function renderServicesMaster(){
       role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
-   return '<article class="service-card">'+
+   return '<article class="service-card '+(romanoIsEmergencyService(x)?'emergency-service-card':'')+'">'+
+     (romanoIsEmergencyService(x)?'<div class="service-emergency-alert">🚨 EMERGENCIA 24H · PRIORIDAD URGENTE</div>':'')+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3></div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      serviceContext+
      '<div class="service-card-meta">'+
@@ -1077,6 +1080,7 @@ async function renderServicesMaster(){
      '<div class="service-card-actions">'+actions+'</div>'+
    '</article>';
  }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
+ if(rows.some(romanoIsEmergencyService))setTimeout(()=>romanoEmergencySound(),50);
  $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div>'+(["employee","maintenance_technician"].includes(role())?"":"<button class=\"btn gold\" onclick=\"openPage('newservice')\">＋ Nuevo servicio ▾</button>")+'</div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
 }
 async function renderCleaningCatalog(){
