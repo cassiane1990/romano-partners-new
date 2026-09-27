@@ -928,7 +928,7 @@ async function openServiceAssignment(serviceId){
  if(!["requested","scheduled"].includes(s.data.status)||s.data.assigned_employee_id){toast("El servicio debe estar programado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
    sb.from("properties").select("id,name,code,latitude,longitude").eq("id",s.data.property_id).maybeSingle(),
-   sb.from("profiles").select("id,full_name,email,role").eq("company_id",currentProfile.company_id).in("role",["employee","maintenance_technician"]).eq("active",true).order("full_name"),
+   sb.from("profiles").select("id,full_name,email,role,active").eq("company_id",currentProfile.company_id).in("role",["employee","maintenance_technician"]).order("full_name"),
    sb.from("employee_locations").select("profile_id,latitude,longitude,recorded_at").eq("company_id",currentProfile.company_id).order("recorded_at",{ascending:false}).limit(500)
  ]);
  if(er.error){toast(er.error.message);return}
@@ -937,11 +937,11 @@ async function openServiceAssignment(serviceId){
  const rad=x=>x*Math.PI/180;
  const dist=(a,b,c,d)=>{if([a,b,c,d].some(v=>v==null)||prop?.latitude==null||prop?.longitude==null)return null;const R=6371,la1=rad(prop.latitude),la2=rad(c),dl=rad(c)-la1,dlo=rad(d)-rad(prop.longitude);const h=Math.sin(dl/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dlo/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
  const maintenanceService=privateMaintenanceServiceType(s.data.service_type);
- const employees=(er.data||[]).filter(e=>maintenanceService?e.role==="maintenance_technician":e.role==="employee").map(e=>({...e,location:latest[e.id]||null,distance:latest[e.id]?dist(prop?.latitude,prop?.longitude,latest[e.id].latitude,latest[e.id].longitude):null})).sort((a,b)=>(a.distance==null?1:b.distance==null?-1:a.distance-b.distance));
+ const employees=(er.data||[]).filter(e=>maintenanceService?e.role==="maintenance_technician":e.role==="employee").map(e=>({...e,location:latest[e.id]||null,distance:latest[e.id]?dist(prop?.latitude,prop?.longitude,latest[e.id].latitude,latest[e.id].longitude):null})).sort((a,b)=>(Number(b.active)-Number(a.active))||(a.distance==null?1:b.distance==null?-1:a.distance-b.distance));
  openModal("Designar funcionario · "+esc(s.data.code),
    '<div class="notice"><strong>Propiedad:</strong> '+esc(prop?.name||prop?.code||"—")+'<br><strong>Horario:</strong> '+esc(s.data.scheduled_at?romanoMadridLabel(s.data.scheduled_at):"—")+'</div>'+
-   '<div class="muted" style="margin:10px 0">Funcionarios activos · primeiro aparecem os que têm localização mais próxima. A designação no inicia el servicio: el funcionario ainda precisa aceitar.</div>'+
-   '<div>'+(employees.length?employees.map(e=>'<div class="panel" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>'+esc(e.full_name||e.email||"Funcionario")+'</strong><div class="muted">'+(e.distance!=null?e.distance.toFixed(1)+" km da propriedade":"Localização GPS no disponible")+(e.location?.recorded_at?" · "+romanoMadridTimeLabel(e.location.recorded_at):"")+'</div></div><button class="btn gold" onclick="assignServiceEmployee(\''+s.data.id+'\',\''+e.id+'\')">Designar</button></div>').join(""):'<div class="empty">Nenhum funcionario ativo disponível.</div>')+'</div>');
+   '<div class="muted" style="margin:10px 0">Funcionarios disponibles · primero aparecen los activos y, entre ellos, los que tienen ubicación más cercana. Si existe conflicto de horario, la designación se permite igualmente y el retraso queda registrado. El funcionario aún debe aceptar.</div>'+
+   '<div>'+(employees.length?employees.map(e=>'<div class="panel" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>'+esc(e.full_name||e.email||"Funcionario")+'</strong><div class="muted">'+(e.active?"Activo":"Inactivo")+" · "+(e.distance!=null?e.distance.toFixed(1)+" km de la propiedad":"Ubicación GPS no disponible")+(e.location?.recorded_at?" · "+romanoMadridTimeLabel(e.location.recorded_at):"")+'</div></div><button class="btn gold" onclick="assignServiceEmployee(\''+s.data.id+'\',\''+e.id+'\')">Designar</button></div>').join(""):'<div class="empty">No hay funcionarios disponibles para esta especialidad.</div>')+'</div>');
 }
 async function assignServiceEmployee(serviceId,employeeId,force=false){
  if(!["admin","supervisor"].includes(role()))return;
