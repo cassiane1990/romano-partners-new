@@ -2191,7 +2191,7 @@ function renderMaintenanceJourneyTimeline(j){
  const fmt=iso=>iso?new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
  const duration=Number(j.worked_minutes||0),durationText=duration?Math.floor(duration/60)+" h "+Math.round(duration%60)+" min":"—";
  const canSeeMoney=["admin","supervisor","client"].includes(role());
- const total=canSeeMoney&&Number(j.total||0)>0?masterMoney(Number(j.total)):"";
+ const total=canSeeMoney&&j.finished_at&&Number(j.total||0)>0?masterMoney(Number(j.total)):"";
  return '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>⏱ Jornada e contabilização do mantenimiento</h3><div class="muted">O relógio começa quando o técnico coloca o serviço em <b>A caminho</b> e termina ao finalizar.</div></div><span class="pill">'+esc(durationText)+'</span></div>'+
  '<div class="two"><div><small class="muted">Aceite</small><p><strong>'+esc(fmt(j.accepted_at))+'</strong></p></div><div><small class="muted">Início da contabilização · A caminho</small><p><strong>'+esc(fmt(j.started_at))+'</strong></p></div><div><small class="muted">Final da manutenção</small><p><strong>'+esc(fmt(j.finished_at))+'</strong></p></div><div><small class="muted">Tempo contabilizado</small><p><strong>'+esc(durationText)+'</strong></p></div>'+(total?'<div><small class="muted">Valor calculado conforme tabela</small><p><strong>'+esc(total)+'</strong></p></div>':"")+'</div>'+
  '<div style="margin-top:12px"><small class="muted">Linha do tempo</small>'+((rows.length?rows.map(r=>'<div class="line"><span><b>'+esc(r.label)+'</b></span><span>'+esc(fmt(r.iso))+'</span></div>').join(""):'<div class="empty">Aguardando eventos da jornada.</div>'))+'</div></div>';
