@@ -2175,6 +2175,18 @@ function renderMaintenanceEmployeeFlow(x,media=[]){
  h+='<div class="notice" style="margin-top:10px">'+(canFinish?'✓ Evidencias anexadas: '+evidenceCount+'. Ya puede finalizar la mantenimiento.':'⚠️ Para finalizar, adjunte al menos una foto o vídeo de la mantenimiento.')+' Al finalizar, el cliente recibirá una notificación y podrá abrir las evidencias.</div></div>';
  return h;
 }
+function renderMaintenanceSupervisorFlow(x,media=[]){
+ if(role()!=="supervisor"||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
+ const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
+ const canFinish=evidenceCount>0;
+ let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Finalización del mantenimiento</h3><div class="muted">El Supervisor puede revisar el mantenimiento, adjuntar fotos o vídeos y finalizarlo.</div></div><span class="pill">Mantenimiento · Por tiempo</span></div>';
+ h+='<div class="notice">'+(canFinish?'✓ Evidencias anexadas: '+evidenceCount+'. El mantenimiento puede finalizarse.':'⚠️ Para finalizar el mantenimiento debe anexar al menos una foto o vídeo.')+'</div>';
+ if(["on_the_way","in_progress","paused"].includes(x.status)){
+   h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
+ }
+ h+='</div>';
+ return h;
+}
 async function viewRelatedCleaning(id){
  if(role()!=="employee"){toast("El seguimiento de limpieza es exclusivo del funcionario de limpieza.");return}
  const q=await sb.rpc("maintenance_employee_cleaning_context");
@@ -4798,17 +4810,4 @@ async function sendChatPremium(e){
 if("serviceWorker" in navigator){
   registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
 }
-function renderMaintenanceSupervisorFlow(x,media=[]){
- if(role()!=="supervisor"||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
- const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
- const canFinish=evidenceCount>0;
- let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Finalización del mantenimiento</h3><div class="muted">El Supervisor puede revisar el mantenimiento, adjuntar fotos o vídeos y finalizarlo.</div></div><span class="pill">Mantenimiento · Por tiempo</span></div>';
- h+='<div class="notice">'+(canFinish?'✓ Evidencias anexadas: '+evidenceCount+'. El mantenimiento puede finalizarse.':'⚠️ Para finalizar el mantenimiento debe anexar al menos una foto o vídeo.')+'</div>';
- if(["on_the_way","in_progress","paused"].includes(x.status)){
-   h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
- }
- h+='</div>';
- return h;
-}
->
 </script></body></html
