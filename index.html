@@ -4529,7 +4529,6 @@ async function saveMaintenanceService(){
   ? await sb.rpc("create_maintenance_service",{p_payload:payload}).then(r=>({data:r.data?{id:r.data}:null,error:r.error}))
   : await sb.from("services").insert(payload).select("id").single();
  if(created.error){toast("No se pudo crear el servicio de mantenimiento: "+created.error.message);return}
- await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:created.data.id,actor_id:(currentProfile?.id||currentUser.id),event_type:"requested",metadata:{service_kind:"maintenance",pricing_source:"worked_time_progressive"}});
  if(employeeId&&internal&&!["employee","maintenance_technician"].includes(role())){
    const asg=await sb.rpc("assign_service_employee",{p_service_id:created.data.id,p_employee_id:employeeId,p_force:false});
    if(asg.error){closeModal();toast("Servicio creado, pero no se pudo designar: "+asg.error.message);renderServicesMaster();return}
@@ -4549,7 +4548,7 @@ async function savePremiumService(){
  const payload={company_id:currentProfile.company_id,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,agreed_amount:(Number($("mpSub")?.dataset?.v||0)),priority:$("mpPriority").value,scheduled_at:requestedSchedule.toISOString(),status:internal?"scheduled":"requested",supervisor_approved_at:internal?new Date().toISOString():null,requested_items:items.filter(x=>x.category!=="additional"),instructions:$("mpNotes").value.trim()||null,notes:null,tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",additional_items:additional,created_by:currentUser.id,updated_by:currentUser.id,created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString(),pricing:{cleaning_original:clean.price,cleaning_quantity:clean.qty,cleaning_basis:clean.cat.basis,subtotal:Number($("mpSub")?.dataset?.v||0),tax:Number($("mpTax")?.dataset?.v||0),total:Number($("mpTotal")?.dataset?.v||0),sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};
  if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:"demo-"+code.toLowerCase(),...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio limpieza ficticio creado · "+code);renderServicesMaster();return}
  const created=await sb.from("services").insert(payload).select("id").single();if(created.error){toast("No se pudo crear el servicio: "+created.error.message);return}
- const ev=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:created.data.id,actor_id:(currentProfile?.id||currentUser.id),event_type:"requested",metadata:{service_kind:"cleaning",dispatch_window_minutes:5,pricing_source:"service_catalog"}});
+ const ev={error:null};
  if(employeeId&&internal){
    const asg=await sb.rpc("assign_service_employee",{p_service_id:created.data.id,p_employee_id:employeeId,p_force:false});
    if(asg.error){closeModal();toast("Servicio creado, pero no se pudo designar: "+asg.error.message);renderServicesMaster();return}
