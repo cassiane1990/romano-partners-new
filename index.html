@@ -2129,14 +2129,19 @@ function renderCleaningFlow(service,checklist,media){
  }
  return h+"</div>";
 }
-function renderMaintenanceEmployeeFlow(x){
+function renderMaintenanceEmployeeFlow(x,media=[]){
  if(role()!=="maintenance_technician"||x.assigned_employee_id!==currentUser.id||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
+ const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
+ const canFinish=evidenceCount>0;
+ const finishButton=canFinish
+  ? '<button class="btn gold" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'completed\\')">✓ FINALIZAR MANTENIMIENTO</button>'
+  : '<button class="btn" type="button" disabled title="Adjunte al menos una foto o vídeo para habilitar la finalización" style="opacity:.55;cursor:not-allowed">✓ FINALIZAR · FALTA FOTO</button>';
  let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>🔧 Trabajo de mantenimiento</h3><div class="muted">Acepte la designación, inicie el trabajo y adjunte fotos o vídeos del resultado.</div></div><span class="pill">'+esc(serviceTypeLabel(x.service_type))+'</span></div>';
- if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
- if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ INICIAR MANTENIMIENTO</button></div>';
- if(x.status==="in_progress")h+='<div class="actions"><button class="btn" onclick="setServiceStatusPremium(\''+x.id+'\',\'paused\')">Ⅱ PAUSAR</button><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
- if(x.status==="paused")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'in_progress\')">▶ CONTINUAR</button><button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button></div>';
- h+='<div class="notice" style="margin-top:10px">Antes de finalizar, debe existir al menos una foto o vídeo del trabajo realizado. Al finalizar, el cliente recibirá una notificación y podrá abrir las evidencias.</div></div>';
+ if(x.status==="scheduled")h+='<div class="actions"><button class="btn gold" onclick="acceptAssignedService(\\''+x.id+'\\');closeModal()">✓ ACEPTAR DESIGNACIÓN</button></div>';
+ if(x.status==="on_the_way")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'in_progress\\')">▶ INICIAR MANTENIMIENTO</button></div>';
+ if(x.status==="in_progress")h+='<div class="actions"><button class="btn" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'paused\\')">Ⅱ PAUSAR</button>'+finishButton+'</div>';
+ if(x.status==="paused")h+='<div class="actions"><button class="btn gold" onclick="setServiceStatusPremium(\\''+x.id+'\\',\\'in_progress\\')">▶ CONTINUAR</button>'+finishButton+'</div>';
+ h+='<div class="notice" style="margin-top:10px">'+(canFinish?'✓ Evidencias anexadas: '+evidenceCount+'. Ya puede finalizar la mantenimiento.':'⚠️ Para finalizar, adjunte al menos una foto o vídeo de la mantenimiento.')+' Al finalizar, el cliente recibirá una notificación y podrá abrir las evidencias.</div></div>';
  return h;
 }
 async function viewRelatedCleaning(id){
@@ -2204,7 +2209,7 @@ async function viewService(id){
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const adminDirectAssignmentButton=isPendingAdminDirect?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">DESIGNAR FUNCIONARIO</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
+ const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
@@ -2227,6 +2232,9 @@ async function setServiceStatusPremium(id,status){
      if(["employee","maintenance_technician"].includes(role())){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
      if(["admin","supervisor"].includes(role())){await approveCleaningService(id);return}
    }else if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id){
+     const evidence=await sb.from("service_media").select("id").eq("service_id",id).in("media_type",["photo","video"]).limit(1);
+     if(evidence.error){toast("No se pudieron verificar las fotos del mantenimiento: "+evidence.error.message);return}
+     if(!evidence.data?.length){toast("⚠️ Para finalizar el mantenimiento, primero debe anexar al menos una foto o vídeo del trabajo.");return}
      const done=await sb.rpc("employee_finish_maintenance_service",{p_service_id:id});
      if(done.error){toast(String(done.error.message||"No se pudo finalizar el mantenimiento"));return}
      toast("✓ Mantenimiento finalizado. El cliente ha sido notificado y podrá ver las evidencias.");
