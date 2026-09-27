@@ -1054,7 +1054,8 @@ function renderServicesMaster(){
    }
  }
  const clientName=role()==="client"?(currentProfile?.full_name||"Cliente"):"";
- const cards=rows.length?rows.map(x=>{
+ const serviceRowsOrdered=[...rows].sort((a,b)=>Number(romanoIsEmergencyService(b))-Number(romanoIsEmergencyService(a)));
+ const cards=serviceRowsOrdered.length?serviceRowsOrdered.map(x=>{
    const p=propertiesMap[x.property_id]||null;
    const c=clientsMap[x.client_id]||null;
    const fallbackClient=p?.client_id?clientsMap[p.client_id]:null;
@@ -1084,7 +1085,7 @@ function renderServicesMaster(){
      '<div class="service-card-actions">'+actions+'</div>'+
    '</article>';
  }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
- if(rows.some(romanoIsEmergencyService))setTimeout(()=>romanoEmergencySound(),50);
+ if(serviceRowsOrdered.some(romanoIsEmergencyService))setTimeout(()=>romanoEmergencySound(),50);
  const emergencyTop=rows.some(romanoIsEmergencyService)?'<div class="panel" style="margin:12px 0;border:2px solid #b42318;background:#fff1f0"><b style="font-size:18px">🚨 EMERGENCIA 24H · ATENCIÓN PRIORITARIA</b><div class="muted">Atención inmediata. No confundir con un mantenimiento normal.</div></div>':"";
  $("content").innerHTML='<section class="services-shell">'+emergencyTop+'<div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Consulta cada servicio de forma clara y acompaña su estado sin sobrecargar la pantalla.</p></div>'+(["employee","maintenance_technician"].includes(role())?"":"<button class=\"btn gold\" onclick=\"openPage('newservice')\">＋ Nuevo servicio ▾</button>")+'</div><div class="services-flow"><span>Solicitado</span><i>→</i><span>Programado</span><i>→</i><span>A camino</span><i>→</i><span>En curso</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
 }
