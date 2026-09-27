@@ -4458,6 +4458,8 @@ async function syncCleaningCatalogFromAdmin(){
    const q=await sb.from("service_catalog").select("code,name,price,tax_included,active").eq("company_id",currentProfile.company_id).eq("category","cleaning").eq("active",true);
    if(q.error)return;
    const rows=q.data||[],byCode=new Map(rows.map(x=>[String(x.code||""),x]));
+   const dbAirbnb=rows.filter(x=>/^T[1-5](?:-|$)/.test(String(x.code||""))).map(x=>({code:x.code,name:x.name,price:x.price==null?null:Number(x.price),tax:!!x.tax_included}));
+   if(dbAirbnb.length) SERVICE_CLEANING_CATALOG.airbnb.options=dbAirbnb;
    Object.values(SERVICE_CLEANING_CATALOG||{}).forEach(cat=>{
      (cat.options||[]).forEach(opt=>{
        const db=byCode.get(String(opt.code||""));
