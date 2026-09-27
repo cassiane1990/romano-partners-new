@@ -1,4 +1,3 @@
-<!-- ROMANO verified stable rebuild b2fec47 -->
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
@@ -3437,7 +3436,7 @@ $("resetBtn").onclick=async()=>{
 };
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
-sb.auth.onAuthStateChange(async(event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(!session)return;if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
+sb.auth.onAuthStateChange(async(event,session)=>{if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
 (async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
 
 async function renderClientsPremium(){return renderClients()}
