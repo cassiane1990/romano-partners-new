@@ -4243,8 +4243,21 @@ async function saveEmergency(e){
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(selectedClientId&&selectedClientId!==clientId){toast("El apartamento seleccionado no pertenece al cliente elegido.");return}
  if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
- const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,service_type:serviceType,category:"maintenance",priority,description,status:"open"};
+ const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:employeeId,service_type:serviceType,category:"maintenance",priority:"urgent",description,status:"open"};
  if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · emergencia guardada para sincronizar");return}
+ let emergencyServiceId=serviceId;
+ if(!emergencyServiceId){
+   const emergencyCode="MNT-24H-"+String(Date.now()).slice(-6);
+   const emergencyService={company_id:currentProfile.company_id,client_id:clientId,property_id:propertyId,assigned_employee_id:employeeId,code:emergencyCode,service_type:"mantenimiento",typology:"other",status:"scheduled",priority:"urgent",scheduled_at:new Date().toISOString(),accepted_at:null,supervisor_approved_at:null,instructions:description,notes:JSON.stringify({emergency_24h:true,emergency_type:serviceType}),requested_items:[{category:"maintenance",code:"emergency_24h",name:"Emergencia 24H",quantity:1,unit_price:0,tax:true,detail:description}],additional_items:[],pricing:{maintenance:true,billing_mode:"worked_time_progressive",rate_key:"emergency",minimum_minutes:30,emergency_24h:true},tax_country:"ES",laundry:false,created_by:currentUser.id,updated_by:currentUser.id,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString()};
+   const cs=await sb.from("services").insert(emergencyService).select("id").single();
+   if(cs.error){toast("No se pudo crear el servicio de emergencia: "+cs.error.message);return}
+   emergencyServiceId=cs.data.id;
+   await sb.rpc("record_service_initial_events",{p_service_id:emergencyServiceId});
+   payload.service_id=emergencyServiceId;
+ }
+ if(emergencyServiceId){
+   const us=await sb.from("services").update({priority:"urgent",pricing:sb.rpc?"undefined":undefined}).eq("id",emergencyServiceId);
+ }
  const r=await sb.from("occurrences").insert({company_id:currentProfile.company_id,created_by:currentUser.id,...payload}).select("id").single();
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Red interrumpida · emergencia puesta en cola")}else toast(r.error.message);return}
  if(r.data?.id)await uploadEmergencyMedia(r.data.id,$("eEmergencyMedia")?.files||[]); await sb.from("notifications").insert({company_id:currentProfile.company_id,recipient_id:employeeId,title:"🚨 Emergencia 24H de mantenimiento",body:"Cliente y apartamento identificados. Revise y atienda la emergencia.",severity:"urgent"});
@@ -4595,10 +4608,7 @@ async function savePremiumService(){
  const payload={company_id:currentProfile.company_id,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,agreed_amount:(Number($("mpSub")?.dataset?.v||0)),priority:$("mpPriority").value,scheduled_at:requestedSchedule.toISOString(),status:internal?"scheduled":"requested",supervisor_approved_at:internal?new Date().toISOString():null,requested_items:items.filter(x=>x.category!=="additional"),instructions:$("mpNotes").value.trim()||null,notes:null,tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",additional_items:additional,created_by:currentUser.id,updated_by:currentUser.id,created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString(),pricing:{cleaning_original:clean.price,cleaning_quantity:clean.qty,cleaning_basis:clean.cat.basis,subtotal:Number($("mpSub")?.dataset?.v||0),tax:Number($("mpTax")?.dataset?.v||0),total:Number($("mpTotal")?.dataset?.v||0),sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};
  if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:"demo-"+code.toLowerCase(),...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio limpieza ficticio creado · "+code);renderServicesMaster();return}
  const created=await sb.from("services").insert(payload).select("id").single();if(created.error){toast("No se pudo crear el servicio: "+created.error.message);return}
- const ev=await sb.from("service_events").insert([
-   {company_id:currentProfile.company_id,service_id:created.data.id,actor_id:currentUser.id,event_type:"created",metadata:{status:payload.status,created_at:payload.created_by_at}},
-   {company_id:currentProfile.company_id,service_id:created.data.id,actor_id:currentUser.id,event_type:"received",metadata:{status:payload.status,received_at:payload.client_requested_at||payload.created_by_at,checkin_at:payload.scheduled_at}}
- ]);
+ const ev=await sb.rpc("record_service_initial_events",{p_service_id:created.data.id});
  if(employeeId&&internal){
    const asg=await sb.rpc("assign_service_employee",{p_service_id:created.data.id,p_employee_id:employeeId,p_force:false});
    if(asg.error){closeModal();toast("Servicio creado, pero no se pudo designar: "+asg.error.message);renderServicesMaster();return}
