@@ -818,8 +818,8 @@ function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"curre
  const is24=isMaint && String(x?.pricing?.rate_key||"") === "emergency";
  const isUrgentCleaning=!isMaint && x?.priority==="urgent";
  if(!is24&&!isUrgentCleaning)return "";
- const label=is24?"URGENCIA 24H":"LIMPIEZA URGENTE";
- return '<span class="romano-urgent-badge" style="display:inline-flex;align-items:center;gap:5px;margin-left:6px;padding:4px 8px;border-radius:999px;background:#b00020;color:#fff;font-weight:800;font-size:11px;animation:romanoUrgentBlink 1s steps(2,end) infinite">🚨 '+label+'</span>';
+ if(is24)return '<span class="romano-urgent-badge romano-maint-24h" title="Mantenimiento 24H" aria-label="Mantenimiento 24H" style="display:inline-flex;align-items:center;justify-content:center;margin-left:7px;font-size:19px;line-height:1;vertical-align:middle">🚨</span>';
+ return '<span class="romano-urgent-badge" title="Limpieza urgente" aria-label="Limpieza urgente" style="display:inline-flex;align-items:center;gap:5px;margin-left:6px;padding:4px 8px;border-radius:999px;background:#b00020;color:#fff;font-weight:800;font-size:11px;animation:romanoUrgentBlink 1s steps(2,end) infinite">🚨 LIMPIEZA URGENTE</span>';
 }
 if(!document.getElementById("romanoUrgentStyle")){const st=document.createElement("style");st.id="romanoUrgentStyle";st.textContent="@keyframes romanoUrgentBlink{50%{opacity:.35;transform:scale(.98)}}";document.head.appendChild(st);}
 
@@ -990,7 +990,7 @@ async function loadEmployeeOperationalServices(){
 async function renderServicesMaster(){
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
-   let q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id").order("created_at",{ascending:false}).limit(100);
+   let q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id,pricing").order("created_at",{ascending:false}).limit(100);
    if(role()==="client"){
      const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
      if(own.error){r.data=[];r.error=own.error}
@@ -1044,7 +1044,7 @@ async function renderServicesMaster(){
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card">'+
-     '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
+     '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+serviceUrgencyBadge(x)+'</h3>+'</div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      serviceContext+
      '<div class="service-card-meta">'+
        '<div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div>'+
