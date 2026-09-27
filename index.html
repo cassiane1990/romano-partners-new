@@ -2226,16 +2226,21 @@ function renderMaintenanceJourneyTimeline(j){
  const marginalRate=billable<=60?45:billable<=120?40:billable<=180?32:billable<=240?30:billable<=300?29:billable<=360?28:27;
  const canSeeMoney=["admin","supervisor","client"].includes(role());
  const authoritativeTotal=Number(j.pricing?.total??j.total??0);
- const finalTotal=j.finished_at&&authoritativeTotal>0?authoritativeTotal:calculatedTotal;
+ const authoritativeMinutes=Number(j.pricing?.worked_minutes??j.worked_minutes??0);
+ const authoritativeMatches=j.finished_at&&authoritativeMinutes>0&&Math.abs(authoritativeMinutes-effectiveMinutes)<=1.5;
+ const finalTotal=authoritativeMatches&&authoritativeTotal>0?authoritativeTotal:calculatedTotal;
+ const taxRate=21;
+ const netTotal=finalTotal/(1+taxRate/100);
+ const taxValue=finalTotal-netTotal;
  const showBreakdown=canSeeMoney&&effectiveMinutes>0;
  return '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>⏱ Jornada e contabilização da manutenção</h3><div class="muted">O relógio começa em <b>A caminho</b>. O tempo em <b>Pausado</b> não entra na cobrança.</div></div><span class="pill">'+esc(durationText)+'</span></div>'+
  '<div class="two"><div><small class="muted">Aceite</small><p><strong>'+esc(fmt(j.accepted_at))+'</strong></p></div><div><small class="muted">Início da contabilização · A caminho</small><p><strong>'+esc(fmt(j.started_at))+'</strong></p></div><div><small class="muted">Final da manutenção</small><p><strong>'+esc(fmt(j.finished_at))+'</strong></p></div><div><small class="muted">Tempo efetivamente trabalhado</small><p><strong>'+esc(durationText)+'</strong></p></div></div>'+
  (showBreakdown?'<div style="margin-top:14px;padding:14px;border:1px solid #e5dac8;border-radius:14px;background:#faf6ee"><div class="panel-head" style="margin-bottom:8px"><div><h3>💶 Cálculo progressivo</h3><div class="muted">'+(j.finished_at?"Valor final calculado pelo servidor":"Estimativa em tempo real")+'</div></div><span class="pill">'+money(finalTotal)+'</span></div>'+
  '<div class="two"><div><small class="muted">Primeira hora</small><p><strong>'+money(firstHour)+'</strong></p></div><div><small class="muted">Tempo adicional</small><p><strong>'+Math.round(additionalMinutes)+' min</strong></p></div><div><small class="muted">Tarifa marginal aplicada</small><p><strong>'+money(marginalRate)+'/h</strong></p></div><div><small class="muted">Valor adicional</small><p><strong>'+money(additional)+'</strong></p></div></div>'+
- '<div style="margin-top:8px;font-size:10px;color:#756a5d">Mínimo faturável: 30 min · 22,50 €. As faixas seguintes aplicam 40 €/h, 32 €/h, 30 €/h, 29 €/h, 28 €/h e 27 €/h progressivamente.</div></div>':"")+
+ '<div style="margin-top:10px;padding:10px 12px;border-radius:11px;background:#fffdf9;border:1px solid #e5dac8"><div style="font-size:11px;font-weight:800;color:#332e27">Total final · IVA incluido ('+taxRate+'%)</div><div style="font-size:24px;font-weight:900;color:#73501c;margin-top:3px">'+money(finalTotal)+'</div><div style="margin-top:5px;font-size:10px;color:#756a5d">Base imponível: '+money(netTotal)+' · IVA: '+money(taxValue)+'</div></div>'+
+ '<div style="margin-top:8px;font-size:10px;color:#756a5d">Mínimo faturável: 30 min · 22,50 €. As faixas seguintes aplicam 40 €/h, 32 €/h, 30 €/h, 29 €/h, 28 €/h e 27 €/h progressivamente. O valor mostrado acima já inclui IVA.</div></div>':"")+
  '<div style="margin-top:12px"><small class="muted">Linha do tempo</small>'+((rows.length?rows.map(r=>'<div class="line"><span><b>'+esc(r.label)+'</b></span><span>'+esc(fmt(r.iso))+'</span></div>').join(""):'<div class="empty">Aguardando eventos da jornada.</div>'))+'</div></div>';
 }
-
 async function viewService(id){
  if(demoMode){
   const x=DEMO_SERVICES.find(s=>s.id===id);if(!x){toast("Servicio demo no encontrado");return}
