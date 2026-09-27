@@ -2188,14 +2188,54 @@ function renderMaintenanceJourneyTimeline(j){
  add("accepted","Aceitou o serviço",j.accepted_at);
  ev.forEach(e=>{const to=e.to_status;const label=to==="on_the_way"?"A caminho":to==="in_progress"?"Iniciado":to==="paused"?"Pausado":to==="completed"?"Finalizado":(e.event_type==="accepted"?"Aceitou o serviço":"");if(label)add(to+"@"+e.created_at,label,e.created_at)});
  add("finished","Finalização",j.finished_at);
+
  const fmt=iso=>iso?new Date(iso).toLocaleString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
- const duration=Number(j.worked_minutes||0),durationText=duration?Math.floor(duration/60)+" h "+Math.round(duration%60)+" min":"—";
+ const money=n=>masterMoney(Number(n||0));
+ const events=ev.filter(e=>e.created_at).slice().sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+ const stateTo=e=>e?.to_status||e?.metadata?.to_status||e?.metadata?.next_status||e?.metadata?.to||e?.metadata?.status||null;
+ const billableMinutes=()=>{
+   const startMs=j.started_at?new Date(j.started_at).getTime():0;
+   const endMs=j.finished_at?new Date(j.finished_at).getTime():Date.now();
+   if(!startMs||endMs<=startMs)return 0;
+   let state="on_the_way",prev=startMs,total=0;
+   for(const e of events){
+     const t=new Date(e.created_at).getTime();
+     if(!Number.isFinite(t)||t<startMs||t>endMs)continue;
+     if((state==="on_the_way"||state==="in_progress")&&t>prev)total+=(t-prev)/60000;
+     const to=stateTo(e);
+     if(to)state=to;
+     else if(e.event_type==="started")state="in_progress";
+     else if(e.event_type==="paused")state="paused";
+     else if(e.event_type==="resumed")state="in_progress";
+     else if(e.event_type==="completed"||e.event_type==="finished")state="completed";
+     prev=t;
+   }
+   if((state==="on_the_way"||state==="in_progress")&&endMs>prev)total+=(endMs-prev)/60000;
+   return Math.max(0,total);
+ };
+ const rawMinutes=Number(j.pricing?.worked_minutes??j.worked_minutes??0);
+ const liveMinutes=j.finished_at?rawMinutes:billableMinutes();
+ const effectiveMinutes=Math.max(0,liveMinutes);
+ const billable=Math.max(30,effectiveMinutes);
+ const h1=Math.min(billable,60),h2=Math.max(Math.min(billable-60,60),0),h3=Math.max(Math.min(billable-120,60),0),h4=Math.max(Math.min(billable-180,60),0),h5=Math.max(Math.min(billable-240,60),0),h6=Math.max(Math.min(billable-300,60),0),h7=Math.max(billable-360,0);
+ const firstHour=h1/60*45;
+ const additional=h2/60*40+h3/60*32+h4/60*30+h5/60*29+h6/60*28+h7/60*27;
+ const calculatedTotal=firstHour+additional;
+ const durationText=effectiveMinutes?Math.floor(effectiveMinutes/60)+" h "+Math.round(effectiveMinutes%60)+" min":"—";
+ const additionalMinutes=Math.max(0,billable-60);
+ const marginalRate=billable<=60?45:billable<=120?40:billable<=180?32:billable<=240?30:billable<=300?29:billable<=360?28:27;
  const canSeeMoney=["admin","supervisor","client"].includes(role());
- const total=canSeeMoney&&j.finished_at&&Number(j.total||0)>0?masterMoney(Number(j.total)):"";
- return '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>⏱ Jornada e contabilização do mantenimiento</h3><div class="muted">O relógio começa quando o técnico coloca o serviço em <b>A caminho</b> e termina ao finalizar.</div></div><span class="pill">'+esc(durationText)+'</span></div>'+
- '<div class="two"><div><small class="muted">Aceite</small><p><strong>'+esc(fmt(j.accepted_at))+'</strong></p></div><div><small class="muted">Início da contabilização · A caminho</small><p><strong>'+esc(fmt(j.started_at))+'</strong></p></div><div><small class="muted">Final da manutenção</small><p><strong>'+esc(fmt(j.finished_at))+'</strong></p></div><div><small class="muted">Tempo contabilizado</small><p><strong>'+esc(durationText)+'</strong></p></div>'+(total?'<div><small class="muted">Valor calculado conforme tabela</small><p><strong>'+esc(total)+'</strong></p></div>':"")+'</div>'+
+ const authoritativeTotal=Number(j.pricing?.total??j.total??0);
+ const finalTotal=j.finished_at&&authoritativeTotal>0?authoritativeTotal:calculatedTotal;
+ const showBreakdown=canSeeMoney&&effectiveMinutes>0;
+ return '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>⏱ Jornada e contabilização da manutenção</h3><div class="muted">O relógio começa em <b>A caminho</b>. O tempo em <b>Pausado</b> não entra na cobrança.</div></div><span class="pill">'+esc(durationText)+'</span></div>'+
+ '<div class="two"><div><small class="muted">Aceite</small><p><strong>'+esc(fmt(j.accepted_at))+'</strong></p></div><div><small class="muted">Início da contabilização · A caminho</small><p><strong>'+esc(fmt(j.started_at))+'</strong></p></div><div><small class="muted">Final da manutenção</small><p><strong>'+esc(fmt(j.finished_at))+'</strong></p></div><div><small class="muted">Tempo efetivamente trabalhado</small><p><strong>'+esc(durationText)+'</strong></p></div></div>'+
+ (showBreakdown?'<div style="margin-top:14px;padding:14px;border:1px solid #e5dac8;border-radius:14px;background:#faf6ee"><div class="panel-head" style="margin-bottom:8px"><div><h3>💶 Cálculo progressivo</h3><div class="muted">'+(j.finished_at?"Valor final calculado pelo servidor":"Estimativa em tempo real")+'</div></div><span class="pill">'+money(finalTotal)+'</span></div>'+
+ '<div class="two"><div><small class="muted">Primeira hora</small><p><strong>'+money(firstHour)+'</strong></p></div><div><small class="muted">Tempo adicional</small><p><strong>'+Math.round(additionalMinutes)+' min</strong></p></div><div><small class="muted">Tarifa marginal aplicada</small><p><strong>'+money(marginalRate)+'/h</strong></p></div><div><small class="muted">Valor adicional</small><p><strong>'+money(additional)+'</strong></p></div></div>'+
+ '<div style="margin-top:8px;font-size:10px;color:#756a5d">Mínimo faturável: 30 min · 22,50 €. As faixas seguintes aplicam 40 €/h, 32 €/h, 30 €/h, 29 €/h, 28 €/h e 27 €/h progressivamente.</div></div>':"")+
  '<div style="margin-top:12px"><small class="muted">Linha do tempo</small>'+((rows.length?rows.map(r=>'<div class="line"><span><b>'+esc(r.label)+'</b></span><span>'+esc(fmt(r.iso))+'</span></div>').join(""):'<div class="empty">Aguardando eventos da jornada.</div>'))+'</div></div>';
 }
+
 async function viewService(id){
  if(demoMode){
   const x=DEMO_SERVICES.find(s=>s.id===id);if(!x){toast("Servicio demo no encontrado");return}
