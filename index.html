@@ -2233,8 +2233,6 @@ function renderMaintenanceJourneyTimeline(j){
    ["6 h","176 + 28","204,00 €"],["6 h 30","204 € + 30 min × 27 €/h","217,50 €"],["7 h","204 + 27","231,00 €"]
  ];
  const durationText=effectiveMinutes?Math.floor(effectiveMinutes/60)+" h "+Math.round(effectiveMinutes%60)+" min":"—";
- const additionalMinutes=Math.max(0,billable-60);
- const marginalRate=appliedRate;
  const canSeeMoney=["admin","supervisor","client"].includes(role());
  const authoritativeTotal=Number(j.pricing?.total??j.total??0);
  const authoritativeMinutes=Number(j.pricing?.worked_minutes??j.worked_minutes??0);
