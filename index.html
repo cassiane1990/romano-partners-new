@@ -1206,9 +1206,17 @@ async function renderServiceJourneyBoard(){
   props=DEMO_PROPERTIES||[];clients=DEMO_CLIENTS||[];employees=DEMO_EMPLOYEES||[];
  }else{
   const startDay=day+"T00:00:00",endDay=day+"T23:59:59.999";let q;
-  const fields="id,code,property_id,client_id,assigned_employee_id,service_type,typology,status,scheduled_at,priority,accepted_at,supervisor_approved_at";
+  const fields="id,code,property_id,client_id,assigned_employee_id,service_type,typology,status,scheduled_at,priority,accepted_at,supervisor_approved_at,finished_at";
   if(role()==="client"){const cr=await sb.from("clients").select("id").eq("profile_id",currentUser.id).single();if(cr.error||!cr.data){$("content").innerHTML='<div class="panel"><div class="msg">No se encontró el cliente asociado.</div></div>';return}q=await sb.from("services").select(fields).eq("client_id",cr.data.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
-  }else if(["employee","maintenance_technician"].includes(role()))q=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+  }else if(["employee","maintenance_technician"].includes(role())){
+    const scheduledQ=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
+    if(scheduledQ.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(scheduledQ.error.message)+'</div></div>';return}
+    const finishedQ=await sb.from("services").select(fields).eq("assigned_employee_id",currentUser.id).eq("status","completed").gte("finished_at",startDay).lt("finished_at",endDay).order("finished_at",{ascending:true});
+    if(finishedQ.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(finishedQ.error.message)+'</div></div>';return}
+    const byId=new Map((scheduledQ.data||[]).map(s=>[s.id,s]));
+    (finishedQ.data||[]).forEach(s=>byId.set(s.id,s));
+    q={data:[...byId.values()].sort((a,b)=>new Date(a.scheduled_at||a.finished_at||0)-new Date(b.scheduled_at||b.finished_at||0)),error:null};
+  }
   else if(role()==="supervisor")q=await sb.from("services").select(fields).or("assigned_supervisor_id.eq."+currentUser.id+",created_by.eq."+currentUser.id+",accepted_by.eq."+currentUser.id+",supervised_by.eq."+currentUser.id+",supervision_approved_by.eq."+currentUser.id).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   else q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
