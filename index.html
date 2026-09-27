@@ -1193,12 +1193,12 @@ async function renderServiceJourneyBoard(){
   const [pr,cr,er]=await Promise.all([
    ids.length?sb.from("properties").select("id,code,name,address,city,country,photo_url,property_type,client_id").in("id",ids):Promise.resolve({data:[]}),
    cids.length?sb.from("clients").select("id,name").in("id",cids):Promise.resolve({data:[]}),
-   eids.length?sb.from("employee_profiles").select("id,full_name,employee_code,function_title,photo_url").in("id",eids):Promise.resolve({data:[]})
+   eids.length?sb.from("employee_profiles").select("id,profile_id,full_name,employee_code,function_title,photo_url").in("profile_id",eids):Promise.resolve({data:[]})
   ]);
   if(pr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(pr.error.message)+'</div></div>';return}
   props=pr.data||[];clients=cr.data||[];employees=er.data||[];
  }
- const pm=Object.fromEntries(props.map(p=>[p.id,p])),cm=Object.fromEntries(clients.map(x=>[x.id,x])),em=Object.fromEntries(employees.map(x=>[x.id,x]));
+ const pm=Object.fromEntries(props.map(p=>[p.id,p])),cm=Object.fromEntries(clients.map(x=>[x.id,x])),em=Object.fromEntries(employees.map(x=>[x.profile_id||x.id,x]));
  const photos={};if(!demoMode)await Promise.all(props.filter(p=>p.photo_url).map(async p=>{const u=await sb.storage.from("property-media").createSignedUrl(p.photo_url,900);if(!u.error)photos[p.id]=u.data.signedUrl}));
  const labels={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervision_pending:"Esperando supervisión",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
  const statusIcon={requested:"○",scheduled:"◷",on_the_way:"🚗",in_progress:"▶",paused:"Ⅱ",supervision_pending:"🔎",supervised:"✓",completed:"✓",approved:"✓",rejected:"×",returned:"↩",cancelled:"×"};
@@ -1239,8 +1239,8 @@ async function renderJourneyMaster(){
    let action="";
    if(s.status==="scheduled")action='<button class="btn gold" data-job-action="accept" data-service-id="'+esc(s.id)+'">✓ ACEPTAR</button>';
    else if(s.status==="on_the_way")action='<button class="btn gold" data-job-action="start" data-service-id="'+esc(s.id)+'">▶ INICIAR</button>';
-   else if(s.status==="in_progress")action='<button class="btn" data-job-action="pause" data-service-id="'+esc(s.id)+'">Ⅱ PAUSAR</button>';
-   else if(s.status==="paused")action='<button class="btn gold" data-job-action="continue" data-service-id="'+esc(s.id)+'">▶ CONTINUAR</button>';
+   else if(s.status==="in_progress")action='<button class="btn" data-job-action="pause" data-service-id="'+esc(s.id)+'">Ⅱ PAUSAR</button>'+(maint?'<button class="btn gold" data-job-action="finish" data-service-id="'+esc(s.id)+'">✓ FINALIZAR</button>':"");
+   else if(s.status==="paused")action='<button class="btn gold" data-job-action="continue" data-service-id="'+esc(s.id)+'">▶ CONTINUAR</button>'+(maint?'<button class="btn gold" data-job-action="finish" data-service-id="'+esc(s.id)+'">✓ FINALIZAR</button>':"");
    return '<div class="line-item" style="align-items:center;gap:10px"><span style="flex:1"><b>'+(maint?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</b><small style="display:block">'+esc(cl.name||"Cliente")+' · '+esc(p.name||p.code||"Apartamento")+'</small><small class="muted" style="display:block">'+esc(s.code||"")+' · '+esc(s.scheduled_at?romanoMadridLabel(s.scheduled_at):"Sin horario")+'</small></span><span style="text-align:right"><span class="status '+esc(s.status)+'">'+esc(statusNames[s.status]||s.status)+'</span><div class="actions" style="justify-content:flex-end;margin-top:6px">'+action+'<button class="btn" data-job-action="view" data-service-id="'+esc(s.id)+'">Ver</button></div></span></div>';
  }).join(""):'<div class="empty">No tienes servicios asignados pendientes o en curso.</div>')+'</div>':"";
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Mi Jornada</h3><div class="muted">Entrada / salida + servicios asignados</div></div><div class="actions"><button class="btn dark" onclick="masterClockIn()">◉ Entrada</button><button class="btn gold" onclick="masterClockOut()">◉ Salida</button></div></div><div class="notice">Una sola acción siguiente por servicio. Al finalizar o aprobar, el servicio queda bloqueado y no puede volver atrás.</div>'+jobs+'<table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody>'+(journal.data?.length?journal.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?new Date(x.check_in_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.check_out_at?new Date(x.check_out_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.status)+'</td></tr>').join(""):'<tr><td colspan="4"><div class="empty">Sin registros.</div></td></tr>')+'</tbody></table></div>';
@@ -1250,6 +1250,7 @@ async function renderJourneyMaster(){
    else if(act==="start")await setServiceStatusPremium(id,"in_progress");
    else if(act==="pause")await setServiceStatusPremium(id,"paused");
    else if(act==="continue")await setServiceStatusPremium(id,"in_progress");
+   else if(act==="finish")await setServiceStatusPremium(id,"completed");
    else if(act==="view")viewService(id);
  }));
 }
@@ -2229,7 +2230,13 @@ async function setServiceStatusPremium(id,status){
      const done=await sb.rpc("employee_finish_maintenance_service",{p_service_id:id});
      if(done.error){toast(String(done.error.message||"No se pudo finalizar el mantenimiento"));return}
      toast("✓ Mantenimiento finalizado. El cliente ha sido notificado y podrá ver las evidencias.");
-     closeModal();await renderServicesMaster();return;
+     const page=window.__romanoCurrentPage;
+     closeModal();
+     if(page==="service_journey")await renderServiceJourneyBoard();
+     else if(page==="journey")await renderJourneyMaster();
+     else await renderServicesMaster();
+     updateOfflineIndicator();
+     return;
    }
  }
  if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id&&["on_the_way","in_progress","paused"].includes(status)){
@@ -4361,7 +4368,8 @@ async function saveMaintenanceService(){
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",clientId).eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).single();if(own.error||!own.data){toast("Este apartamento no pertenece a su cuenta de cliente.");return}}
  const payload={company_id:currentProfile.company_id,client_id:clientId,property_id:prop,assigned_employee_id:employeeId,code,service_type:"mantenimiento",typology:category,pricing_code:null,agreed_amount:gross,priority:$("msPriority").value,scheduled_at:date.toISOString(),status:internal?"scheduled":"requested",supervisor_approved_at:internal?new Date().toISOString():null,instructions:$("msDescription")?.value.trim()||title,notes:JSON.stringify({maintenance_category:category,title,description:$("msDescription")?.value.trim()||null,billing_mode:"worked_time_progressive",rate_key:rateKey,minimum_minutes:30,minimum_gross:minimumGross,catalog_id:catalogSel?.value||null,catalog_name:catalogOpt?.textContent||null,estimated_cost:Number($("msEstimated")?.value||0),actual_cost:Number($("msActual")?.value||0),notes:$("msNotes")?.value.trim()||null}),tax_country:$("msVat").value==="23"?"PT":"ES",requested_items:[{category:"maintenance",code:"worked_time",name:title,quantity:1,unit_price:minimumGross,tax:true,detail:"Mínimo 30 min; cálculo final automático por tiempo trabajado"}],additional_items:catalogPrice?[{category:"maintenance_catalog",code:catalogSel.value,name:catalogOpt.textContent,quantity:1,unit_price:catalogPrice,tax:catalogIsGross}]:[],pricing:{maintenance:true,category,billing_mode:"worked_time_progressive",rate_key:rateKey,minimum_minutes:30,minimum_gross:minimumGross,worked_minutes:null,base_value:minimumGross,catalog_value:catalogPrice,subtotal,tax,total:gross,estimated_cost:Number($("msEstimated")?.value||0),actual_cost:Number($("msActual")?.value||0)},laundry:false,created_by:currentUser.id,updated_by:currentUser.id,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString()};
  if(demoMode){DEMO_SERVICES.unshift({id:"demo-"+code.toLowerCase(),...payload,subtotal,tax_amount:tax,total:gross,employee_name:null});closeModal();toast("Servicio de mantenimiento ficticio creado · "+code);renderServicesMaster();return}
- const created=internal&&["admin","supervisor"].includes(role())
+ const useMaintenanceCreationRpc=internal&&["admin","supervisor"].includes(role())||role()==="maintenance_technician";
+ const created=useMaintenanceCreationRpc
   ? await sb.rpc("create_maintenance_service",{p_payload:payload}).then(r=>({data:r.data?{id:r.data}:null,error:r.error}))
   : await sb.from("services").insert(payload).select("id").single();
  if(created.error){toast("No se pudo crear el servicio de mantenimiento: "+created.error.message);return}
