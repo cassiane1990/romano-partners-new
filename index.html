@@ -1281,25 +1281,27 @@ async function renderJourneyMaster(){
    journal=await sb.from("work_journal_entries").select("work_date,check_in_at,check_out_at,status,profile_id").eq("profile_id",currentUser.id).order("work_date",{ascending:false}).limit(100);
    if(role()==="supervisor"){
      serviceActivity=await sb.from("services").select("id,code,service_type,scheduled_at,created_at,client_requested_at,accepted_at,accepted_by,assigned_at,assigned_by,started_at,started_by,supervised_at,supervised_by,supervision_approved_at,supervision_approved_by,finished_at,finished_by,status,assigned_employee_id").eq("company_id",currentProfile.company_id).or("accepted_by.eq."+currentUser.id+",assigned_by.eq."+currentUser.id+",supervised_by.eq."+currentUser.id+",supervision_approved_by.eq."+currentUser.id).order("scheduled_at",{ascending:false}).limit(500);
+   }else if(["employee","maintenance_technician"].includes(role())){
+     serviceActivity=await sb.from("services").select("id,code,service_type,scheduled_at,created_at,client_requested_at,accepted_at,accepted_by,assigned_at,assigned_by,started_at,started_by,finished_at,finished_by,status,assigned_employee_id").eq("company_id",currentProfile.company_id).eq("assigned_employee_id",currentUser.id).order("scheduled_at",{ascending:false}).limit(500);
    }
  }
  if(journal.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(journal.error.message||"No se pudo cargar la jornada.")+'</div></div>';return;}
  if(serviceActivity.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(serviceActivity.error.message||"No se pudieron cargar los servicios de la jornada.")+'</div></div>';return;}
  const open=journal.data?.find(x=>x.status==="open"),supervisor=role()==="supervisor";
- const serviceRows=supervisor?(serviceActivity.data||[]).map(x=>{
+ const serviceRows=(supervisor||["employee","maintenance_technician"].includes(role()))?(serviceActivity.data||[]).map(x=>{
    const received=x.client_requested_at||x.created_at;
-   const accepted=x.accepted_by===currentUser.id?x.accepted_at:null;
-   const assigned=x.assigned_by===currentUser.id?x.assigned_at:null;
+   const accepted=x.accepted_at;
+   const assigned=x.assigned_at;
    const started=x.started_at;
-   const supervised=x.supervised_by===currentUser.id?x.supervised_at:(x.supervision_approved_by===currentUser.id?x.supervision_approved_at:null);
-   const finalized=x.finished_at||supervised;
-   return '<tr><td><b>'+esc(x.code||"—")+'</b><br><small>'+esc(serviceTypeLabel(x.service_type)||"Servicio")+'</small></td><td>'+esc(received?romanoMadridLabel(received):"—")+'</td><td>'+esc(accepted?romanoMadridLabel(accepted):"—")+'</td><td>'+esc(assigned?romanoMadridLabel(assigned):"—")+'</td><td>'+esc(started?romanoMadridLabel(started):"—")+'</td><td>'+esc(supervised?romanoMadridLabel(supervised):"—")+'</td><td>'+esc(finalized?romanoMadridLabel(finalized):"—")+'</td><td><button class="btn" onclick="viewService(\''+esc(x.id)+'\')">Ver ficha</button></td></tr>';
+   const supervised=supervisor?(x.supervised_by===currentUser.id?x.supervised_at:(x.supervision_approved_by===currentUser.id?x.supervision_approved_at:null)):null;
+   const finalized=x.finished_at;
+   return '<tr><td><b>'+esc(x.code||"—")+'</b><br><small>'+esc(serviceTypeLabel(x.service_type)||"Servicio")+'</small></td><td>'+esc(received?romanoMadridLabel(received):"—")+'</td><td>'+esc(accepted?romanoMadridLabel(accepted):"—")+'</td><td>'+esc(assigned?romanoMadridLabel(assigned):"—")+'</td><td>'+esc(started?romanoMadridLabel(started):"—")+'</td>'+ (supervisor?'<td>'+esc(supervised?romanoMadridLabel(supervised):"—")+'</td>':'') +'<td>'+esc(finalized?romanoMadridLabel(finalized):"—")+'</td><td><button class="btn" onclick="viewService(\''+esc(x.id)+'\')">Ver ficha</button></td></tr>';
  }).join(""):'';
  $("content").innerHTML='<div class="panel">'+
    '<div class="panel-head"><div><h3>Mi Jornada</h3><div class="muted">'+(supervisor?"Registro de jornada y actividades de supervisión.":"Registro de entrada y salida del trabajo.")+'</div></div><div class="actions"><button class="btn dark" '+(open?'disabled style="opacity:.55;cursor:not-allowed"':'onclick="masterClockIn()"')+'>◉ Entrada</button><button class="btn gold" '+(!open?'disabled style="opacity:.55;cursor:not-allowed"':'onclick="masterClockOut()"')+'>◉ Salida</button></div></div>'+
    '<div class="notice">'+(open?'Jornada abierta desde '+esc(romanoMadridLabel(open.check_in_at))+'.':'Use Entrada para registrar el inicio de su jornada y Salida para registrarla como cerrada.')+'</div>'+
    '<table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody>'+(journal.data?.length?journal.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?romanoMadridLabel(x.check_in_at):"—")+'</td><td>'+esc(x.check_out_at?romanoMadridLabel(x.check_out_at):"—")+'</td><td>'+esc(x.status)+'</td></tr>').join(""):'<tr><td colspan="4"><div class="empty">Sin registros.</div></td></tr>')+'</tbody></table></div>'+
-   (supervisor?'<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Solicitudes y servicios gestionados</h3><div class="muted">Registro de cada etapa: recibido, aceptado, designado, iniciado, supervisado y finalizado.</div></div><span class="pill">'+(serviceActivity.data||[]).length+'</span></div>'+(serviceRows?'<div style="overflow:auto"><table class="table"><thead><tr><th>Servicio</th><th>Recibido</th><th>Aceptado</th><th>Designado</th><th>Iniciado</th><th>Supervisado</th><th>Finalizado</th><th></th></tr></thead><tbody>'+serviceRows+'</tbody></table></div>':'<div class="empty">Nenhum serviço registrado na sua jornada.</div>')+'</div>':'');
+ ((supervisor||["employee","maintenance_technician"].includes(role()))?'<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>'+(supervisor?"Solicitudes y servicios gestionados":"Servicios realizados")+'</h3><div class="muted">Registro con hora de recibido, aceptación, designación, inicio'+(supervisor?", supervisión":"")+' y finalización.</div></div><span class="pill">'+(serviceActivity.data||[]).length+'</span></div>'+(serviceRows?'<div style="overflow:auto"><table class="table"><thead><tr><th>Servicio</th><th>Recibido</th><th>Aceptado</th><th>Designado</th><th>Iniciado</th>'+(supervisor?'<th>Supervisado</th>':'')+'<th>Finalizado</th><th></th></tr></thead><tbody>'+serviceRows+'</tbody></table></div>':'<div class="empty">No hay servicios registrados en su jornada.</div>')+'</div>':'');
 }
 async function masterClockIn(){
  const existing=await sb.from("work_journal_entries").select("id,check_in_at").eq("profile_id",currentUser.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
