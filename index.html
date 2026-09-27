@@ -778,15 +778,15 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 
 const MASTER_PRICES={
  cleaning:[
-  {code:"T1-1B",name:"T1 · 1 dormitorio + 1 baño",price:30,tax:false},
-  {code:"T2-1B",name:"T2 · 2 dormitorios + 1 baño",price:40,tax:false},
-  {code:"T2-2B",name:"T2 · 2 dormitorios + 2 baños",price:55,tax:false},
-  {code:"T3-2B",name:"T3 · 3 dormitorios + 2 baños",price:65,tax:false},
-  {code:"T3-3B",name:"T3 · 3 dormitorios + 3 baños",price:80,tax:false},
-  {code:"T4-2B",name:"T4 · 4 dormitorios + 2 baños",price:85,tax:false},
-  {code:"T4-3B",name:"T4 · 4 dormitorios + 3 baños",price:95,tax:false},
-  {code:"T4-4B",name:"T4 · 4 dormitorios + 4 baños",price:110,tax:false},
-  {code:"T5",name:"T5 · según propiedad",price:null,tax:false}
+  {code:"T1-1B",name:"T1 · 1 dormitorio + 1 baño",price:24,tax:false},
+  {code:"T2-1B",name:"T2 · 2 dormitorios + 1 baño",price:28,tax:false},
+  {code:"T2-2B",name:"T2 · 2 dormitorios + 2 baños",price:30,tax:false},
+  {code:"T3-2B",name:"T3 · 3 dormitorios + 2 baños",price:34,tax:false},
+  {code:"T3-3B",name:"T3 · 3 dormitorios + 3 baños",price:36,tax:false},
+  {code:"T4-2B",name:"T4 · 4 dormitorios + 2 baños",price:38,tax:false},
+  {code:"T4-3B",name:"T4 · 4 dormitorios + 3 baños",price:40,tax:false},
+  {code:"T4-4B",name:"T4 · 4 dormitorios + 4 baños",price:45,tax:false},
+  {code:"T5",name:"T5 · según propiedad",price:60,tax:false}
  ],
  maintenance:[
   {code:"M1",name:"Mantenimiento · 1ª hora",price:45,tax:true},{code:"M2",name:"2ª hora",price:40,tax:true},
@@ -815,7 +815,7 @@ const MASTER_PRICES={
 };
 function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}
 const SERVICE_CLEANING_CATALOG={
- airbnb:{label:"Limpieza Airbnb / Alojamiento Local",basis:"tipologia",tax:false,options:[{code:"T1-1B",name:"T1 · 1 baño",price:30},{code:"T2-1B",name:"T2 · 1 baño",price:40},{code:"T2-2B",name:"T2 · 2 baños",price:55},{code:"T3-2B",name:"T3 · 2 baños",price:65},{code:"T3-3B",name:"T3 · 3 baños",price:80},{code:"T4-2B",name:"T4 · 2 baños",price:85},{code:"T4-3B",name:"T4 · 3 baños",price:95},{code:"T4-4B",name:"T4 · 4 baños",price:110},{code:"T5",name:"T5 · según propiedad",price:null}]},
+ airbnb:{label:"Limpieza Airbnb / Alojamiento Local",basis:"tipologia",tax:false,options:[{code:"T1-1B",name:"T1 · 1 baño",price:24},{code:"T2-1B",name:"T2 · 1 baño",price:28},{code:"T2-2B",name:"T2 · 2 baños",price:30},{code:"T3-2B",name:"T3 · 2 baños",price:34},{code:"T3-3B",name:"T3 · 3 baños",price:36},{code:"T4-2B",name:"T4 · 2 baños",price:38},{code:"T4-3B",name:"T4 · 3 baños",price:40},{code:"T4-4B",name:"T4 · 4 baños",price:45},{code:"T5",name:"T5 · según propiedad",price:60}]},
  hotel:{label:"Limpieza hotel 5 estrellas",basis:"consultar",tax:false,options:[{code:"HOTEL-CONSULTA",name:"Hotel 5 estrellas · tarifa a confirmar",price:null}]},
  office:{label:"Limpieza de oficina",basis:"mixto",tax:false,options:[{code:"OFF-PRO",name:"Limpieza profesional de oficina · 18 €/hora",price:18,unit:"hora"},{code:"OFF-REC",name:"Limpieza estándar recurrente · 16 €/hora",price:16,unit:"hora"},{code:"OFF-DEEP",name:"Limpieza profunda · 20 €/hora",price:20,unit:"hora"},{code:"OFF-SPECIAL",name:"Servicio especial / fuera de horario · 22 €/hora",price:22,unit:"hora"},{code:"OFF-DES",name:"Desinfección reforzada · desde 20 €/hora",price:20,unit:"hora"},{code:"OFF-GLASS",name:"Cristales · 5 €/m²",price:5,unit:"m²"},{code:"OFF-INITIAL",name:"Limpieza profunda inicial · 1,50–2,50 €/m²",price:1.5,maxPrice:2.5,unit:"m²",range:true}]},
  postobra:{label:"Limpieza post-obra",basis:"m2",tax:false,options:[{code:"POST-LIGHT",name:"Post-obra ligera · 4,50 €/m²",price:4.5,unit:"m²"},{code:"POST-STANDARD",name:"Post-obra estándar · 5,50 €/m²",price:5.5,unit:"m²"},{code:"POST-INTENSIVE",name:"Post-obra intensiva · 7,00 €/m²",price:7,unit:"m²"},{code:"POST-SPECIAL",name:"Post-obra especial · 8,00–10,00 €/m²",price:8,maxPrice:10,unit:"m²",range:true},{code:"POST-GLASS",name:"Cristales y ventanas post-obra · 3,00–6,00 €/m²",price:3,maxPrice:6,unit:"m²",range:true},{code:"POST-PAINT",name:"Restos de pintura / adhesivo · desde 4,00 €/m²",price:4,unit:"m²"},{code:"POST-CEMENT",name:"Restos de cemento / mortero · desde 5,00 €/m²",price:5,unit:"m²"}]},
