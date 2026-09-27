@@ -2217,13 +2217,13 @@ function renderMaintenanceJourneyTimeline(j){
  const liveMinutes=j.finished_at?rawMinutes:billableMinutes();
  const effectiveMinutes=Math.max(0,liveMinutes);
  const billable=Math.max(30,effectiveMinutes);
- const h1=Math.min(billable,60),h2=Math.max(Math.min(billable-60,60),0),h3=Math.max(Math.min(billable-120,60),0),h4=Math.max(Math.min(billable-180,60),0),h5=Math.max(Math.min(billable-240,60),0),h6=Math.max(Math.min(billable-300,60),0),h7=Math.max(billable-360,0);
- const firstHour=h1/60*45;
- const additional=h2/60*40+h3/60*32+h4/60*30+h5/60*29+h6/60*28+h7/60*27;
- const calculatedTotal=firstHour+additional;
+ const appliedRate=billable<=60?45:billable<=120?40:billable<=180?32:billable<=240?30:billable<=300?29:billable<=360?28:27;
+ const calculatedTotal=billable/60*appliedRate;
+ const firstHour=billable<=60?calculatedTotal:0;
+ const additional= billable>60?calculatedTotal:0;
  const durationText=effectiveMinutes?Math.floor(effectiveMinutes/60)+" h "+Math.round(effectiveMinutes%60)+" min":"—";
  const additionalMinutes=Math.max(0,billable-60);
- const marginalRate=billable<=60?45:billable<=120?40:billable<=180?32:billable<=240?30:billable<=300?29:billable<=360?28:27;
+ const marginalRate=appliedRate;
  const canSeeMoney=["admin","supervisor","client"].includes(role());
  const authoritativeTotal=Number(j.pricing?.total??j.total??0);
  const authoritativeMinutes=Number(j.pricing?.worked_minutes??j.worked_minutes??0);
@@ -2238,7 +2238,7 @@ function renderMaintenanceJourneyTimeline(j){
  (showBreakdown?'<div style="margin-top:14px;padding:14px;border:1px solid #e5dac8;border-radius:14px;background:#faf6ee"><div class="panel-head" style="margin-bottom:8px"><div><h3>💶 Cálculo progressivo</h3><div class="muted">'+(j.finished_at?"Valor final calculado pelo servidor":"Estimativa em tempo real")+'</div></div><span class="pill">'+money(finalTotal)+'</span></div>'+
  '<div class="two"><div><small class="muted">Primeira hora</small><p><strong>'+money(firstHour)+'</strong></p></div><div><small class="muted">Tempo adicional</small><p><strong>'+Math.round(additionalMinutes)+' min</strong></p></div><div><small class="muted">Tarifa marginal aplicada</small><p><strong>'+money(marginalRate)+'/h</strong></p></div><div><small class="muted">Valor adicional</small><p><strong>'+money(additional)+'</strong></p></div></div>'+
  '<div style="margin-top:10px;padding:10px 12px;border-radius:11px;background:#fffdf9;border:1px solid #e5dac8"><div style="font-size:11px;font-weight:800;color:#332e27">Total final · IVA incluido ('+taxRate+'%)</div><div style="font-size:24px;font-weight:900;color:#73501c;margin-top:3px">'+money(finalTotal)+'</div><div style="margin-top:5px;font-size:10px;color:#756a5d">Base imponível: '+money(netTotal)+' · IVA: '+money(taxValue)+'</div></div>'+
- '<div style="margin-top:8px;font-size:10px;color:#756a5d">Mínimo faturável: 30 min · 22,50 €. As faixas seguintes aplicam 40 €/h, 32 €/h, 30 €/h, 29 €/h, 28 €/h e 27 €/h progressivamente. O valor mostrado acima já inclui IVA.</div></div>':"")+
+ '<div style="margin-top:8px;font-size:10px;color:#756a5d">Mínimo faturável: 30 min · 22,50 €. A tarifa é aplicada à duração total: 1 h = 45 €/h, 2 h = 40 €/h, 3 h = 32 €/h, 4 h = 30 €/h, 5 h = 29 €/h, 6 h = 28 €/h e acima de 6 h = 27 €/h. O valor mostrado acima já inclui IVA.</div></div>':"")+
  '<div style="margin-top:12px"><small class="muted">Linha do tempo</small>'+((rows.length?rows.map(r=>'<div class="line"><span><b>'+esc(r.label)+'</b></span><span>'+esc(fmt(r.iso))+'</span></div>').join(""):'<div class="empty">Aguardando eventos da jornada.</div>'))+'</div></div>';
 }
 async function viewService(id){
