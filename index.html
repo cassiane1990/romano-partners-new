@@ -4210,6 +4210,8 @@ async function uploadEmergencyMedia(occurrenceId,files){
 }
 async function saveEmergency(e){
  e.preventDefault();
+ const currentRole=role();
+ const isClientEmergency=currentRole==="client";
  const propertyId=$("eProperty")?.value||null,serviceId=$("eService")?.value||null,employeeId=$("eEmployee")?.value||null,serviceType=$("eType")?.value||null,priority=$("ePriority")?.value||"urgent",description=$("eDesc")?.value.trim()||"";
  const selectedClientId=$("eClient")?.tagName==="SELECT"?($("eClient")?.value||null):null;
  if(!propertyId||(!isClientEmergency&&!employeeId)||!serviceType||!description){toast(isClientEmergency?"Seleccione apartamento, tipo de servicio y describa la emergencia.":"Seleccione cliente, apartamento, tipo de servicio, funcionario y describa la emergencia.");return}
@@ -4225,7 +4227,6 @@ async function saveEmergency(e){
    if(serviceType!=="mantenimiento" && !relatedType.includes(serviceType.replace("fontaneria","fontan").replace("hidraulica","hydraulic"))){toast("El tipo de servicio no coincide con el servicio relacionado.");return}
  }
  let propertyRecord=null;
- const currentRole=role();
  if(currentRole==="maintenance_technician"){
    const ctx=await sb.rpc("maintenance_technician_emergency_context");
    if(ctx.error){toast("No se pudo validar el apartamento: "+ctx.error.message);return}
@@ -4244,7 +4245,6 @@ async function saveEmergency(e){
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(selectedClientId&&selectedClientId!==clientId){toast("El apartamento seleccionado no pertenece al cliente elegido.");return}
  if(["employee","maintenance_technician"].includes(role())&&employeeId!==currentUser.id){toast("El funcionario de una emergencia creada por un empleado debe ser él mismo.");return}
- const isClientEmergency=currentRole==="client";
  const payload={id:crypto.randomUUID(),service_id:serviceId,property_id:propertyId,assigned_employee_id:isClientEmergency?null:employeeId,service_type:serviceType,category:"maintenance",priority:"urgent",description,status:"open"};
  if(!navigator.onLine){await queueOfflineMutation("occurrence_create",payload);closeModal();toast("Sin conexión · emergencia guardada para sincronizar");return}
  let emergencyServiceId=serviceId;
