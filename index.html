@@ -950,13 +950,18 @@ async function assignServiceEmployee(serviceId,employeeId,force=false){
    const msg=String(r.error.message||"");
    if(msg.startsWith("DIVERGENCIA_HORARIO:")&&!force){
      const detail=msg.replace("DIVERGENCIA_HORARIO:","").trim();
-     if(confirm("⚠️ Divergência de horário.\\n\\n"+detail+"\\n\\n¿Desea usar DESIGNAR EXTRA y enviarlo de todos modos para el funcionario?")){
-       return assignServiceEmployee(serviceId,employeeId,true);
-     }
+     toast("⚠️ "+detail+" · Se realizará la designación igualmente.");
+     return assignServiceEmployee(serviceId,employeeId,true);
    }
-   toast("No fue posible designar: "+msg.replace("DIVERGENCIA_HORARIO:","").trim());return
+   toast("No fue posible designar: "+msg.replace("DIVERGENCIA_HORARIO:","").trim());return;
  }
- closeModal();toast(r.data?.extra?"✓ Designación EXTRA enviada. El funcionario verá o conflito e decidirá se pode aceitar.":"✓ Funcionario designado. Aguardando aceitação dele.");await renderServicesMaster();
+ closeModal();
+ if(r.data?.extra){
+   toast("✓ Funcionario designado. Existe una divergencia de horario y puede producirse un retraso; el conflicto queda registrado.");
+ }else{
+   toast("✓ Funcionario designado. Aguardando aceptación.");
+ }
+ await renderServicesMaster();
 }
 function privateMaintenanceServiceType(v){return /manten|pint|electric|fontan|hidraulic|hydraulic|silic|monta|instal|repar/i.test(String(v||""))}
 function serviceTypeLabel(v){
