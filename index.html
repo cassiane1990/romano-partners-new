@@ -4249,7 +4249,7 @@ async function requestServiceAdvance(serviceId){
    s=DEMO_SERVICES.find(x=>x.id===serviceId);if(!s){toast("Servicio demo no encontrado");return}
    p=DEMO_PROPERTIES.find(x=>x.id===s.property_id);
  }else{
-   const sr=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,status,client_id").eq("id",serviceId).single();
+   const sr=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,status,client_id,created_at").eq("id",serviceId).single();
    if(sr.error){toast(sr.error.message);return}s=sr.data;
    if(["completed","cancelled"].includes(s.status)){toast("Este servicio ya no admite cambios de horario.");return}
    const pr=await sb.from("properties").select("id,name,code").eq("id",s.property_id).single();
