@@ -1139,20 +1139,31 @@ function journeyActionsForService(s){
 }
 function renderServiceStatusAvatarSequence(s){
  const status=String(s?.status||"scheduled");
- const steps=[
-  {key:"received",label:"Recibido",icon:"📄"},
-  {key:"accepted",label:"Aceptado",icon:"✓"},
-  {key:"on_the_way",label:"A camino",icon:"📍"},
-  {key:"in_progress",label:"En curso",icon:"🔧"},
-  {key:"supervised",label:"Supervisado",icon:"🔎"},
-  {key:"completed",label:"Finalizado",icon:"✓"}
- ];
- const progress={scheduled:0,requested:0,on_the_way:2,in_progress:3,paused:3,supervision_pending:4,supervised:4,completed:5,approved:5,rejected:-1,returned:-1,cancelled:-1};
+ const maint=privateMaintenanceServiceType(s?.service_type);
+ const steps=maint
+  ? [
+    {key:"received",label:"Recibido",icon:"📄"},
+    {key:"accepted",label:"Aceptado",icon:"✓"},
+    {key:"on_the_way",label:"A camino",icon:"📍"},
+    {key:"in_progress",label:"En curso",icon:"🔧"},
+    {key:"completed",label:"Finalizado",icon:"✓"}
+   ]
+  : [
+    {key:"received",label:"Recibido",icon:"📄"},
+    {key:"accepted",label:"Aceptado",icon:"✓"},
+    {key:"on_the_way",label:"A camino",icon:"📍"},
+    {key:"in_progress",label:"En curso",icon:"🔧"},
+    {key:"supervised",label:"Supervisado",icon:"🔎"},
+    {key:"completed",label:"Finalizado",icon:"✓"}
+   ];
+ const progress=maint
+  ? {scheduled:0,requested:0,on_the_way:2,in_progress:3,paused:3,completed:4,approved:4,rejected:-1,returned:-1,cancelled:-1}
+  : {scheduled:0,requested:0,on_the_way:2,in_progress:3,paused:3,supervision_pending:4,supervised:4,completed:5,approved:5,rejected:-1,returned:-1,cancelled:-1};
  const current=Object.prototype.hasOwnProperty.call(progress,status)?progress[status]:0;
- const activeStatus=status==="paused"?"Pausado":status==="supervision_pending"?"Esperando supervisión":"";
+ const activeStatus=status==="paused"?"Pausado":(!maint&&status==="supervision_pending"?"Esperando supervisión":"");
  return '<div class="sj-avatar-sequence" aria-label="Secuencia del servicio">'+steps.map((x,i)=>{
    const done=current>i,now=current===i;
-   const extra=x.key==="completed"&&current===5?" final":"";
+   const extra=x.key==="completed"&&current===steps.length-1?" final":"";
    const sub=now&&activeStatus?activeStatus:"";
    return '<div class="sj-avatar-step '+(done?"done ":"")+(now?"current ":"")+extra+'"><div class="sj-avatar" title="'+esc(x.label)+'">'+x.icon+'</div><div class="sj-avatar-label">'+esc(x.label)+'</div>'+(sub?'<div class="sj-avatar-time">'+esc(sub)+'</div>':"")+'</div>';
  }).join("")+'</div>';
@@ -1221,38 +1232,41 @@ async function renderServiceJourneyBoard(){
   return '<article class="sj-card '+(own?"sj-own":"")+'" onclick="viewService('+sid+')"><div class="sj-photo">'+(p.photo_url?'<img src="'+esc(photos[p.id]||"")+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type '+(isMaint(s)?"maint":"clean")+'">'+(isMaint(s)?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</span><div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(serviceTypeLabel(s.service_type))+'</p><span class="sj-priority">'+esc(servicePriorityLabel(s.priority))+'</span></div><div class="sj-status"><div class="sj-current"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><small>'+esc(stageText)+'</small></div>'+stageHtml+'<button class="sj-btn" onclick="event.stopPropagation();viewService('+sid+')">Ver ficha</button>'+(action?'<div class="sj-quick">'+action+'</div>':"")+'</div></article>';
  }).join("");
  const sjHint=window.__sjShowingActiveAssigned?'Mostrando también servicios activos que siguen asignados a ti, aunque su fecha programada ya haya pasado.': 'Una sola acción siguiente por servicio. Los estados verificados/finalizados quedan bloqueados.';
- $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>'+esc(sjHint)+'</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>🧹 Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>🔧 Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados / cerrados</small><strong>'+services.filter(s=>["completed","approved","supervised"].includes(s.status)).length+'</strong></div></div><div class="sj-legend"><span>🚗 A camino</span><span>▶ Iniciado</span><span>Ⅱ Pausado</span><span>🔎 Esperando supervisión</span><span>✓ Finalizado</span></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
+ $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>'+esc(sjHint)+'</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>🧹 Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>🔧 Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados / cerrados</small><strong>'+services.filter(s=>["completed","approved","supervised"].includes(s.status)).length+'</strong></div></div><div class="sj-legend"><span>🚗 A camino</span><span>▶ Iniciado</span><span>Ⅱ Pausado</span><span class="sj-legend-cleaning">🔎 Esperando supervisión (limpieza)</span><span>✓ Finalizado</span></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
  $("sjDay").onchange=()=>{window.__sjDay=$("sjDay").value;renderServiceJourneyBoard()};
 }
 async function renderJourneyMaster(){
- let journal={data:[],error:null},assigned={data:[],error:null};
- if(demoMode){journal={data:[{work_date:"2026-09-23",check_in_at:"2026-09-23T07:55:00+02:00",check_out_at:null,status:"open",profile_id:"demo-e1"}],error:null};assigned={data:(DEMO_SERVICES||[]).filter(x=>x.assigned_employee_id==="demo-e1").slice(0,10),error:null};}
- else{
-  journal=await sb.from("work_journal_entries").select("work_date,check_in_at,check_out_at,status,profile_id").eq("profile_id",currentUser.id).order("work_date",{ascending:false}).limit(100);
-  if(["employee","maintenance_technician"].includes(role()))assigned=await sb.from("services").select("id,code,property_id,client_id,service_type,status,scheduled_at,assigned_employee_id,priority").eq("assigned_employee_id",currentUser.id).in("status",["scheduled","on_the_way","in_progress","paused","supervision_pending"]).order("scheduled_at",{ascending:true}).limit(50);
+ let journal={data:[],error:null};
+ if(demoMode){
+   journal={data:[{work_date:"2026-09-23",check_in_at:"2026-09-23T07:55:00+02:00",check_out_at:null,status:"open",profile_id:"demo-e1"}],error:null};
+ }else{
+   journal=await sb.from("work_journal_entries")
+     .select("work_date,check_in_at,check_out_at,status,profile_id")
+     .eq("profile_id",currentUser.id)
+     .order("work_date",{ascending:false})
+     .limit(100);
  }
- const rows=assigned.data||[],pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))],cids=[...new Set(rows.map(x=>x.client_id).filter(Boolean))],pm={},cm={};
- if(pids.length&&!demoMode){const q=await sb.from("properties").select("id,name,code,address,city").in("id",pids);(q.data||[]).forEach(p=>pm[p.id]=p)}
- if(cids.length&&!demoMode){const q=await sb.from("clients").select("id,name").in("id",cids);(q.data||[]).forEach(x=>cm[x.id]=x)}
- const jobs=["employee","maintenance_technician"].includes(role())?'<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Servicios asignados</h3><div class="muted">Acepta aquí tu servicio y continúa con la siguiente acción.</div></div><span class="pill">'+rows.length+'</span></div>'+(rows.length?rows.map(s=>{
-   const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},maint=/manten|electric|plumb|pint|repar|silicon|montaj|instal/i.test(String(s.service_type||""));
-   let action="";
-   if(s.status==="scheduled")action='<button class="btn gold" data-job-action="accept" data-service-id="'+esc(s.id)+'">✓ ACEPTAR</button>';
-   else if(s.status==="on_the_way")action='<button class="btn gold" data-job-action="start" data-service-id="'+esc(s.id)+'">▶ INICIAR</button>';
-   else if(s.status==="in_progress")action='<button class="btn" data-job-action="pause" data-service-id="'+esc(s.id)+'">Ⅱ PAUSAR</button>'+(maint?'<button class="btn gold" data-job-action="finish" data-service-id="'+esc(s.id)+'">✓ FINALIZAR</button>':"");
-   else if(s.status==="paused")action='<button class="btn gold" data-job-action="continue" data-service-id="'+esc(s.id)+'">▶ CONTINUAR</button>'+(maint?'<button class="btn gold" data-job-action="finish" data-service-id="'+esc(s.id)+'">✓ FINALIZAR</button>':"");
-   return '<div class="line-item" style="align-items:center;gap:10px"><span style="flex:1"><b>'+(maint?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</b><small style="display:block">'+esc(cl.name||"Cliente")+' · '+esc(p.name||p.code||"Apartamento")+'</small><small class="muted" style="display:block">'+esc(s.code||"")+' · '+esc(s.scheduled_at?romanoMadridLabel(s.scheduled_at):"Sin horario")+'</small></span><span style="text-align:right"><span class="status '+esc(s.status)+'">'+esc(statusNames[s.status]||s.status)+'</span><div class="actions" style="justify-content:flex-end;margin-top:6px">'+action+'<button class="btn" data-job-action="view" data-service-id="'+esc(s.id)+'">Ver</button></div></span></div>';
- }).join(""):'<div class="empty">No tienes servicios asignados pendientes o en curso.</div>')+'</div>':"";
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Mi Jornada</h3><div class="muted">Entrada / salida + servicios asignados</div></div><div class="actions"><button class="btn dark" onclick="masterClockIn()">◉ Entrada</button><button class="btn gold" onclick="masterClockOut()">◉ Salida</button></div></div><div class="notice">Una sola acción siguiente por servicio. Al finalizar o aprobar, el servicio queda bloqueado y no puede volver atrás.</div>'+jobs+'<table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody>'+(journal.data?.length?journal.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?new Date(x.check_in_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.check_out_at?new Date(x.check_out_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.status)+'</td></tr>').join(""):'<tr><td colspan="4"><div class="empty">Sin registros.</div></td></tr>')+'</tbody></table></div>';
- document.querySelectorAll("[data-job-action]").forEach(btn=>btn.addEventListener("click",async e=>{
-   e.stopPropagation();const id=btn.dataset.serviceId,act=btn.dataset.jobAction;
-   if(act==="accept")await acceptAssignedService(id);
-   else if(act==="start")await setServiceStatusPremium(id,"in_progress");
-   else if(act==="pause")await setServiceStatusPremium(id,"paused");
-   else if(act==="continue")await setServiceStatusPremium(id,"in_progress");
-   else if(act==="finish")await setServiceStatusPremium(id,"completed");
-   else if(act==="view")viewService(id);
- }));
+ if(journal.error){
+   $("content").innerHTML='<div class="panel"><div class="msg">'+esc(journal.error.message||"No se pudo cargar la jornada.")+'</div></div>';
+   return;
+ }
+ const open=journal.data?.find(x=>x.status==="open");
+ $("content").innerHTML=
+   '<div class="panel">'+
+     '<div class="panel-head">'+
+       '<div><h3>Mi Jornada</h3><div class="muted">Registro de entrada y salida del trabajo.</div></div>'+
+       '<div class="actions">'+
+         '<button class="btn dark" '+(open?'disabled style="opacity:.55;cursor:not-allowed"': 'onclick="masterClockIn()"')+'>◉ Entrada</button>'+
+         '<button class="btn gold" '+(!open?'disabled style="opacity:.55;cursor:not-allowed"': 'onclick="masterClockOut()"')+'>◉ Salida</button>'+
+       '</div>'+
+     '</div>'+
+     '<div class="notice">'+(open?'Jornada abierta desde '+esc(romanoMadridLabel(open.check_in_at))+'. La Jornada de servicios se utiliza para aceptar, iniciar, pausar y finalizar cada servicio.':'Use Entrada para registrar el inicio de su jornada y Salida para registrarla como cerrada. Los servicios se gestionan exclusivamente en Jornada de servicios.')+'</div>'+
+     '<table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody>'+
+       (journal.data?.length
+         ?journal.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?new Date(x.check_in_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.check_out_at?new Date(x.check_out_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.status)+'</td></tr>').join("")
+         :'<tr><td colspan="4"><div class="empty">Sin registros.</div></td></tr>')+
+     '</tbody></table>'+
+   '</div>';
 }
 async function masterClockIn(){
  const existing=await sb.from("work_journal_entries").select("id,check_in_at").eq("profile_id",currentUser.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
