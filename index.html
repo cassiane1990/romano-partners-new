@@ -2118,9 +2118,25 @@ async function requestCleaningSupervision(serviceId){
  if(current.error){serviceActionError(current.error.message);return}
  if(current.data.assigned_employee_id!==currentUser.id){serviceActionError("Este servicio no está asignado a su usuario.");return}
  if(!["in_progress","paused"].includes(current.data.status)){serviceActionError("Primero debe iniciar el servicio. Estado actual: "+(statusNames[current.data.status]||current.data.status)+".");return}
- const r=await sb.rpc("request_cleaning_supervision",{p_service_id:serviceId});
- if(r.error){serviceActionError(r.error.message);return}
- toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");await viewService(serviceId);
+ const checklist=await sb.from("service_checklist_items").select("id,checked").eq("service_id",serviceId);
+ if(checklist.error){serviceActionError(checklist.error.message);return}
+ const media=await sb.from("service_media").select("id").eq("service_id",serviceId).eq("media_type","photo").limit(1);
+ if(media.error){serviceActionError(media.error.message);return}
+ if((checklist.data||[]).length<11||(checklist.data||[]).filter(x=>x.checked).length<11){serviceActionError("Complete todo el checklist antes de solicitar la supervisión.");return}
+ if(!(media.data||[]).length){serviceActionError("Anexe al menos una foto antes de solicitar la supervisión.");return}
+ const now=new Date().toISOString();
+ const update=await sb.from("services")
+   .update({status:"supervision_pending",updated_at:now,updated_by:currentUser.id,updated_by_at:now})
+   .eq("id",serviceId)
+   .eq("status",current.data.status)
+   .select("status")
+   .maybeSingle();
+ if(update.error||!update.data||update.data.status!=="supervision_pending"){
+   serviceActionError(update.error?.message||"No se pudo enviar la limpieza a supervisión.");
+   return;
+ }
+ toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");
+ await viewService(serviceId);
 }
 async function reviewServiceMedia(mediaId,path,serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor o Administrador puede revisar las fotos.");return}
