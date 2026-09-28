@@ -764,7 +764,7 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 <button class="primary">Entrar al sistema</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
 </div></div>
 
-<div id="mfa" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>VERIFICACIÓN</h1><p>SEGURIDAD ROMANO PARTNERS</p></div>
+<div id="recovery" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>NUEVA CONTRASEÑA</h1><p>RECUPERACIÓN DE ACCESO · ROMANO PARTNERS</p></div><p class="muted">Define una nueva contraseña para recuperar el acceso a tu cuenta.</p><div class="field"><label>Nueva contraseña</label><input id="recoveryPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo 8 caracteres"></div><div class="field"><label>Confirmar nueva contraseña</label><input id="recoveryPasswordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="Repite la nueva contraseña"></div><button id="recoveryBtn" type="button" class="primary">Guardar nueva contraseña</button><div id="recoveryMsg" class="msg hidden"></div></div></div>\n\n<div id="mfa" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>VERIFICACIÓN</h1><p>SEGURIDAD ROMANO PARTNERS</p></div>
 <p class="muted">Introduce el código de tu aplicación autenticadora.</p><div class="field"><label>Código MFA</label><input id="mfaCode" inputmode="numeric" maxlength="6"></div>
 <button id="mfaBtn" class="primary">Verificar</button><div id="mfaMsg" class="msg hidden"></div></div></div>
 
@@ -3330,7 +3330,7 @@ $("resetBtn").onclick=async()=>{
 };
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
-sb.auth.onAuthStateChange(async(event,session)=>{if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
+sb.auth.onAuthStateChange(async(event,session)=>{if(event==="PASSWORD_RECOVERY"){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));$("recovery").classList.remove("hidden");return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
 (async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
 
 async function renderClientsPremium(){return renderClients()}
