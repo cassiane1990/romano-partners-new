@@ -1136,7 +1136,7 @@ function journeyActionsForService(s){
  if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(s.status))return "";
  const maint=privateMaintenanceServiceType(s.service_type);
  const sid=JSON.stringify(s.id);
- const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium('+sid+','+JSON.stringify(status)+')">'+label+'</button>';
+ const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="setServiceStatusPremium('+sid+','+JSON.stringify(status)+')">'+label+'</button>';
  if((r==="employee"||r==="maintenance_technician")&&!own)return "";
  if(r==="supervisor"&&!s.assigned_employee_id&&(s.status==="requested"||(s.status==="scheduled"&&!s.supervisor_approved_at)))return '<button type="button" class="btn gold" onclick="event.stopPropagation();acceptServiceRequest('+sid+')">✓ ACEPTAR SOLICITUD</button>';
  if(s.status==="scheduled")return ["employee","maintenance_technician"].includes(r)?'<button type="button" class="btn gold" onclick="event.stopPropagation();acceptAssignedService('+sid+')">✓ ACEPTAR</button>':(r==="admin"||r==="supervisor")&&s.supervisor_approved_at&&!s.assigned_employee_id?'<button type="button" class="btn gold" onclick="event.stopPropagation();openServiceAssignment('+sid+')">DESIGNAR FUNCIONARIO</button>':"";
@@ -1739,7 +1739,7 @@ window.addEventListener("offline",()=>updateOfflineIndicator());
 async function initOfflineSync(){if(__offlineListenersReady)return;__offlineListenersReady=true;await updateOfflineIndicator();if(navigator.onLine)syncOfflineQueue()}
 
 function toast(t){const el=$("toast");if(!el)return;el.textContent=t;el.classList.remove("hidden");clearTimeout(window.__romanoToastTimer);window.__romanoToastTimer=setTimeout(()=>el.classList.add("hidden"),4000)}
-function serviceActionError(message){const body=$("modalBody");if(!body)return;let box=$("romanoServiceActionError");if(!box){box=document.createElement("div");box.id="romanoServiceActionError";box.style.cssText="position:sticky;top:0;z-index:1105;margin:0 0 12px;padding:12px 14px;border:1px solid #d8a6a0;border-radius:12px;background:#fff3f1;color:#8a3329;font-weight:700;font-size:12px;box-shadow:0 8px 22px rgba(0,0,0,.12)";body.prepend(box)}box.textContent="⚠️ "+String(message||"No se pudo completar la operación.");box.scrollIntoView({block:"nearest",behavior:"smooth"});toast(String(message||"No se pudo completar la operación."))}
+function serviceActionError(message){const body=$("modalBody");const text="⚠️ "+String(message||"No se pudo completar la operación.");if(body){let box=$("romanoServiceActionError");if(!box){box=document.createElement("div");box.id="romanoServiceActionError";box.style.cssText="position:sticky;top:0;z-index:1105;margin:0 0 12px;padding:12px 14px;border:1px solid #d8a6a0;border-radius:12px;background:#fff3f1;color:#8a3329;font-weight:700;font-size:12px;box-shadow:0 8px 22px rgba(0,0,0,.12)";body.prepend(box)}box.textContent=text;box.scrollIntoView({block:"nearest",behavior:"smooth"})}toast(String(message||"No se pudo completar la operación."))}
 function clearServiceActionError(){const box=$("romanoServiceActionError");if(box)box.remove()}
 function openModal(t,html){$("modalTitle").textContent=t;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden")}
@@ -2296,8 +2296,17 @@ async function setServiceStatusPremium(id,status){
    let finalState=null;
    if(role()==="employee" && isCleaningServiceType(sr.data.service_type) && currentStatus==="on_the_way" && status==="in_progress"){
      const start=await sb.rpc("employee_start_cleaning_service",{p_service_id:id});
-     if(start.error){serviceActionError("No se pudo iniciar la limpieza: "+start.error.message);return}
-     finalState={status:start.data?.status||"in_progress"};
+     if(start.error){
+       const detail=[start.error.message,start.error.code,start.error.details,start.error.hint].filter(Boolean).join(" · ");
+       serviceActionError("No se pudo iniciar la limpieza: "+detail);
+       return;
+     }
+     const verifyStart=await sb.from("services").select("status,started_at,started_by,updated_at").eq("id",id).single();
+     if(verifyStart.error||verifyStart.data?.status!=="in_progress"){
+       serviceActionError("El servidor no confirmó el inicio de la limpieza. Estado actual: "+(statusNames[verifyStart.data?.status]||verifyStart.data?.status||"desconocido")+".");
+       return;
+     }
+     finalState=verifyStart.data;
    }else{
      const now=new Date().toISOString();
      const patch={status,updated_at:now,updated_by:currentUser.id,updated_by_at:now,...(status==="in_progress"&&currentStatus!=="in_progress"?{started_at:now,started_by:currentUser.id}:{})};
