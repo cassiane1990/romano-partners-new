@@ -2124,15 +2124,9 @@ async function requestCleaningSupervision(serviceId){
  if(media.error){serviceActionError(media.error.message);return}
  if((checklist.data||[]).length<11||(checklist.data||[]).filter(x=>x.checked).length<11){serviceActionError("Complete todo el checklist antes de solicitar la supervisión.");return}
  if(!(media.data||[]).length){serviceActionError("Anexe al menos una foto antes de solicitar la supervisión.");return}
- const now=new Date().toISOString();
- const update=await sb.from("services")
-   .update({status:"supervision_pending",updated_at:now,updated_by:currentUser.id,updated_by_at:now})
-   .eq("id",serviceId)
-   .eq("status",current.data.status)
-   .select("status")
-   .maybeSingle();
- if(update.error||!update.data||update.data.status!=="supervision_pending"){
-   serviceActionError(update.error?.message||"No se pudo enviar la limpieza a supervisión.");
+ const update=await sb.rpc("employee_request_cleaning_supervision",{p_service_id:serviceId});
+ if(update.error){
+   serviceActionError("No se pudo enviar la limpieza a supervisión: "+update.error.message);
    return;
  }
  toast("✓ Limpieza enviada a Supervisor / Administrador para revisión.");
@@ -2299,22 +2293,29 @@ async function setServiceStatusPremium(id,status){
  }
  if(["employee","maintenance_technician"].includes(role())&&sr.data.assigned_employee_id===currentUser.id&&["on_the_way","in_progress","paused"].includes(status)){
    clearServiceActionError();
-   const now=new Date().toISOString();
-   const patch={status,updated_at:now,updated_by:currentUser.id,updated_by_at:now,...(status==="in_progress"&&currentStatus!=="in_progress"?{started_at:now,started_by:currentUser.id}:{})};
-   let direct=await sb.from("services").update(patch).eq("id",id).eq("status",currentStatus).select("status,started_at,started_by").maybeSingle();
-   if(direct.error||!direct.data||direct.data.status!==status){
-     const fallback=await sb.rpc("employee_transition_service_status",{p_service_id:id,p_next_status:status});
-     if(fallback.error){
-       serviceActionError("No se pudo cambiar el estado. "+(direct.error?.message||fallback.error?.message||"Operación no confirmada."));
-       return;
-     }
-     const verifyRpc=await sb.from("services").select("status,started_at,started_by").eq("id",id).single();
-     if(verifyRpc.error||verifyRpc.data?.status!==status){
-       serviceActionError("El servidor no confirmó el nuevo estado. Estado actual: "+(statusNames[verifyRpc.data?.status]||verifyRpc.data?.status||"desconocido")+".");
-       return;
-     }
+   let finalState=null;
+   if(role()==="employee" && isCleaningServiceType(sr.data.service_type) && currentStatus==="on_the_way" && status==="in_progress"){
+     const start=await sb.rpc("employee_start_cleaning_service",{p_service_id:id});
+     if(start.error){serviceActionError("No se pudo iniciar la limpieza: "+start.error.message);return}
+     finalState={status:start.data?.status||"in_progress"};
+   }else{
+     const now=new Date().toISOString();
+     const patch={status,updated_at:now,updated_by:currentUser.id,updated_by_at:now,...(status==="in_progress"&&currentStatus!=="in_progress"?{started_at:now,started_by:currentUser.id}:{})};
+     let direct=await sb.from("services").update(patch).eq("id",id).eq("status",currentStatus).select("status,started_at,started_by").maybeSingle();
+     if(direct.error||!direct.data||direct.data.status!==status){
+       const fallback=await sb.rpc("employee_transition_service_status",{p_service_id:id,p_next_status:status});
+       if(fallback.error){
+         serviceActionError("No se pudo cambiar el estado. "+(direct.error?.message||fallback.error?.message||"Operación no confirmada."));
+         return;
+       }
+       const verifyRpc=await sb.from("services").select("status,started_at,started_by").eq("id",id).single();
+       if(verifyRpc.error||verifyRpc.data?.status!==status){
+         serviceActionError("El servidor no confirmó el nuevo estado. Estado actual: "+(statusNames[verifyRpc.data?.status]||verifyRpc.data?.status||"desconocido")+".");
+         return;
+       }
+       finalState=verifyRpc.data;
+     }else finalState=direct.data;
    }
-   const finalState=direct.data||{status};
    if(finalState.status!==status){serviceActionError("El estado no cambió.");return}
    if(status==="on_the_way"||status==="in_progress"){startServiceGPS(id)}
    if(status==="paused"||status==="completed"){stopServiceGPS()}
