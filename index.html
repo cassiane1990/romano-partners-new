@@ -2206,7 +2206,7 @@ function renderServiceStatusActions(x){
  if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(x.status))
    return '<div class="notice" style="margin-top:12px"><b>Estado bloqueado.</b><br>Este servicio ya fue verificado/finalizado y no se puede retroceder.</div>';
  const sid=JSON.stringify(x.id),maint=!isCleaningServiceType(x.service_type);
- const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium('+sid+','+JSON.stringify(status)+')">'+label+'</button>';
+ const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="event.stopPropagation();setServiceStatusPremium(\''+x.id+'\',\''+status+'\')">'+label+'</button>';
  if(x.status==="on_the_way")return '<div class="actions" style="margin-top:12px"><span class="muted" style="align-self:center">Siguiente estado:</span>'+btn("▶ Iniciado","in_progress",true)+'</div>';
  if(x.status==="in_progress")return '<div class="actions" style="margin-top:12px"><span class="muted" style="align-self:center">Siguiente estado:</span>'+btn("Ⅱ Pausar","paused",false)+(maint?btn("✓ Finalizar","completed",true):"")+'</div>';
  if(x.status==="paused")return '<div class="actions" style="margin-top:12px"><span class="muted" style="align-self:center">Siguiente estado:</span>'+btn("▶ Continuar","in_progress",true)+(maint?btn("✓ Finalizar","completed",true):"")+'</div>';
