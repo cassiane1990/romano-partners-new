@@ -1136,7 +1136,7 @@ function journeyActionsForService(s){
  if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(s.status))return "";
  const maint=privateMaintenanceServiceType(s.service_type);
  const sid=JSON.stringify(s.id);
- const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="setServiceStatusPremium('+sid+','+JSON.stringify(status)+')">'+label+'</button>';
+ const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="setServiceStatusPremium(\''+x.id+'\',\''+status+'\')">'+label+'</button>';
  if((r==="employee"||r==="maintenance_technician")&&!own)return "";
  if(r==="supervisor"&&!s.assigned_employee_id&&(s.status==="requested"||(s.status==="scheduled"&&!s.supervisor_approved_at)))return '<button type="button" class="btn gold" onclick="event.stopPropagation();acceptServiceRequest('+sid+')">✓ ACEPTAR SOLICITUD</button>';
  if(s.status==="scheduled")return ["employee","maintenance_technician"].includes(r)?'<button type="button" class="btn gold" onclick="event.stopPropagation();acceptAssignedService('+sid+')">✓ ACEPTAR</button>':(r==="admin"||r==="supervisor")&&s.supervisor_approved_at&&!s.assigned_employee_id?'<button type="button" class="btn gold" onclick="event.stopPropagation();openServiceAssignment('+sid+')">DESIGNAR FUNCIONARIO</button>':"";
