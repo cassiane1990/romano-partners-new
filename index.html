@@ -1250,7 +1250,6 @@ async function renderServiceJourneyBoard(){
  let services=[],props=[],clients=[],employees=[];
  if(demoMode){
   services=(DEMO_SERVICES||[]).filter(x=>String(x.scheduled_at||"").slice(0,10)===day);
-  if(!services.length)services=(DEMO_SERVICES||[]).slice(0,8);
   props=DEMO_PROPERTIES||[];clients=DEMO_CLIENTS||[];employees=DEMO_EMPLOYEES||[];
  }else{
   const startDay=day+"T00:00:00",endDay=day+"T23:59:59.999";let q;
@@ -1261,21 +1260,9 @@ async function renderServiceJourneyBoard(){
   else q=await sb.from("services").select(fields).gte("scheduled_at",startDay).lt("scheduled_at",endDay).order("scheduled_at",{ascending:true});
   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
   services=q.data||[];
-  if(["employee","maintenance_technician"].includes(role())&&services.length===0){
-    const activeQ=await sb.from("services").select(fields)
-      .eq("assigned_employee_id",currentUser.id)
-      .in("status",["scheduled","on_the_way","in_progress","paused","supervision_pending"])
-      .order("scheduled_at",{ascending:true})
-      .limit(100);
-    if(!activeQ.error&&activeQ.data?.length){
-      services=activeQ.data;
-      window.__sjShowingActiveAssigned=true;
-    }else{
-      window.__sjShowingActiveAssigned=false;
-    }
-  }else{
-    window.__sjShowingActiveAssigned=false;
-  }
+  // A jornada/tempo real mostra exclusivamente os serviços agendados para o dia selecionado.
+  // Não recuperar serviços antigos só porque ainda estão ativos.
+  window.__sjShowingActiveAssigned=false;
   if(role()==="maintenance_technician")services=services.filter(s=>privateMaintenanceServiceType(s.service_type));
   const ids=[...new Set(services.map(s=>s.property_id).filter(Boolean))],cids=[...new Set(services.map(s=>s.client_id).filter(Boolean))],eids=[...new Set(services.map(s=>s.assigned_employee_id).filter(Boolean))];
   const [pr,cr,er]=await Promise.all([
