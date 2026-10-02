@@ -2171,29 +2171,27 @@ function renderMaintenanceBillingSummary(x){
  const rate=Number(p.hourly_rate||0);
  if(rate<=0)return '<div class="notice" style="margin-top:12px"><strong>💶 Cálculo del servicio</strong><br>La tarifa específica de mantenimiento todavía no está disponible.</div>';
  const fmtDate=d=>d?new Date(d).toLocaleString("es-ES",{timeZone:ROMANO_TIME_ZONE,day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
- const mins=Number(p.worked_minutes||0);
- const done=String(x.status)==="completed"||!!x.finished_at;
- if(!done)return '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>💶 Cálculo del servicio</h3><span class="pill">Tiempo real</span></div><div class="line-item"><span>Servicio específico</span><b>'+esc(p.catalog_service_name||"Mantenimiento")+'</b></div><div class="line-item"><span>Tarifa del catálogo</span><b>'+masterMoney(rate)+' / hora</b></div><div class="line-item"><span>Inicio</span><b>'+esc(fmtDate(x.started_at||p.started_at))+'</b></div><div class="notice">El importe definitivo se calculará automáticamente al finalizar, con el tiempo efectivo trabajado y la tarifa por hora de este servicio.</div></div>';
- const billable=Math.max(30,mins);
- const hours=billable/60;
+ const mins=Math.max(0,Number(p.worked_minutes||0));
+ const hours=mins/60;
  const net=Math.round(hours*rate*100)/100;
  const taxRate=Number(p.tax_rate||((x.tax_country||"ES")==="PT"?0.23:0.21));
  const taxIncluded=!!p.catalog_tax_included;
  const tax=taxIncluded?Math.round((net-net/(1+taxRate))*100)/100:Math.round(net*taxRate*100)/100;
  const total=taxIncluded?net:Math.round((net+tax)*100)/100;
- const minLabel=billable!==mins?" (mínimo facturable 30 min)":""; 
- return '<div class="panel" style="margin-top:12px;border:2px solid #ead7b5"><div class="panel-head"><div><h3>💶 Cálculo detallado del servicio</h3><div class="muted">Importe calculado según el servicio específico del catálogo y el tiempo efectivo trabajado.</div></div><span class="pill">FINAL</span></div>'+
+ const done=String(x.status)==="completed"||!!x.finished_at;
+ return '<div class="panel" style="margin-top:12px;border:2px solid #ead7b5"><div class="panel-head"><div><h3>💶 Cálculo real del servicio</h3><div class="muted">El importe se calcula exclusivamente con el tiempo real trabajado y la tarifa del servicio específico del catálogo.</div></div><span class="pill">'+(done?"FINAL":"EN CURSO")+'</span></div>'+
  '<div class="line-item"><span>Servicio específico</span><b>'+esc(p.catalog_service_name||"Mantenimiento")+'</b></div>'+
  '<div class="line-item"><span>Tarifa del catálogo</span><b>'+masterMoney(rate)+' / hora</b></div>'+
  '<div class="line-item"><span>Hora de inicio</span><b>'+esc(fmtDate(x.started_at||p.started_at))+'</b></div>'+
  '<div class="line-item"><span>Hora de finalización</span><b>'+esc(fmtDate(x.finished_at||p.finished_at))+'</b></div>'+
- '<div class="line-item"><span>Tiempo efectivo facturable</span><b>'+esc((billable/60).toFixed(2).replace(".",","))+' h · '+esc(String(Math.round(billable)))+' min'+esc(minLabel)+'</b></div>'+
- '<div class="notice" style="margin-top:10px"><strong>Fórmula:</strong> '+esc(String(Math.round(billable)))+' min ÷ 60 × '+masterMoney(rate)+' = <strong>'+masterMoney(net)+'</strong> '+(taxIncluded?"IVA incluido":"SIN IVA")+'</div>'+
+ '<div class="line-item"><span>Tiempo real trabajado</span><b>'+esc(String(Math.floor(mins/60)).padStart(2,"0"))+'h '+esc(String(Math.floor(mins%60)).padStart(2,"0"))+'min '+esc(String(Math.round((mins%1)*60)).padStart(2,"0"))+'s</b></div>'+
+ '<div class="notice" style="margin-top:10px"><strong>Fórmula real:</strong> '+esc(hours.toFixed(4))+' h × '+masterMoney(rate)+' = <strong>'+masterMoney(net)+'</strong> '+(taxIncluded?"IVA incluido":"SIN IVA")+'</div>'+
  '<div class="line-item"><span>Base del servicio</span><b>'+masterMoney(net)+'</b></div>'+
  '<div class="line-item"><span>IVA ('+esc(String(Math.round(taxRate*100)))+'%)</span><b>'+masterMoney(tax)+'</b></div>'+
  '<div class="line-item" style="font-size:18px;border-top:2px solid #ead7b5;padding-top:12px"><span><strong>TOTAL DEL SERVICIO</strong></span><b>'+masterMoney(total)+'</b></div>'+
- '<div class="muted" style="margin-top:8px">El tiempo se contabiliza automáticamente entre el inicio y la finalización, excluyendo pausas registradas. El cliente puede consultar este desglose.</div></div>';
+ '<div class="muted" style="margin-top:8px">Se factura el tiempo real trabajado. No se aplica un mínimo de 30 minutos. Las pausas registradas se excluyen del tiempo trabajado.</div></div>';
 }
+
 function renderServiceAudit(auditRows,actorNames){
  if(!auditRows.length)return '<div class="empty">Sin registros de auditoría.</div>';
  const rows=[...auditRows].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
