@@ -993,7 +993,7 @@ async function acceptAssignedService(serviceId){
 }
 async function openServiceAssignment(serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede designar.");return}
- const s=await sb.from("services").select("id,code,property_id,service_type,scheduled_at,status,assigned_employee_id").eq("id",serviceId).single();
+ const s=await sb.from("services").select("id,code,property_id,service_type,priority,scheduled_at,status,assigned_employee_id").eq("id",serviceId).single();
  if(s.error){toast(s.error.message);return}
  if(!["requested","scheduled"].includes(s.data.status)||s.data.assigned_employee_id){toast("El servicio debe estar programado y sin funcionario designado.");return}
  const [pr,er,lr]=await Promise.all([
@@ -1008,9 +1008,12 @@ async function openServiceAssignment(serviceId){
  const dist=(a,b,c,d)=>{if([a,b,c,d].some(v=>v==null)||prop?.latitude==null||prop?.longitude==null)return null;const R=6371,la1=rad(prop.latitude),la2=rad(c),dl=rad(c)-la1,dlo=rad(d)-rad(prop.longitude);const h=Math.sin(dl/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dlo/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
  const maintenanceService=privateMaintenanceServiceType(s.data.service_type);
  const employees=(er.data||[]).filter(e=>maintenanceService?e.role==="maintenance_technician":e.role==="employee").map(e=>({...e,location:latest[e.id]||null,distance:latest[e.id]?dist(prop?.latitude,prop?.longitude,latest[e.id].latitude,latest[e.id].longitude):null})).sort((a,b)=>(a.distance==null?1:b.distance==null?-1:a.distance-b.distance));
- openModal("Designar funcionario · "+esc(s.data.code),
-   '<div class="notice"><strong>Propiedad:</strong> '+esc(prop?.name||prop?.code||"—")+'<br><strong>Horario:</strong> '+esc(s.data.scheduled_at?romanoMadridLabel(s.data.scheduled_at):"—")+'</div>'+
-   '<div class="muted" style="margin:10px 0">Funcionarios activos · primeiro aparecem os que têm localização mais próxima. A designação no inicia el servicio: el funcionario ainda precisa aceitar.</div>'+
+ const isMaintenance=privateMaintenanceServiceType(s.data.service_type);
+ const dispatchRole=isMaintenance?"Técnicos de Mantenimiento":"Funcionarios de Limpieza";
+ const dispatchTitle=isMaintenance?(s.data.priority==="urgent"?"🚨 Designar Técnico · URGENCIA 24H · ":"🔧 Designar Técnico de Mantenimiento · "):"🧹 Designar Funcionario de Limpieza · ";
+ openModal(dispatchTitle+esc(s.data.code),
+   '<div class="notice"><strong>Tipo de servicio:</strong> '+(isMaintenance?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+(s.data.priority==="urgent"?' · <strong style="color:#b00020">🚨 URGENCIA</strong>':"")+'<br><strong>Propiedad:</strong> '+esc(prop?.name||prop?.code||"—")+'<br><strong>Horario:</strong> '+esc(s.data.scheduled_at?romanoMadridLabel(s.data.scheduled_at):"—")+'</div>'+
+   '<div class="muted" style="margin:10px 0"><strong>'+dispatchRole+' activos</strong> · primeiro aparecem os que têm localização mais próxima. La designación no inicia el servicio: el profesional aún debe aceptar.</div>'+
    '<div>'+(employees.length?employees.map(e=>'<div class="panel" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>'+esc(e.full_name||e.email||"Funcionario")+'</strong><div class="muted">'+(e.distance!=null?e.distance.toFixed(1)+" km da propriedade":"Localização GPS no disponible")+(e.location?.recorded_at?" · "+romanoMadridTimeLabel(e.location.recorded_at):"")+'</div></div><button class="btn gold" onclick="assignServiceEmployee(\''+s.data.id+'\',\''+e.id+'\')">Designar</button></div>').join(""):'<div class="empty">Nenhum funcionario ativo disponível.</div>')+'</div>');
 }
 async function assignServiceEmployee(serviceId,employeeId,force=false){
@@ -3230,7 +3233,9 @@ async function renderNotifications(){
    const isPendingService=["admin","supervisor"].includes(role())&&/servicio sin aceptar/.test(t);
    const action=(isMessage||isEmployeeAssignment||isPendingService||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
    const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ ACEPTAR SERVICIO":isPendingService?"✓ ACEPTAR Y DESIGNAR":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
-   return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
+   const urgent=String(x.severity||"").toLowerCase()==="critical"||/urgencia 24h|🚨/i.test(String(x.title||""));
+   const serviceKind=/mantenimiento/i.test(String(x.title||""))?"🔧 MANTENIMIENTO":/limpieza/i.test(String(x.title||""))?"🧹 LIMPIEZA":"";
+   return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"0")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(urgent?'border:2px solid #b00020;background:#fff4f3;box-shadow:0 6px 18px #b0002030;':'')+(x.read_at?"opacity:.68":(!urgent?"border-color:#c59643;box-shadow:0 4px 14px #b7893f18":""))+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:'+(urgent?'#b00020;color:#fff':'#fbe5e3;color:#a52b25')+'">'+(urgent?'🚨 URGENTE':'NUEVA')+'</span>':'')+'</div><div style="margin-top:5px;font-weight:800">'+serviceKind+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" '+(urgent?'style="background:#b00020;border-color:#b00020" ':'')+'onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
  }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';enableNotificationSwipe();
 }
 
