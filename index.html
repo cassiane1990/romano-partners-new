@@ -2150,28 +2150,37 @@ function renderServiceItemsPremium(items,hideFinance=false){
 function renderServiceAudit(auditRows,actorNames){
  if(!auditRows.length)return '<div class="empty">Sin registros de auditoría.</div>';
  const rows=[...auditRows].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
- const statusAt={};
- rows.forEach(a=>{const st=String(a.metadata?.status||"");if(st&&!statusAt[st])statusAt[st]=a});
  const fmt=d=>new Date(d).toLocaleString("es-ES",{timeZone:ROMANO_TIME_ZONE,day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"});
- const milestones=[
-  ["accepted","on_the_way","✓ Funcionario aceptó el servicio"],
-  ["started","in_progress","▶ Funcionario inició el servicio"],
-  ["supervision_pending","supervision_pending","🔎 Servicio enviado a supervisión"],
-  ["finished","completed","✓ Servicio finalizado"]
- ];
- const timeline=milestones.map(([key,status,label])=>{
-   const a=statusAt[status]; if(!a)return "";
-   return '<div class="line" style="border-left:3px solid #c59643;padding-left:12px"><span><strong>'+label+'</strong><br><small>Por: '+esc(actorNames[a.actor_id]||"Sistema")+'</small></span><span><strong>'+esc(fmt(a.created_at))+'</strong></span></div>';
- }).join("");
- const timelineHtml=timeline
-   ? '<div class="notice" style="margin-bottom:12px"><strong>⏱ Linha do tempo do serviço</strong><div style="margin-top:8px">'+timeline+'</div></div>'
-   : "";
+ const statusLabel=st=>({
+   requested:"📨 Solicitud creada",
+   scheduled:"📅 Servicio programado",
+   on_the_way:"🚗 Funcionario/Técnico aceptó · A camino",
+   in_progress:"▶ Servicio iniciado",
+   paused:"⏸ Servicio pausado",
+   supervision_pending:"🔎 Enviado para supervisión",
+   supervised:"✓ Supervisión realizada",
+   completed:"🏁 Servicio finalizado",
+   approved:"✓ Servicio aprobado",
+   cancelled:"✕ Servicio cancelado",
+   rejected:"✕ Servicio rechazado",
+   returned:"↩ Servicio devuelto"
+ })[st]||st;
+ const transitions=[];
+ rows.forEach(a=>{
+   const from=a.metadata?.from_status||a.metadata?.previous_status;
+   const to=a.metadata?.to_status||a.metadata?.status;
+   if(to&&to!==from)transitions.push({a,status:to});
+   else if(a.action==="service_created"||a.action==="insert_service")transitions.push({a,status:to||"scheduled"});
+ });
+ const timeline=transitions.map(({a,status})=>'<div class="line" style="border-left:3px solid #c59643;padding-left:12px"><span><strong>'+esc(statusLabel(status))+'</strong><br><small>Por: '+esc(actorNames[a.actor_id]||"Sistema")+'</small></span><span><strong>'+esc(fmt(a.created_at))+'</strong></span></div>').join("");
  const history=rows.map(a=>{
-  const label=a.action==="insert_service"?"Creado por":a.action==="update_service"?"Modificado por":a.action==="delete_service"?"Eliminado por":(a.action||"Acción");
-  return '<div class="line"><span><strong>'+esc(label)+': '+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.metadata?.status||"")+'</small></span><span>'+esc(fmt(a.created_at))+'</span></div>';
+   const label=a.action==="insert_service"?"Creado por":a.action==="update_service"?"Modificado por":a.action==="delete_service"?"Eliminado por":a.action==="service_created"?"Servicio creado":(a.action||"Acción");
+   const st=a.metadata?.to_status||a.metadata?.status||"";
+   return '<div class="line"><span><strong>'+esc(label)+': '+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(st)+'</small></span><span>'+esc(fmt(a.created_at))+'</span></div>';
  }).join("");
- return timelineHtml+'<div style="margin-top:8px"><strong>Historial completo</strong></div>'+history;
+ return '<div class="notice" style="margin-bottom:12px"><strong>⏱ Evolución del servicio</strong><div style="margin-top:8px">'+(timeline||'<div class="empty">Sin cambios de estado registrados.</div>')+'</div></div><div style="margin-top:8px"><strong>Historial completo</strong></div>'+history;
 }
+
 const ROMANO_CLEANING_CHECKLIST=[
  {key:"quarto",label:"Quarto"},{key:"sala",label:"Sala"},{key:"banheiro",label:"Baño"},{key:"cozinha",label:"Cocina"},
  {key:"lixeiros",label:"Lixeiros"},{key:"geladeira",label:"Geladeira / Nevera"},{key:"forno",label:"Forno"},
@@ -4536,7 +4545,7 @@ function maintenanceServiceCatalogChanged(){
  const prop=$("msProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
  const title=$("msTitle")?.value.trim();if(!title){toast("Indique el título del trabajo.");return}
  const date=new Date($("msDate")?.value||"");if(Number.isNaN(date.getTime())){toast("Seleccione una fecha y hora válidas.");return}
- const category=$("msCategory")?.value||"maintenance",catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",employeeId=role()==="maintenance_technician"?currentUser.id:($("msEmployee")?.value||null),code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor"].includes(role());
+ const category=$("msCategory")?.value||"maintenance",catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",employeeId=null,code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor"].includes(role());
  const propRow=(window.__mpProps||[]).find(x=>x.id===prop);const clientId=$("msClient")?.value||propRow?.client_id||null;
  if(!clientId){toast("El apartamento no está vinculado a un cliente.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",clientId).eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).single();if(own.error||!own.data){toast("Este apartamento no pertenece a su cuenta de cliente.");return}}
