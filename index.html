@@ -3164,66 +3164,33 @@ async function openChatFromNotification(title,body){
  return true;
 }
 async function notificationAction(id,title,body){
- const t=String(title||"").toLowerCase(),b=String(body||"");
- if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){
-   const opened=await openChatFromNotification(title,body);
-   if(opened){await markNotificationRead(id,false);return}
- }
- await markNotificationRead(id,false);
- if(["employee","maintenance_technician"].includes(role())&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
-   const m=b.match(/(?:SRV|MNT)-[A-Z0-9-]+/i);
-   if(m){
-    const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",m[0]).maybeSingle();
-    if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){
-      const a=await sb.rpc("employee_accept_service_assignment",{p_service_id:q.data.id});
-      if(a.error){toast("No se pudo aceptar: "+a.error.message);return}
-      toast("✓ Servicio aceptado. Estado: A camino.");
-      await renderServicesMaster();
-      return;
-    }
-   }
-   openPage("services");return;
- }
- if(!["admin","supervisor"].includes(role())){await renderNotifications();return}
- if(/novo serviço|novo pedido de serviço/.test(t)){
-   const m=b.match(/SRV-[A-Z0-9-]+/i);
-   if(m){
-    const q=await sb.from("services").select("id,status").eq("code",m[0]).maybeSingle();
-    if(q.data?.id&&["requested","scheduled"].includes(q.data.status)&&!q.data.accepted_at){await viewService(q.data.id);return}
-   }
-   openPage("services");return;
- }
- if(/adelanto|check-in/.test(t)){openPage("change_requests");return}
- if(/incidencia|emergencia/.test(t)){openPage("emergency");return}
- openPage("notifications");
-}
-async function notificationAction(id,title,body){
- const t=String(title||"").toLowerCase(),b=String(body||"");
+ const t=String(title||"").toLowerCase(),raw=String(body||"");
  await markNotificationRead(id,false);
  if(/servicio sin aceptar/.test(t)){
   if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede aceptar y designar.");return}
-  const codeMatch=b.match(/\\b(?:SRV|MNT)-[A-Z0-9-]+\\b/i);
-  const code=codeMatch?.[0]||null;
-  if(!code){toast("No se pudo identificar el servicio de esta notificación.");return}
-  const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",code).maybeSingle();
-  if(q.error||!q.data?.id){toast("No se pudo localizar el servicio "+code+".");return}
+  const code=(raw.match(/(?:SRV|MNT)-[0-9A-Z-]+/i)||[])[0]||null;
+  const uuid=(raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i)||[])[0]||null;
+  let q=null;
+  if(uuid)q=await sb.from("services").select("id,status,assigned_employee_id").eq("id",uuid).maybeSingle();
+  if((q?.error||!q?.data)&&code)q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",code).maybeSingle();
+  if(q?.error||!q?.data?.id){toast("No se pudo localizar el servicio de esta notificación.");return}
   if(q.data.assigned_employee_id){toast("Este servicio ya tiene un funcionario designado.");return}
   if(!["requested","scheduled"].includes(q.data.status)){toast("El servicio ya no está pendiente de designación.");return}
   await openServiceAssignment(q.data.id);
   return;
  }
  if(["employee","maintenance_technician"].includes(role())&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
-  const codeMatch=b.match(/\\b(?:SRV|MNT)-[A-Z0-9-]+\\b/i);
-  const code=codeMatch?.[0]||null;
-  if(code){
-   const q=await sb.from("services").select("id,assigned_employee_id").eq("code",code).maybeSingle();
-   if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){
-    const a=await sb.rpc("employee_accept_service_assignment",{p_service_id:q.data.id});
-    if(a.error){toast("No se pudo aceptar: "+a.error.message);return}
-    toast("✓ Servicio aceptado. Estado: A camino.");
-    await renderServicesMaster();
-    return;
-   }
+  const code=(raw.match(/(?:SRV|MNT)-[0-9A-Z-]+/i)||[])[0]||null;
+  const uuid=(raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i)||[])[0]||null;
+  let q=null;
+  if(uuid)q=await sb.from("services").select("id,assigned_employee_id").eq("id",uuid).maybeSingle();
+  if((q?.error||!q?.data)&&code)q=await sb.from("services").select("id,assigned_employee_id").eq("code",code).maybeSingle();
+  if(q?.data?.id&&q.data.assigned_employee_id===currentUser.id){
+   const a=await sb.rpc("employee_accept_service_assignment",{p_service_id:q.data.id});
+   if(a.error){toast("No se pudo aceptar: "+a.error.message);return}
+   toast("✓ Servicio aceptado. Estado: A camino.");
+   await renderServicesMaster();
+   return;
   }
   openPage("services");
   return;
