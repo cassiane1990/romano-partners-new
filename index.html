@@ -3624,7 +3624,7 @@ async function saveUnit(e,id=null){e.preventDefault();const data={property_id:$(
 async function editUnit(id){const q=demoMode?{data:(window.__DEMO_UNITS||[]).find(x=>x.id===id),error:null}:await sb.from("property_units").select("*").eq("id",id).single();if(q.error||!q.data){toast(q.error?.message||"Unidad no encontrada.");return}const x=q.data,props=demoMode?(DEMO_PROPERTIES||[]):((await sb.from("properties").select("id,name,code").order("name")).data||[]);openModal("Editar unidad / área",'<form onsubmit="saveUnit(event,\''+id+'\')"><div class="field"><label>Propiedad / apartamento</label><select id="uProperty" required>'+props.map(v=>'<option value="'+v.id+'" '+(v.id===x.property_id?"selected":"")+'>'+esc(v.name)+' · '+esc(v.code||"")+'</option>').join("")+'</select></div><div class="two"><div class="field"><label>Nombre del área</label><input id="uName" value="'+esc(x.name)+'" required></div><div class="field"><label>Tipo</label><select id="uType">'+["area","bedroom","bathroom","kitchen","living_room","terrace","office","other"].map(v=>'<option value="'+v+'" '+(v===x.unit_type?"selected":"")+'>'+v+'</option>').join("")+'</select></div></div><div class="two"><div class="field"><label>Planta</label><input id="uFloor" value="'+esc(x.floor||"")+'"></div><div class="field"><label>Estado</label><select id="uActive"><option value="true" '+(x.active?'selected':'')+'>Activa</option><option value="false" '+(!x.active?'selected':'')+'>Inactiva</option></select></div></div><div class="field"><label>Descripción</label><textarea id="uDescription">'+esc(x.description||"")+'</textarea></div><button class="primary">Guardar cambios</button></form>');}
 async function renderUnitsPremium(){return units()}
 async function teams(){
- const base=new Date();const ym=new URLSearchParams(location.hash.split("?")[1]||"").get("month")||base.toISOString().slice(0,7);
+ const base=new Date();const ym=new URLSearchParams(location.hash.split("?")[1]||"").get("month")||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid"}).format(base).slice(0,7);
  const [yy,mm]=ym.split("-").map(Number);const days=new Date(yy,mm,0).getDate();
  const empQ=demoMode?{data:DEMO_EMPLOYEES||[],error:null}:await sb.from("employee_profiles").select("id,employee_code,full_name,function_title,active,profile_id").eq("company_id",currentProfile.company_id).eq("active",true).order("full_name",{ascending:true});
  if(empQ.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(empQ.error.message)+'</div></div>';return}
@@ -3637,33 +3637,44 @@ async function teams(){
  }
  let schedules=[];
  if(demoMode){window.__DEMO_SCHEDULES=window.__DEMO_SCHEDULES||[];schedules=window.__DEMO_SCHEDULES.filter(x=>String(x.work_date||"").slice(0,7)===ym)}
- else{const q=await sb.from("employee_schedules").select("id,employee_profile_id,work_date,start_time,end_time,day_type,notes").eq("company_id",currentProfile.company_id).gte("work_date",ym+"-01").lte("work_date",ym+"-"+String(days).padStart(2,"0")).order("work_date",{ascending:true});if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}schedules=q.data||[]}
- const byKey=new Map(schedules.map(x=>[x.employee_profile_id+"|"+x.work_date,x]));
- let serviceRows=[];
- if(!demoMode){
-   const sq=await sb.from("services").select("id,assigned_employee_id,status,scheduled_at,started_at,finished_at").eq("company_id",currentProfile.company_id).gte("scheduled_at",ym+"-01T00:00:00").lt("scheduled_at",new Date(yy,mm,1).toISOString());
-   if(!sq.error)serviceRows=sq.data||[];
+ else{
+   const q=await sb.from("employee_schedules").select("id,employee_profile_id,work_date,start_time,end_time,day_type,notes").eq("company_id",currentProfile.company_id).gte("work_date",ym+"-01").lte("work_date",ym+"-"+String(days).padStart(2,"0")).order("work_date",{ascending:true});
+   if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}
+   schedules=q.data||[];
  }
- const madridNowParts=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]));return o})();
+ const byKey=new Map(schedules.map(x=>[x.employee_profile_id+"|"+x.work_date,x]));
+ let journalRows=[];
+ if(!demoMode){
+   const profileIds=employees.map(x=>x.profile_id).filter(Boolean);
+   if(profileIds.length){
+     const jq=await sb.from("work_journal_entries").select("id,profile_id,work_date,check_in_at,check_out_at,status").eq("company_id",currentProfile.company_id).gte("work_date",ym+"-01").lte("work_date",ym+"-"+String(days).padStart(2,"0")).in("profile_id",profileIds).order("work_date",{ascending:false});
+     if(!jq.error)journalRows=jq.data||[];
+   }
+ }
+ const journalByKey=new Map();
+ journalRows.forEach(x=>{const k=x.profile_id+"|"+x.work_date;if(!journalByKey.has(k)||(!journalByKey.get(k).check_in_at&&x.check_in_at))journalByKey.set(k,x)});
+ const madridNowParts=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());return Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]);})();
  const todayKey=String(madridNowParts.year).padStart(4,"0")+"-"+String(madridNowParts.month).padStart(2,"0")+"-"+String(madridNowParts.day).padStart(2,"0");
  const nowMinutes=madridNowParts.hour*60+madridNowParts.minute;
  const statusFor=(x,employee,date)=>{
-   const type=x?.day_type||"work";
+   const type=x?.day_type||"work",journal=journalByKey.get(employee.profile_id+"|"+date);
    if(type==="off")return {cls:"off",label:"Folga"};
    if(type==="holiday")return {cls:"holiday",label:"Férias"};
    if(type==="sick")return {cls:"absent",label:"Ausente"};
-   if(type==="work"){
-     if(date===todayKey&&x?.start_time){
-       const parts=String(x.start_time).slice(0,5).split(":").map(Number),startMinutes=(parts[0]||0)*60+(parts[1]||0);
-       const started=serviceRows.some(s=>s.assigned_employee_id===employee.profile_id&&String(s.scheduled_at||"").slice(0,10)===date&&["on_the_way","in_progress","paused","supervised","completed","approved"].includes(s.status)&&(s.started_at||s.finished_at));
-       if(nowMinutes>startMinutes+10&&!started)return {cls:"late",label:"Atrasado"};
+   if(journal?.check_in_at)return {cls:"work",label:journal.check_out_at?"Cerrada":"Trabajando"};
+   if(type==="work"&&x?.start_time){
+     const parts=String(x.start_time).slice(0,5).split(":").map(Number),startMinutes=(parts[0]||0)*60+(parts[1]||0);
+     if(date<todayKey)return {cls:"absent",label:"Falta"};
+     if(date===todayKey){
+       if(nowMinutes>=startMinutes+60)return {cls:"absent",label:"Falta"};
+       if(nowMinutes>=startMinutes+10)return {cls:"late",label:"Atrasado"};
      }
      return {cls:"work",label:"Trabajando"};
    }
    return {cls:"off",label:type};
  };
- let h='<div class="panel"><div class="panel-head"><div><h3>Equipos · Plan mensual</h3><div class="muted">Planifique la jornada de cada funcionario por día. Los cambios quedan registrados en la agenda.</div></div><div class="actions"><button class="btn" onclick="teamsMonth(-1)">‹ Mes anterior</button><b class="pill">'+new Date(yy,mm-1,1).toLocaleDateString("es-ES",{month:"long",year:"numeric"})+'</b><button class="btn" onclick="teamsMonth(1)">Mes siguiente ›</button></div></div>';
- h+='<div class="actions" style="margin-bottom:10px"><button class="btn gold" onclick="newTeamSchedule()">＋ Planificar día</button><span class="pill">'+employees.length+' funcionarios · '+schedules.length+' jornadas registradas</span></div>';
+ let h='<div class="panel"><div class="panel-head"><div><h3>Equipos · Plan mensual</h3><div class="muted">Planifique la jornada de cada funcionario por día. El estado se cruza automáticamente con el registro real de Entrada / Salida.</div></div><div class="actions"><button class="btn" onclick="teamsMonth(-1)">‹ Mes anterior</button><b class="pill">'+new Date(yy,mm-1,1).toLocaleDateString("es-ES",{month:"long",year:"numeric"})+'</b><button class="btn" onclick="teamsMonth(1)">Mes siguiente ›</button></div></div>';
+ h+='<div class="actions" style="margin-bottom:10px"><button class="btn gold" onclick="newTeamSchedule()">＋ Planificar día</button><button class="btn" onclick="openPage(\'journey\')">◷ Ver jornada / histórico</button><span class="pill">'+employees.length+' funcionarios · '+schedules.length+' jornadas planificadas</span></div>';
  h+='<div class="rpc-calendar-legend" style="margin:0 0 12px"><span style="border-left:4px solid #7d7d7d">● Folga</span><span style="border-left:4px solid #3f8b57">● Trabalhando</span><span style="border-left:4px solid #d59b22">● Atrasado</span><span style="border-left:4px solid #c84b43">● Ausente</span></div>';
  if(!employees.length)h+='<div class="empty">No hay funcionarios activos con cuenta para planificar.</div>';
  else h+='<div class="rpc-month-calendar"><div class="rpc-weekdays">'+["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>'<div>'+d+'</div>').join("")+'</div><div class="rpc-month-grid">'+Array.from({length:(new Date(yy,mm-1,1).getDay()+6)%7},()=>'<div class="rpc-empty-day"></div>').join("")+Array.from({length:days},(_,i)=>{const date=ym+"-"+String(i+1).padStart(2,"0");const dayItems=employees.map(e=>{const x=byKey.get(e.id+"|"+date);if(!x)return '<button class="rpc-person-day unset" onclick="newTeamSchedule(\''+e.id+'\',\''+date+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>＋ Planificar</span></button>';const st=statusFor(x,e,date);const hours=x.day_type==="work"&&x.start_time?((x.start_time||"").slice(0,5)+"–"+(x.end_time||"").slice(0,5)):"";return '<button class="rpc-person-day '+st.cls+'" onclick="editTeamSchedule(\''+x.id+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>'+esc(st.label)+(hours?" · "+esc(hours):"")+'</span></button>'}).join("");return '<div class="rpc-month-day"><div class="rpc-date">'+String(i+1).padStart(2,"0")+'</div>'+dayItems+'</div>'}).join("")+'</div></div>';
