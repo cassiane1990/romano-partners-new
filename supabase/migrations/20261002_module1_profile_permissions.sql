@@ -156,3 +156,23 @@ $function$;
 revoke execute on function public.create_maintenance_service(jsonb) from anon;
 revoke execute on function public.create_maintenance_service(jsonb) from public;
 grant execute on function public.create_maintenance_service(jsonb) to authenticated;
+
+
+drop policy if exists catalog_select on public.service_catalog;
+create policy catalog_select on public.service_catalog
+for select to authenticated
+using (
+  company_id = private.current_company_id()
+  and private.current_role() in ('admin','client')
+);
+
+create or replace view public.service_catalog_operational
+with (security_barrier=true)
+as
+select id,company_id,category,code,name,description,unit,active
+from public.service_catalog
+where company_id = private.current_company_id()
+  and private.current_role() in ('admin','supervisor','maintenance_technician','client');
+
+revoke all on public.service_catalog_operational from anon;
+grant select on public.service_catalog_operational to authenticated;
