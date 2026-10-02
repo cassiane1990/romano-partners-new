@@ -3653,7 +3653,7 @@ async function teams(){
  }
  const journalByKey=new Map();
  journalRows.forEach(x=>{const k=x.profile_id+"|"+x.work_date;if(!journalByKey.has(k)||(!journalByKey.get(k).check_in_at&&x.check_in_at))journalByKey.set(k,x)});
- const madridNowParts=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());return Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]);})();
+ const madridNowParts=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());return Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]));})();
  const todayKey=String(madridNowParts.year).padStart(4,"0")+"-"+String(madridNowParts.month).padStart(2,"0")+"-"+String(madridNowParts.day).padStart(2,"0");
  const nowMinutes=madridNowParts.hour*60+madridNowParts.minute;
  const statusFor=(x,employee,date)=>{
