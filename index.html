@@ -1549,7 +1549,7 @@ async function getPremiumDashboardData(){
  let pq=sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").order("created_at",{ascending:false}).limit(12);
  if(r==="employee"||r==="maintenance_technician")sq=sq.eq("assigned_employee_id",currentUser.id);
  if(r==="maintenance_technician")pq=pq.in("id",[]);
- const [sr,pr,nr]=await Promise.all([sq,pq,sb.from("notifications").select("id").eq("recipient_id",currentUser.id).is("read_at",null).limit(100)]);
+ const [sr,pr,nr]=await Promise.all([sq,pq,sb.from("notifications").select("id").eq("recipient_id",currentUser.id).is("read_at",null)]);
  let services=sr.data||[],properties=pr.data||[];
  if(r==="maintenance_technician"){services=services.filter(s=>privateMaintenanceServiceType(s.service_type));const pids=[...new Set(services.map(s=>s.property_id).filter(Boolean))];if(pids.length){const pp=await sb.from("properties").select("id,name,code,photo_url,city,address,property_type,client_id").in("id",pids);properties=pp.data||[]}}
  return {name:currentProfile?.full_name||currentUser?.email||"Usurio",avatar:currentProfile?.avatar_display_url||"",role:r,services,properties,unread:(nr.data||[]).length};
@@ -3322,7 +3322,7 @@ function enableNotificationSwipe(){
  });
 }
 async function renderNotifications(){
- const r=await sb.from("notifications").select("id,title,body,severity,read_at,created_at").eq("recipient_id",currentUser.id).order("created_at",{ascending:false}).limit(50);
+ const r=await sb.from("notifications").select("id,title,body,severity,read_at,created_at").eq("recipient_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=r.data||[],unread=rows.filter(x=>!x.read_at).length,readCount=rows.filter(x=>!!x.read_at).length;
  rows.forEach(x=>{if(x.title&&/novo serviço/i.test(x.title))x.title=String(x.title).replace(/\s*[·•-]?\s*5 minutos para aceitar/ig,"");if(x.body)x.body=String(x.body).replace(/\s*·?\s*resposta antes de\s*\d{1,2}:\d{2}/ig,"");});
