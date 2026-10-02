@@ -1303,6 +1303,7 @@ async function renderServiceJourneyBoard(){
 }
 async function renderJourneyMaster(){
  const isManagement=["admin","supervisor"].includes(role());
+ const isSupervisor=role()==="supervisor";
  const madridNow=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());return Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,x.value]))})();
  const todayKey=String(madridNow.year).padStart(4,"0")+"-"+String(madridNow.month).padStart(2,"0")+"-"+String(madridNow.day).padStart(2,"0");
 
@@ -1318,6 +1319,19 @@ async function renderJourneyMaster(){
    return;
  }
 
+ let supervisorJourneyHtml="";
+ if(isSupervisor){
+  let sj={data:[],error:null};
+  if(demoMode)sj={data:[{work_date:todayKey,check_in_at:null,check_out_at:null,status:"open"}],error:null};
+  else sj=await sb.from("work_journal_entries").select("id,work_date,check_in_at,check_out_at,status,notes").eq("profile_id",currentUser.id).order("work_date",{ascending:false}).limit(100);
+  if(sj.error)supervisorJourneyHtml='<div class="panel"><div class="msg">'+esc(sj.error.message||"No se pudo cargar mi jornada.")+'</div></div>';
+  else{
+   const open=sj.data?.find(x=>x.status==="open");
+   supervisorJourneyHtml='<div class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3>Mi Jornada</h3><div class="muted">Entrada, salida y horas registradas del Supervisor.</div></div><div class="actions"><button class="btn dark" '+(open?'disabled style="opacity:.55;cursor:not-allowed"':'onclick="masterClockIn()"')+'>◉ Entrada</button><button class="btn gold" '+(!open?'disabled style="opacity:.55;cursor:not-allowed"':'onclick="masterClockOut()"')+'>◉ Salida</button></div></div><div class="notice">'+(open?'Jornada abierta desde '+esc(romanoMadridLabel(open.check_in_at))+'.':'Registre Entrada al comenzar y Salida al terminar.')+'</div><table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th></tr></thead><tbody>'+
+   (sj.data?.length?sj.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?romanoMadridTimeLabel(x.check_in_at):"—")+'</td><td>'+esc(x.check_out_at?romanoMadridTimeLabel(x.check_out_at):"—")+'</td><td>'+esc(journeyHoursLabel(x.check_in_at,x.check_out_at))+'</td><td>'+esc(x.status==="open"?"En jornada":"Cerrada")+'</td></tr>').join(""):'<tr><td colspan="5"><div class="empty">Sin registros.</div></td></tr>')+
+   '</tbody></table></div>';
+  }
+ }
  const employeeFilter=window.__journeyAdminEmployee||"";
  const nameFilter=window.__journeyAdminName||"";
 
@@ -1325,7 +1339,7 @@ async function renderJourneyMaster(){
    const employees=DEMO_EMPLOYEES||[];
    const schedules=(window.__DEMO_SCHEDULES||[]).filter(x=>String(x.work_date||"").slice(0,10)===todayKey).map(x=>({...x,profile_id:x.employee_profile_id}));
    const journals=[];
-   $("content").innerHTML=renderAdminJourneyHtml(employees,schedules,journals,todayKey,employeeFilter,nameFilter);
+   $("content").innerHTML=supervisorJourneyHtml+renderAdminJourneyHtml(employees,schedules,journals,todayKey,employeeFilter,nameFilter);
    if(window.__journeyAdminTimer)clearInterval(window.__journeyAdminTimer);
    window.__journeyAdminTimer=setInterval(()=>{if(location.hash.startsWith("#journey"))renderJourneyMaster();else{clearInterval(window.__journeyAdminTimer);window.__journeyAdminTimer=null}},60000);
    return;
@@ -1350,7 +1364,7 @@ async function renderJourneyMaster(){
    profileIds.length?sb.from("work_journal_entries").select("id,work_date,check_in_at,check_out_at,status,profile_id,notes").eq("company_id",currentProfile.company_id).eq("work_date",todayKey).in("profile_id",profileIds).order("created_at",{ascending:false}):Promise.resolve({data:[],error:null})
  ]);
  if(sq.error||wq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(sq.error?.message||wq.error?.message||"No se pudo cargar la jornada.")+'</div></div>';return}
- $("content").innerHTML=renderAdminJourneyHtml(employees,sq.data||[],wq.data||[],todayKey,employeeFilter,nameFilter);
+ $("content").innerHTML=supervisorJourneyHtml+renderAdminJourneyHtml(employees,sq.data||[],wq.data||[],todayKey,employeeFilter,nameFilter);
  if(window.__journeyAdminTimer)clearInterval(window.__journeyAdminTimer);
  window.__journeyAdminTimer=setInterval(()=>{if(location.hash.startsWith("#journey"))renderJourneyMaster();else{clearInterval(window.__journeyAdminTimer);window.__journeyAdminTimer=null}},60000);
 }
