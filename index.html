@@ -815,13 +815,13 @@ const MASTER_PRICES={
 };
 function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}function serviceUrgencyBadge(x){
  const isMaint=privateMaintenanceServiceType(x?.service_type);
- const is24=isMaint && String(x?.pricing?.rate_key||"") === "emergency";
+ const is24=isMaint && x?.priority==="urgent";
  const isUrgentCleaning=!isMaint && x?.priority==="urgent";
  if(!is24&&!isUrgentCleaning)return "";
- const label=is24?"URGENCIA 24H":"LIMPIEZA URGENTE";
+ const label=is24?"PRIORIDAD MÁXIMA · URGENCIA 24H":"PRIORIDAD · LIMPIEZA URGENTE";
  return '<span class="romano-urgent-badge" style="display:inline-flex;align-items:center;gap:5px;margin-left:6px;padding:4px 8px;border-radius:999px;background:#b00020;color:#fff;font-weight:800;font-size:11px;animation:romanoUrgentBlink 1s steps(2,end) infinite">🚨 '+label+'</span>';
 }
-if(!document.getElementById("romanoUrgentStyle")){const st=document.createElement("style");st.id="romanoUrgentStyle";st.textContent="@keyframes romanoUrgentBlink{50%{opacity:.35;transform:scale(.98)}}";document.head.appendChild(st);}
+if(!document.getElementById("romanoUrgentStyle")){const st=document.createElement("style");st.id="romanoUrgentStyle";st.textContent="@keyframes romanoUrgentBlink{50%{opacity:.35;transform:scale(.98)}} .service-card.romano-priority-24h{border:2px solid #b00020!important;box-shadow:0 0 0 3px rgba(176,0,32,.10),0 12px 30px rgba(176,0,32,.12)} .service-card.romano-priority-24h .service-card-head{background:linear-gradient(90deg,rgba(176,0,32,.11),transparent)} .sj-card.romano-priority-24h{border:2px solid #b00020!important;box-shadow:0 0 0 3px rgba(176,0,32,.10),0 12px 30px rgba(176,0,32,.12)} .sj-card.romano-priority-24h .sj-time{color:#b00020} .romano-priority-label{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:7px 10px;border-radius:9px;background:#b00020;color:#fff;font-weight:900;font-size:11px;letter-spacing:.2px}";document.head.appendChild(st);}
 
 const SERVICE_CLEANING_CATALOG={
  airbnb:{label:"Limpieza Airbnb / Alojamiento Local",basis:"tipologia",tax:false,options:[{code:"T1-1B",name:"T1 · 1 baño",price:30},{code:"T2-1B",name:"T2 · 1 baño",price:40},{code:"T2-2B",name:"T2 · 2 baños",price:55},{code:"T3-2B",name:"T3 · 2 baños",price:65},{code:"T3-3B",name:"T3 · 3 baños",price:80},{code:"T4-2B",name:"T4 · 2 baños",price:85},{code:"T4-3B",name:"T4 · 3 baños",price:95},{code:"T4-4B",name:"T4 · 4 baños",price:110},{code:"T5",name:"T5 · según propiedad",price:null}]},
@@ -1010,7 +1010,7 @@ async function renderServicesMaster(){
    $("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';
    return;
  }
- const rows=r.data||[];
+ const rows=r.data||[];rows.sort((a,b)=>{const au=a?.priority==="urgent"?0:1,bu=b?.priority==="urgent"?0:1;if(au!==bu)return au-bu;return new Date(a?.scheduled_at||a?.created_at||0)-new Date(b?.scheduled_at||b?.created_at||0);});
  let propertiesMap={},clientsMap={};
  if(rows.length&&!demoMode){
    const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
@@ -1043,7 +1043,7 @@ async function renderServicesMaster(){
       role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':'');
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
-   return '<article class="service-card">'+
+   return '<article class="service-card '+(privateMaintenanceServiceType(x.service_type)&&x.priority==='urgent'?'romano-priority-24h':'')+'">'+
      '<div class="service-card-head"><div><span class="service-code">'+esc(x.code)+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status)+'">'+esc(statusNames[x.status]||x.status)+'</span></div>'+
      serviceContext+
      '<div class="service-card-meta">'+
@@ -1225,6 +1225,7 @@ async function renderServiceJourneyBoard(){
  const isMaint=s=>privateMaintenanceServiceType(s.service_type);
  const cleaning=services.filter(s=>!isMaint(s)).length,maintenance=services.length-cleaning;
  const active=services.filter(s=>["on_the_way","in_progress","paused","supervision_pending"].includes(s.status)).length;
+ services.sort((a,b)=>{const au=a?.priority==='urgent'?0:1,bu=b?.priority==='urgent'?0:1;if(au!==bu)return au-bu;return new Date(a?.scheduled_at||0)-new Date(b?.scheduled_at||0);});
  const cards=services.map(s=>{
   const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{},own=["employee","maintenance_technician"].includes(role())&&s.assigned_employee_id===currentUser.id;
   const action=journeyActionsForService(s),terminal=["supervision_pending","supervised","completed","approved","cancelled","rejected","returned"].includes(s.status);
@@ -1238,7 +1239,7 @@ async function renderServiceJourneyBoard(){
   const currentIndex=s.status==="paused"?3:s.status==="supervision_pending"?4:s.status==="completed"||s.status==="approved"?5:["scheduled","on_the_way","in_progress"].indexOf(s.status);
   const stageHtml=renderServiceStatusAvatarSequence(s);
   const sid=JSON.stringify(s.id);
-  return '<article class="sj-card '+(own?"sj-own":"")+'" onclick="viewService('+sid+')"><div class="sj-photo">'+(p.photo_url?'<img src="'+esc(photos[p.id]||"")+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type '+(isMaint(s)?"maint":"clean")+'">'+(isMaint(s)?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</span>'+serviceUrgencyBadge(s)+'<div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(serviceTypeLabel(s.service_type))+'</p><span class="sj-priority">'+esc(servicePriorityLabel(s.priority))+'</span></div><div class="sj-status"><div class="sj-current"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><small>'+esc(stageText)+'</small></div>'+stageHtml+'<button class="sj-btn" onclick="event.stopPropagation();viewService('+sid+')">Ver ficha</button>'+(action?'<div class="sj-quick">'+action+'</div>':"")+'</div></article>';
+  return '<article class="sj-card '+(own?"sj-own":"")+'" onclick="viewService('+sid+')"><div class="sj-photo">'+(p.photo_url?'<img src="'+esc(photos[p.id]||"")+'" alt="'+esc(p.name||"Propiedad")+'">':"⌂")+'</div><div class="sj-main"><h3>'+esc(p.name||"Apartamento")+'</h3><p>'+esc(p.code||"Sin código")+' · '+esc(s.typology||"—")+'</p><span class="sj-type '+(isMaint(s)?"maint":"clean")+'">'+(isMaint(s)?"🔧 MANTENIMIENTO":"🧹 LIMPIEZA")+'</span>'+serviceUrgencyBadge(s)+'<div class="sj-employee">👤 '+esc(emp.full_name||emp.employee_code||"Sin funcionario asignado")+'</div><div class="sj-client">Cliente: '+esc(cl.name||"—")+'</div></div><div class="sj-location"><div class="sj-time">'+(s.scheduled_at?romanoMadridTimeLabel(s.scheduled_at):"Sin hora")+'</div><p>⌖ '+esc([p.address,p.city,p.country].filter(Boolean).join(", ")||"Dirección no registrada")+'</p><p>'+esc(serviceTypeLabel(s.service_type))+'</p><span class="sj-priority">'+esc(servicePriorityLabel(s.priority))+'</span>'+(isMaint(s)&&s.priority==="urgent"?'<div class="romano-priority-label">🚨 PRIORIDADE MÁXIMA · FAZER PRIMEIRO</div>':"")</div><div class="sj-status"><div class="sj-current"><span class="sj-dot"></span><b>'+statusIcon[s.status]+" "+esc(labels[s.status]||s.status||"Pendiente")+'</b><small>'+esc(stageText)+'</small></div>'+stageHtml+'<button class="sj-btn" onclick="event.stopPropagation();viewService('+sid+')">Ver ficha</button>'+(action?'<div class="sj-quick">'+action+'</div>':"")+'</div></article>';
  }).join("");
  const sjHint=window.__sjShowingActiveAssigned?'Mostrando también servicios activos que siguen asignados a ti, aunque su fecha programada ya haya pasado.': 'Una sola acción siguiente por servicio. Los estados verificados/finalizados quedan bloqueados.';
  $("content").innerHTML='<div class="sj-board"><div class="sj-head"><div><div class="sj-kicker">ROMANO PROPERTY CARE · OPERACIÓN</div><h2>Jornada de servicios</h2><p>'+esc(sjHint)+'</p></div><div class="sj-date"><label>Seleccionar día</label><input id="sjDay" type="date" value="'+day+'"></div></div><div class="sj-summary"><div class="sj-stat"><small>Servicios del día</small><strong>'+services.length+'</strong></div><div class="sj-stat"><small>En operación</small><strong>'+active+'</strong></div><div class="sj-stat"><small>🧹 Limpiezas</small><strong>'+cleaning+'</strong></div><div class="sj-stat"><small>🔧 Mantenimiento</small><strong>'+maintenance+'</strong></div><div class="sj-stat"><small>Finalizados / cerrados</small><strong>'+services.filter(s=>["completed","approved","supervised"].includes(s.status)).length+'</strong></div></div><div class="sj-legend"><span>🚗 A camino</span><span>▶ Iniciado</span><span>Ⅱ Pausado</span><span class="sj-legend-cleaning">🔎 Esperando supervisión (limpieza)</span><span>✓ Finalizado</span></div><div class="sj-list">'+(cards||'<div class="sj-empty">No hay servicios programados para este día.</div>')+'</div></div>';
