@@ -1302,44 +1302,112 @@ async function renderServiceJourneyBoard(){
  $("sjDay").onchange=()=>{window.__sjDay=$("sjDay").value;renderServiceJourneyBoard()};
 }
 async function renderJourneyMaster(){
- let journal={data:[],error:null};
- if(demoMode){
-   journal={data:[{work_date:"2026-09-23",check_in_at:"2026-09-23T07:55:00+02:00",check_out_at:null,status:"open",profile_id:"demo-e1"}],error:null};
- }else{
-   journal=await sb.from("work_journal_entries")
-     .select("work_date,check_in_at,check_out_at,status,profile_id")
-     .eq("profile_id",currentUser.id)
-     .order("work_date",{ascending:false})
-     .limit(100);
- }
- if(journal.error){
-   $("content").innerHTML='<div class="panel"><div class="msg">'+esc(journal.error.message||"No se pudo cargar la jornada.")+'</div></div>';
+ const isManagement=["admin","supervisor"].includes(role());
+ const madridNow=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());return Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,x.value]))})();
+ const todayKey=String(madridNow.year).padStart(4,"0")+"-"+String(madridNow.month).padStart(2,"0")+"-"+String(madridNow.day).padStart(2,"0");
+ const currentMonth=todayKey.slice(0,7);
+
+ if(!isManagement){
+   let journal={data:[],error:null};
+   if(demoMode)journal={data:[{work_date:todayKey,check_in_at:null,check_out_at:null,status:"open",profile_id:"demo-e1"}],error:null};
+   else journal=await sb.from("work_journal_entries").select("id,work_date,check_in_at,check_out_at,status,profile_id,notes").eq("profile_id",currentUser.id).order("work_date",{ascending:false}).limit(100);
+   if(journal.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(journal.error.message||"No se pudo cargar la jornada.")+'</div></div>';return}
+   const open=journal.data?.find(x=>x.status==="open");
+   $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Mi Jornada</h3><div class="muted">Entrada, salida y horas registradas. El historial queda guardado para consulta posterior.</div></div><div class="actions"><button class="btn dark" '+(open?'disabled style="opacity:.55;cursor:not-allowed"':'onclick="masterClockIn()"')+'>◉ Entrada</button><button class="btn gold" '+(!open?'disabled style="opacity:.55;cursor:not-allowed"':'onclick="masterClockOut()"')+'>◉ Salida</button></div></div><div class="notice">'+(open?'Jornada abierta desde '+esc(romanoMadridLabel(open.check_in_at))+'.':'Registre Entrada al comenzar y Salida al terminar.')+'</div><table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th></tr></thead><tbody>'+
+     (journal.data?.length?journal.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?romanoMadridTimeLabel(x.check_in_at):"—")+'</td><td>'+esc(x.check_out_at?romanoMadridTimeLabel(x.check_out_at):"—")+'</td><td>'+esc(journeyHoursLabel(x.check_in_at,x.check_out_at))+'</td><td>'+esc(x.status==="open"?"En jornada":"Cerrada")+'</td></tr>').join(""):'<tr><td colspan="5"><div class="empty">Sin registros.</div></td></tr>')+
+     '</tbody></table></div>';
    return;
  }
- const open=journal.data?.find(x=>x.status==="open");
- $("content").innerHTML=
-   '<div class="panel">'+
-     '<div class="panel-head">'+
-       '<div><h3>Mi Jornada</h3><div class="muted">Registro de entrada y salida del trabajo.</div></div>'+
-       '<div class="actions">'+
-         '<button class="btn dark" '+(open?'disabled style="opacity:.55;cursor:not-allowed"': 'onclick="masterClockIn()"')+'>◉ Entrada</button>'+
-         '<button class="btn gold" '+(!open?'disabled style="opacity:.55;cursor:not-allowed"': 'onclick="masterClockOut()"')+'>◉ Salida</button>'+
-       '</div>'+
-     '</div>'+
-     '<div class="notice">'+(open?'Jornada abierta desde '+esc(romanoMadridLabel(open.check_in_at))+'. La Jornada de servicios se utiliza para aceptar, iniciar, pausar y finalizar cada servicio.':'Use Entrada para registrar el inicio de su jornada y Salida para registrarla como cerrada. Los servicios se gestionan exclusivamente en Jornada de servicios.')+'</div>'+
-     '<table class="table" style="margin-top:14px"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody>'+
-       (journal.data?.length
-         ?journal.data.map(x=>'<tr><td>'+esc(x.work_date)+'</td><td>'+esc(x.check_in_at?new Date(x.check_in_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.check_out_at?new Date(x.check_out_at).toLocaleString("es-ES"):"—")+'</td><td>'+esc(x.status)+'</td></tr>').join("")
-         :'<tr><td colspan="4"><div class="empty">Sin registros.</div></td></tr>')+
-     '</tbody></table>'+
-   '</div>';
+
+ const month=window.__journeyAdminMonth||currentMonth;
+ const employeeFilter=window.__journeyAdminEmployee||"";
+ const nameFilter=window.__journeyAdminName||"";
+ const [yy,mm]=month.split("-").map(Number);
+ const lastDay=new Date(Date.UTC(yy,mm,0)).getUTCDate();
+ const startDate=month+"-01",endDate=month+"-"+String(lastDay).padStart(2,"0");
+
+ if(demoMode){
+   const employees=DEMO_EMPLOYEES||[];
+   const rows=(window.__DEMO_SCHEDULES||[]).filter(x=>String(x.work_date||"").slice(0,7)===month).map(x=>({...x,profile_id:x.employee_profile_id}));
+   const filtered=rows.filter(x=>!employeeFilter||x.employee_profile_id===employeeFilter);
+   $("content").innerHTML=renderAdminJourneyHtml(employees,filtered,[],month,employeeFilter,nameFilter);
+   return;
+ }
+
+ const ep=await sb.from("employee_profiles").select("id,profile_id,employee_code,full_name,function_title,active").eq("company_id",currentProfile.company_id).eq("active",true).order("full_name",{ascending:true});
+ if(ep.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(ep.error.message)+'</div></div>';return}
+ const pids=(ep.data||[]).map(x=>x.profile_id).filter(Boolean);
+ let employees=ep.data||[];
+ if(pids.length){
+   const pr=await sb.from("profiles").select("id,role,active").in("id",pids).eq("active",true);
+   const roleMap=new Map((pr.data||[]).map(x=>[x.id,x.role]));
+   employees=employees.filter(x=>["employee","maintenance_technician"].includes(roleMap.get(x.profile_id)));
+ }
+ if(employeeFilter)employees=employees.filter(x=>x.profile_id===employeeFilter||x.id===employeeFilter);
+ if(nameFilter)employees=employees.filter(x=>String(x.full_name||"").toLowerCase().includes(nameFilter.toLowerCase())||String(x.employee_code||"").toLowerCase().includes(nameFilter.toLowerCase()));
+
+ const employeeIds=employees.map(x=>x.id);
+ const profileIds=employees.map(x=>x.profile_id).filter(Boolean);
+ const [sq,wq]=await Promise.all([
+   employeeIds.length?sb.from("employee_schedules").select("id,employee_profile_id,work_date,start_time,end_time,day_type,notes").eq("company_id",currentProfile.company_id).gte("work_date",startDate).lte("work_date",endDate).in("employee_profile_id",employeeIds).order("work_date",{ascending:false}):Promise.resolve({data:[],error:null}),
+   profileIds.length?sb.from("work_journal_entries").select("id,work_date,check_in_at,check_out_at,status,profile_id,notes").eq("company_id",currentProfile.company_id).gte("work_date",startDate).lte("work_date",endDate).in("profile_id",profileIds).order("work_date",{ascending:false}):Promise.resolve({data:[],error:null})
+ ]);
+ if(sq.error||wq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(sq.error?.message||wq.error?.message||"No se pudo cargar la jornada.")+'</div></div>';return}
+ $("content").innerHTML=renderAdminJourneyHtml(employees,sq.data||[],wq.data||[],month,employeeFilter,nameFilter);
+ if(window.__journeyAdminTimer)clearInterval(window.__journeyAdminTimer);
+ window.__journeyAdminTimer=setInterval(()=>{if(location.hash.startsWith("#journey"))renderJourneyMaster();else{clearInterval(window.__journeyAdminTimer);window.__journeyAdminTimer=null}},60000);
+}
+
+function journeyHoursLabel(checkIn,checkOut){
+ if(!checkIn)return "—";
+ const a=new Date(checkIn),b=checkOut?new Date(checkOut):new Date();
+ const mins=Math.max(0,Math.round((b-a)/60000));
+ return Math.floor(mins/60)+"h "+String(mins%60).padStart(2,"0")+"m";
+}
+function journeyMadridDateTime(date,time){
+ if(!date||!time)return null;
+ return new Date(date+"T"+String(time).slice(0,5)+":00+02:00");
+}
+function journeyRowStatus(schedule,journal,date,todayKey){
+ if(schedule?.day_type==="off")return {cls:"off",label:"Folga"};
+ if(schedule?.day_type==="holiday")return {cls:"holiday",label:"Vacaciones"};
+ if(schedule?.day_type==="sick")return {cls:"absent",label:"Baja / ausencia"};
+ if(journal?.check_in_at)return {cls:journal.check_out_at?"work":"working",label:journal.check_out_at?"Cerrada":"Trabajando"};
+ if(schedule?.day_type==="work"&&schedule?.start_time){
+   if(date<todayKey)return {cls:"absent",label:"Falta"};
+   if(date===todayKey){
+     const parts=String(schedule.start_time).slice(0,5).split(":").map(Number),start=(parts[0]||0)*60+(parts[1]||0);
+     const nowParts=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());return Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]))})();
+     const nowMin=nowParts.hour*60+nowParts.minute;
+     if(nowMin>=start+60)return {cls:"absent",label:"Falta"};
+     if(nowMin>=start+10)return {cls:"late",label:"Atrasado"};
+   }
+   return {cls:"scheduled",label:"Programado"};
+ }
+ return journal?{cls:"work",label:"Registrada"}:{cls:"unset",label:"Sin planificar"};
+}
+function renderAdminJourneyHtml(employees,schedules,journals,month,employeeFilter,nameFilter){
+ const todayKey=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid"}).format(new Date());
+ const em=Object.fromEntries((employees||[]).map(e=>[e.id,e]));
+ const bySchedule=new Map((schedules||[]).map(x=>[x.employee_profile_id+"|"+x.work_date,x]));
+ const byJournal=new Map();
+ (journals||[]).forEach(x=>{const k=x.profile_id+"|"+x.work_date;if(!byJournal.has(k)||(!byJournal.get(k).check_in_at&&x.check_in_at))byJournal.set(k,x)});
+ const keys=[...new Set([...schedules.map(x=>x.employee_profile_id+"|"+x.work_date),...journals.map(x=>{const e=employees.find(a=>a.profile_id===x.profile_id);return e?e.id+"|"+x.work_date:""}).filter(Boolean)])];
+ const rows=keys.map(k=>{const [eid,date]=k.split("|"),e=em[eid],s=bySchedule.get(k),j=byJournal.get((e?.profile_id||"")+"|"+date);if(!e)return null;const st=journeyRowStatus(s,j,date,todayKey);return {e,date,s,j,st}}).filter(Boolean).sort((a,b)=>b.date.localeCompare(a.date)||String(a.e.full_name||"").localeCompare(String(b.e.full_name||"")));
+ const counts={total:rows.length,late:rows.filter(x=>x.st.cls==="late").length,absent:rows.filter(x=>x.st.cls==="absent").length,working:rows.filter(x=>["working","work"].includes(x.st.cls)).length};
+ const options=(employees||[]).map(e=>'<option value="'+esc(e.profile_id||e.id)+'" '+((employeeFilter===(e.profile_id||e.id))?"selected":"")+'>'+esc(e.full_name||e.employee_code)+'</option>').join("");
+ let h='<div class="panel"><div class="panel-head"><div><h3>Jornada · Todos los funcionarios</h3><div class="muted">Histórico permanente de entradas, salidas y horas. Seleccione cualquier mes para consultar jornadas antigas.</div></div><span class="pill">Admin · Control de jornada</span></div><div class="two" style="margin-top:12px"><div class="field"><label>Mes</label><input id="journeyAdminMonth" type="month" value="'+esc(month)+'" onchange="window.__journeyAdminMonth=this.value;renderJourneyMaster()"></div><div class="field"><label>Funcionario</label><select id="journeyAdminEmployee" onchange="window.__journeyAdminEmployee=this.value;renderJourneyMaster()"><option value="">Todos los funcionarios</option>'+options+'</select></div></div><div class="field"><label>Buscar por nombre o código</label><input id="journeyAdminName" value="'+esc(nameFilter)+'" placeholder="Nombre o código..." onkeydown="if(event.key===\'Enter\'){window.__journeyAdminName=this.value;renderJourneyMaster()}"><div class="actions" style="margin-top:8px"><button class="btn gold" onclick="window.__journeyAdminName=$(\'journeyAdminName\').value;renderJourneyMaster()">Buscar</button><button class="btn" onclick="window.__journeyAdminMonth=\''+todayKey.slice(0,7)+'\';window.__journeyAdminEmployee=\'\';window.__journeyAdminName=\'\';renderJourneyMaster()">Mes actual</button></div></div><div class="master-kpis" style="grid-template-columns:repeat(4,1fr);margin-top:12px"><div class="master-kpi"><small>Registros</small><strong>'+counts.total+'</strong></div><div class="master-kpi"><small>Trabajando / cerradas</small><strong>'+counts.working+'</strong></div><div class="master-kpi"><small>Atrasados</small><strong>'+counts.late+'</strong></div><div class="master-kpi"><small>Faltas / ausencias</small><strong>'+counts.absent+'</strong></div></div><div class="rpc-calendar-legend" style="margin:12px 0"><span style="border-left:4px solid #7d7d7d">● Folga</span><span style="border-left:4px solid #3f8b57">● Trabajando / Cerrada</span><span style="border-left:4px solid #d59b22">● Atrasado</span><span style="border-left:4px solid #c84b43">● Falta</span></div><div class="panel" style="padding:0;overflow:auto"><table class="table"><thead><tr><th>Fecha</th><th>Funcionario</th><th>Horario previsto</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th><th></th></tr></thead><tbody>';
+ h+=rows.length?rows.map(x=>'<tr><td>'+esc(new Date(x.date+"T12:00:00").toLocaleDateString("es-ES"))+'</td><td><b>'+esc(x.e.full_name||x.e.employee_code)+'</b><small class="muted" style="display:block">'+esc(x.e.employee_code||"")+'</small></td><td>'+esc(x.s?.start_time?String(x.s.start_time).slice(0,5):"—")+(x.s?.end_time?"–"+esc(String(x.s.end_time).slice(0,5)):"")+'</td><td>'+esc(x.j?.check_in_at?romanoMadridTimeLabel(x.j.check_in_at):"—")+'</td><td>'+esc(x.j?.check_out_at?romanoMadridTimeLabel(x.j.check_out_at):"—")+'</td><td>'+esc(journeyHoursLabel(x.j?.check_in_at,x.j?.check_out_at))+'</td><td><span class="status '+esc(x.st.cls)+'">'+esc(x.st.label)+'</span></td><td><button class="btn" onclick="viewEmployee(\''+esc(x.e.id)+'\')">Ficha</button></td></tr>').join(""):'<tr><td colspan="8"><div class="empty">No hay registros de jornada para este período.</div></td></tr>';
+ h+='</tbody></table></div></div>';
+ return h;
 }
 async function masterClockIn(){
  const existing=await sb.from("work_journal_entries").select("id,check_in_at").eq("profile_id",currentUser.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
  if(existing.error){toast("No se pudo comprobar la jornada: "+existing.error.message);return}
  if(existing.data){toast("✓ Ya tienes una jornada abierta desde "+romanoMadridLabel(existing.data.check_in_at));await renderJourneyMaster();return}
+ const madridDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid"}).format(new Date());
  const pos=await masterGeo();
- const r=await sb.from("work_journal_entries").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,check_in_at:new Date().toISOString(),check_in_lat:pos?.lat||null,check_in_lng:pos?.lng||null,status:"open"});
+ const r=await sb.from("work_journal_entries").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,work_date:madridDate,check_in_at:new Date().toISOString(),check_in_lat:pos?.lat||null,check_in_lng:pos?.lng||null,status:"open"});
  if(r.error)toast("No se pudo registrar la entrada: "+r.error.message);
  else{toast("✓ Entrada registrada");await renderJourneyMaster()}
 }
