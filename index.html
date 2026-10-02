@@ -3367,7 +3367,18 @@ function notifyClientServiceFinished(service){
 async function startRealtime(){
  if(window.__romanoChannel)sb.removeChannel(window.__romanoChannel);
  window.__romanoChannel=sb.channel("romano-live-"+(currentProfile?.company_id||currentUser?.id))
- .on("postgres_changes",{event:"*",schema:"public",table:"services"},(payload)=>{if(payload.eventType==="UPDATE"&&payload.old?.status!==payload.new?.status&&["completed","approved"].includes(payload.new?.status)){notifyClientServiceFinished(payload.new)}if(document.querySelector("#content")){const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page;if(["dashboard","services","calendar","locations","service_journey"].includes(active))openPage(active)}})
+ .on("postgres_changes",{event:"*",schema:"public",table:"services"},(payload)=>{
+   const changed=payload.eventType==="UPDATE"&&payload.old&&payload.new;
+   const statusChanged=changed&&payload.old.status!==payload.new.status;
+   const assignmentChanged=changed&&payload.old.assigned_employee_id!==payload.new.assigned_employee_id;
+   const scheduleChanged=changed&&payload.old.scheduled_at!==payload.new.scheduled_at;
+   if(statusChanged&&["completed","approved"].includes(payload.new.status))notifyClientServiceFinished(payload.new);
+   if(!(statusChanged||assignmentChanged||scheduleChanged||payload.eventType==="INSERT"||payload.eventType==="DELETE"))return;
+   if(document.querySelector("#content")){
+     const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page;
+     if(["dashboard","services","calendar","locations","service_journey"].includes(active))openPage(active);
+   }
+ })
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},(payload)=>{
    if(!payload.new||payload.new.recipient_id!==currentUser?.id)return;
    const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page||"";
