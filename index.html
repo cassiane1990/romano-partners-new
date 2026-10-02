@@ -755,6 +755,62 @@ html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
 .sj-avatar-step.done .sj-avatar-label,.sj-avatar-step.current .sj-avatar-label{color:#5e4828}
 .sj-avatar-time{font-size:7px;color:#a0978b;margin-top:2px;white-space:nowrap}
 @media(max-width:650px){.sj-avatar-step{min-width:64px}.sj-avatar{width:40px;height:40px;font-size:17px}.sj-avatar-step:not(:last-child):after{top:20px}.sj-avatar-label{font-size:7px}.sj-avatar-time{font-size:6px}}
+</style><style id="romano-universal-standard-2026-10-02">
+/* ROMANO UNIVERSAL STANDARD
+   One application / one component tree on every device.
+   Responsive behavior changes only available width, never the modules or forms.
+*/
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+.app,.main,.content{min-width:0;max-width:100%}
+.side{width:250px!important}
+.main{margin-left:250px!important}
+.nav .master-group{display:block!important}
+.nav button{display:flex!important;align-items:center!important;justify-content:flex-start!important;text-align:left!important}
+.nav button .nav-icon{display:inline-flex!important;align-items:center;justify-content:center;width:24px!important;min-width:24px!important}
+.nav button span:last-child{display:inline!important}
+.side-footer{display:block!important}
+.side-footer .sf-user{display:flex!important}
+.side-footer .sf-name,.side-footer .sf-role,.side-footer .sf-logout{display:block!important}
+
+/* iPad/tablet: same complete navigation and same modules as desktop. */
+@media (min-width:768px) and (max-width:1199px){
+  .side{width:250px!important;padding:18px 12px 14px!important}
+  .main{margin-left:250px!important}
+  .content{padding:20px 18px!important}
+  .top{padding:0 18px!important}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wizard-grid{grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr)}
+}
+
+/* Phone: same complete menu in a drawer; no separate icon-only version. */
+@media (max-width:767px){
+  .side{
+    position:fixed!important;left:0!important;top:0!important;bottom:0!important;
+    width:min(286px,86vw)!important;margin:0!important;
+    transform:translateX(-110%)!important;
+    transition:transform .22s ease!important;
+    z-index:2000!important;overflow-y:auto!important;
+    box-shadow:18px 0 45px rgba(0,0,0,.28)!important;
+    padding:18px 12px 14px!important;
+  }
+  .app.mobile-menu-open .side{transform:translateX(0)!important}
+  .main{margin-left:0!important;width:100%!important}
+  .mobile-menu-toggle{display:flex!important;position:fixed!important;left:12px!important;top:10px!important;z-index:2100!important;width:42px!important;height:42px!important;align-items:center!important;justify-content:center!important}
+  .mobile-menu-backdrop{display:none!important;position:fixed!important;inset:0!important;z-index:1999!important;background:rgba(0,0,0,.42)!important}
+  .app.mobile-menu-open .mobile-menu-backdrop{display:block!important}
+  .side-brand strong,.side-brand span,.side .role,.nav .master-group,.nav button span:last-child,.side-footer .sf-name,.side-footer .sf-role,.side-footer .sf-logout{display:block!important}
+  .nav button{width:100%!important;height:auto!important;padding:11px 13px!important;margin:2px 0!important}
+  .nav button .nav-icon{width:24px!important;min-width:24px!important}
+  .content,.dashboard-page .content{padding:12px 10px 20px!important}
+  .top{padding:9px 10px 9px 58px!important}
+  .top h2{font-size:18px!important}
+  .grid,.two{grid-template-columns:1fr!important}
+  .modal{padding:8px!important}
+  .modal-card{width:calc(100vw - 16px)!important;max-width:900px!important;padding:16px!important}
+  .modal-card .wizard-grid{grid-template-columns:1fr!important}
+  .modal-card .wizard-grid .two{grid-template-columns:1fr!important}
+  .modal-card .wizard-grid input,.modal-card .wizard-grid select,.modal-card .wizard-grid textarea{min-width:0!important;max-width:100%!important;font-size:16px!important}
+}
 </style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
