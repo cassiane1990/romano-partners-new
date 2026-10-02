@@ -49,11 +49,14 @@
 .rpc-month-day{min-height:190px;border-right:1px solid #e5dac8;border-top:1px solid #e5dac8;padding:8px;background:#fffdf9}
 .rpc-empty-day{min-height:190px;background:#f7f2e9;border-right:1px solid #e5dac8;border-top:1px solid #e5dac8}
 .rpc-date{font-weight:800;font-size:13px;margin-bottom:7px;color:#6f5427}
-.rpc-person-day{display:flex;flex-direction:column;width:100%;text-align:left;border:1px solid #e4d8c6;border-radius:8px;padding:6px;margin-bottom:5px;background:#fff;cursor:pointer}
+.rpc-person-day{display:flex;flex-direction:column;width:100%;text-align:left;border:1px solid #e4d8c6;border-radius:8px;padding:6px;margin-bottom:5px;background:#fff;cursor:pointer;position:relative}
 .rpc-person-day b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rpc-person-day span{font-size:9px;color:#777;margin-top:2px}
-.rpc-person-day.work{border-left:4px solid #b7893f}
-.rpc-person-day.off{border-left:4px solid #777;background:#f1f1ef}
+.rpc-person-day.work{border-left:4px solid #3f8b57;background:#eef8f0}
+.rpc-person-day.off{border-left:4px solid #7d7d7d;background:#eeeeec;color:#5f5f5b}
+.rpc-person-day.late{border-left:4px solid #d59b22;background:#fff5d8;color:#7a5a17}
+.rpc-person-day.absent{border-left:4px solid #c84b43;background:#fff0ee;color:#8f3933}
+.rpc-person-day.holiday{border-left:4px solid #8a8a86;background:#eeeeec;color:#5f5f5b}
 .rpc-person-day.unset{border-style:dashed;opacity:.7}
 @media(max-width:1100px){
 .rpc-month-calendar{overflow:hidden;width:100%;max-width:100%;box-sizing:border-box}
@@ -3519,11 +3522,37 @@ async function teams(){
  if(demoMode){window.__DEMO_SCHEDULES=window.__DEMO_SCHEDULES||[];schedules=window.__DEMO_SCHEDULES.filter(x=>String(x.work_date||"").slice(0,7)===ym)}
  else{const q=await sb.from("employee_schedules").select("id,employee_profile_id,work_date,start_time,end_time,day_type,notes").eq("company_id",currentProfile.company_id).gte("work_date",ym+"-01").lte("work_date",ym+"-"+String(days).padStart(2,"0")).order("work_date",{ascending:true});if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(q.error.message)+'</div></div>';return}schedules=q.data||[]}
  const byKey=new Map(schedules.map(x=>[x.employee_profile_id+"|"+x.work_date,x]));
+ let serviceRows=[];
+ if(!demoMode){
+   const sq=await sb.from("services").select("id,assigned_employee_id,status,scheduled_at,started_at,finished_at").eq("company_id",currentProfile.company_id).gte("scheduled_at",ym+"-01T00:00:00").lt("scheduled_at",new Date(yy,mm,1).toISOString());
+   if(!sq.error)serviceRows=sq.data||[];
+ }
+ const madridNowParts=(()=>{const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]));return o})();
+ const todayKey=String(madridNowParts.year).padStart(4,"0")+"-"+String(madridNowParts.month).padStart(2,"0")+"-"+String(madridNowParts.day).padStart(2,"0");
+ const nowMinutes=madridNowParts.hour*60+madridNowParts.minute;
+ const statusFor=(x,employee,date)=>{
+   const type=x?.day_type||"work";
+   if(type==="off")return {cls:"off",label:"Folga"};
+   if(type==="holiday")return {cls:"holiday",label:"Férias"};
+   if(type==="sick")return {cls:"absent",label:"Ausente"};
+   if(type==="work"){
+     if(date===todayKey&&x?.start_time){
+       const parts=String(x.start_time).slice(0,5).split(":").map(Number),startMinutes=(parts[0]||0)*60+(parts[1]||0);
+       const started=serviceRows.some(s=>s.assigned_employee_id===employee.profile_id&&String(s.scheduled_at||"").slice(0,10)===date&&["on_the_way","in_progress","paused","supervised","completed","approved"].includes(s.status)&&(s.started_at||s.finished_at));
+       if(nowMinutes>startMinutes+10&&!started)return {cls:"late",label:"Atrasado"};
+     }
+     return {cls:"work",label:"Trabajando"};
+   }
+   return {cls:"off",label:type};
+ };
  let h='<div class="panel"><div class="panel-head"><div><h3>Equipos · Plan mensual</h3><div class="muted">Planifique la jornada de cada funcionario por día. Los cambios quedan registrados en la agenda.</div></div><div class="actions"><button class="btn" onclick="teamsMonth(-1)">‹ Mes anterior</button><b class="pill">'+new Date(yy,mm-1,1).toLocaleDateString("es-ES",{month:"long",year:"numeric"})+'</b><button class="btn" onclick="teamsMonth(1)">Mes siguiente ›</button></div></div>';
- h+='<div class="actions" style="margin-bottom:14px"><button class="btn gold" onclick="newTeamSchedule()">＋ Planificar día</button><span class="pill">'+employees.length+' funcionarios · '+schedules.length+' jornadas registradas</span></div>';
+ h+='<div class="actions" style="margin-bottom:10px"><button class="btn gold" onclick="newTeamSchedule()">＋ Planificar día</button><span class="pill">'+employees.length+' funcionarios · '+schedules.length+' jornadas registradas</span></div>';
+ h+='<div class="rpc-calendar-legend" style="margin:0 0 12px"><span style="border-left:4px solid #7d7d7d">● Folga</span><span style="border-left:4px solid #3f8b57">● Trabalhando</span><span style="border-left:4px solid #d59b22">● Atrasado</span><span style="border-left:4px solid #c84b43">● Ausente</span></div>';
  if(!employees.length)h+='<div class="empty">No hay funcionarios activos con cuenta para planificar.</div>';
- else h+='<div class="rpc-month-calendar"><div class="rpc-weekdays">'+["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>'<div>'+d+'</div>').join("")+'</div><div class="rpc-month-grid">'+Array.from({length:(new Date(yy,mm-1,1).getDay()+6)%7},()=>'<div class="rpc-empty-day"></div>').join("")+Array.from({length:days},(_,i)=>{const date=ym+"-"+String(i+1).padStart(2,"0");const dayItems=employees.map(e=>{const x=byKey.get(e.id+"|"+date);return x?'<button class="rpc-person-day '+(x.day_type==="off"?"off":"work")+'" onclick="editTeamSchedule(\''+x.id+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>'+(x.day_type==="off"?"Folga":x.day_type==="holiday"?"Férias":x.day_type==="sick"?"Ausencia":(x.start_time||"").slice(0,5)+"–"+(x.end_time||"").slice(0,5))+'</span></button>': '<button class="rpc-person-day unset" onclick="newTeamSchedule(\''+e.id+'\',\''+date+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>＋ Planificar</span></button>'}).join("");return '<div class="rpc-month-day"><div class="rpc-date">'+String(i+1).padStart(2,"0")+'</div>'+dayItems+'</div>'}).join("")+'</div></div>';
+ else h+='<div class="rpc-month-calendar"><div class="rpc-weekdays">'+["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>'<div>'+d+'</div>').join("")+'</div><div class="rpc-month-grid">'+Array.from({length:(new Date(yy,mm-1,1).getDay()+6)%7},()=>'<div class="rpc-empty-day"></div>').join("")+Array.from({length:days},(_,i)=>{const date=ym+"-"+String(i+1).padStart(2,"0");const dayItems=employees.map(e=>{const x=byKey.get(e.id+"|"+date);if(!x)return '<button class="rpc-person-day unset" onclick="newTeamSchedule(\''+e.id+'\',\''+date+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>＋ Planificar</span></button>';const st=statusFor(x,e,date);const hours=x.day_type==="work"&&x.start_time?((x.start_time||"").slice(0,5)+"–"+(x.end_time||"").slice(0,5)):"";return '<button class="rpc-person-day '+st.cls+'" onclick="editTeamSchedule(\''+x.id+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>'+esc(st.label)+(hours?" · "+esc(hours):"")+'</span></button>'}).join("");return '<div class="rpc-month-day"><div class="rpc-date">'+String(i+1).padStart(2,"0")+'</div>'+dayItems+'</div>'}).join("")+'</div></div>';
  h+='</div>';$("content").innerHTML=h;
+ if(window.__teamsStatusTimer)clearInterval(window.__teamsStatusTimer);
+ window.__teamsStatusTimer=setInterval(()=>{if(location.hash.startsWith("#teams"))teams();else{clearInterval(window.__teamsStatusTimer);window.__teamsStatusTimer=null}},60000);
 }
 function teamsMonth(delta){const d=new Date();const cur=new Date(d.getFullYear(),d.getMonth()+delta,1);location.hash="teams?month="+cur.toISOString().slice(0,7);openPage("teams")}
 async function newTeamSchedule(employeeProfileId="",date=""){
