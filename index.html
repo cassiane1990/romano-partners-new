@@ -1421,17 +1421,20 @@ function renderAdminJourneyHtml(employees,schedules,journals,todayKey,employeeFi
 }
 
 async function masterClockIn(){
- const existing=await sb.from("work_journal_entries").select("id,check_in_at").eq("profile_id",currentUser.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
- if(existing.error){toast("No se pudo comprobar la jornada: "+existing.error.message);return}
- if(existing.data){toast("✓ Ya tienes una jornada abierta desde "+romanoMadridLabel(existing.data.check_in_at));await renderJourneyMaster();return}
- const madridDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid"}).format(new Date());
  const pos=await masterGeo();
- const r=await sb.from("work_journal_entries").insert({company_id:currentProfile.company_id,profile_id:currentUser.id,work_date:madridDate,check_in_at:new Date().toISOString(),check_in_lat:pos?.lat||null,check_in_lng:pos?.lng||null,status:"open"});
- if(r.error)toast("No se pudo registrar la entrada: "+r.error.message);
- else{toast("✓ Entrada registrada");await renderJourneyMaster()}
+ const r=await sb.rpc("clock_in_work_journal",{p_lat:pos?.lat||null,p_lng:pos?.lng||null});
+ if(r.error){toast("No se pudo registrar la entrada: "+(r.error.message||"Error desconocido"));return}
+ toast("✓ Entrada registrada");
+ await renderJourneyMaster();
 }
-async function masterClockOut(){const pos=await masterGeo();const r=await sb.from("work_journal_entries").update({check_out_at:new Date().toISOString(),check_out_lat:pos?.lat||null,check_out_lng:pos?.lng||null,status:"closed"}).eq("profile_id",currentUser.id).eq("status","open");if(r.error)toast(r.error.message);else{toast("Salida registrada");renderJourneyMaster()}}
-function masterGeo(){return new Promise(resolve=>{if(!navigator.geolocation)return resolve(null);navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),()=>resolve(null),{enableHighAccuracy:true,timeout:7000})})}
+async function masterClockOut(){
+ const pos=await masterGeo();
+ const r=await sb.rpc("clock_out_work_journal",{p_lat:pos?.lat||null,p_lng:pos?.lng||null});
+ if(r.error){toast("No se pudo registrar la salida: "+(r.error.message||"Error desconocido"));return}
+ toast("✓ Salida registrada");
+ await renderJourneyMaster();
+}
+function masterGeo(){return new Promise(resolve=>{if(!navigator.geolocation)return resolve(null);navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),()=>resolve(null),{enableHighAccuracy:true,timeout:7000})}
 async function renderEmployeeWorkPanel(){
  if(!["employee","maintenance_technician"].includes(role()))return "";
  let rows=[];
