@@ -1393,7 +1393,7 @@ const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcion
 /* ROMANO PROFILE MASTER · one interface model per role, shared by every user of that role. */
 const ROMANO_PROFILE_MASTER=Object.freeze({
  admin:Object.freeze({key:"admin",label:"Administrador",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
- supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
+ supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["dashboard","service_journey","operations","services","newservice","calendar","change_requests","emergency","quality","clients","properties","units","employees","teams","journey","locations","materialsreq","recurring","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
  employee:Object.freeze({key:"employee",label:"Funcionario de Limpieza",allowed:["dashboard","service_journey","services","calendar","journey","materialsreq","locations","chat","documents","employee_documents","notifications","sync","profile"]}),
  maintenance_technician:Object.freeze({key:"maintenance_technician",label:"Técnico de Mantenimiento",allowed:["dashboard","service_journey","operations","services","newservice","calendar","journey","locations","materialsreq","stock","emergency","chat","notifications","employee_documents","sync","profile"]}),
  client:Object.freeze({key:"client",label:"Cliente",allowed:["dashboard","service_journey","services","newservice","calendar","change_requests","properties","units","prepostos","documents","service_history","chat","notifications","emergency","locations","sync","profile"]})
@@ -4383,7 +4383,7 @@ async function loadServiceCreationContext(){
 }
 function openNewServiceMenu(){
  if(!romanoProfileCan("newservice")){toast("Este perfil no puede crear servicios.");return}
- const employeeOnly=["employee","maintenance_technician"].includes(role());
+ const employeeOnly=role()==="maintenance_technician";
  const buttons=employeeOnly
   ? "<button type='button' class='btn gold' style='min-height:110px;font-size:15px' onclick='closeModal();newMaintenanceServicePremium()'>🔧<br><strong>Servicio mantenimiento</strong><small style='display:block;margin-top:6px'>Crear mantenimiento para cualquier cliente y apartamento</small></button>"
   : "<div class='two' style='gap:14px'><button type='button' class='btn gold' style='min-height:100px;font-size:15px' onclick='closeModal();newServicePremium()'>🧹<br><strong>Servicio limpieza</strong><small style='display:block;margin-top:6px'>Limpieza, ropa, lavandería y adicionales</small></button><button type='button' class='btn' style='min-height:100px;font-size:15px' onclick='closeModal();newMaintenanceServicePremium()'>🔧<br><strong>Servicio mantenimiento</strong><small style='display:block;margin-top:6px'>Mantenimiento, pintura, electricidad, fontanería y tarifas</small></button></div>";
@@ -4416,7 +4416,7 @@ function maintenanceServicePrice(rateKey,hours,customValue=0){
 async function newMaintenanceServicePremium(){
  const {clientMode,employeeMode,internalCreation,ownClient,clients,props}=await loadServiceCreationContext();
  let catalog=[];
- if(!demoMode){const q=await sb.from("service_catalog").select("id,code,name,description,unit,price,tax_included,active").eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name");if(!q.error)catalog=q.data||[]}
+ if(!demoMode){const catalogFields=canSeeFinance()?"id,code,name,description,unit,price,tax_included,active":"id,code,name,description,unit,active";const q=await sb.from("service_catalog").select(catalogFields).eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name");if(!q.error)catalog=q.data||[]}
  const clientOptions=clients.map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
  const catalogOptions=catalog.map(x=>"<option value='"+x.id+"' data-price='"+Number(x.price||0)+"' data-tax='"+(x.tax_included?'1':'0')+"'>"+esc(x.name)+" · "+Number(x.price||0).toFixed(2)+" €"+(x.tax_included?" IVA incluido":" SIN IVA")+"</option>").join("");
  const typeOptions=MAINTENANCE_TYPES.map(x=>"<option value='"+x[0]+"'>"+x[1]+"</option>").join("");
@@ -4444,6 +4444,7 @@ function maintenanceServiceRecalc(){
 }
 async function saveMaintenanceService(){
  const prop=$("msProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
+ if(role()==="maintenance_technician"&&($("msPriority")?.value!=="urgent"||$("msRate")?.value!=="emergency")){toast("El Técnico de Mantenimiento solo puede crear Mantenimiento de Urgencia 24H.");return}
  const title=$("msTitle")?.value.trim();if(!title){toast("Indique el título del trabajo.");return}
  const date=new Date($("msDate")?.value||"");if(Number.isNaN(date.getTime())){toast("Seleccione una fecha y hora válidas.");return}
  const category=$("msCategory")?.value||"maintenance",rateKey=$("msRate")?.value||"normal",catalogSel=$("msCatalog"),catalogOpt=catalogSel?.selectedOptions?.[0],catalogPrice=Number(catalogOpt?.dataset?.price||0),catalogIsGross=catalogOpt?.dataset?.tax==="1",vat=Number($("msVat")?.value||21)/100,minimumGross={normal:22.5,emergency:30,night:40,holiday:45}[rateKey]||22.5,gross=minimumGross+(catalogIsGross?catalogPrice:catalogPrice*(1+vat)),subtotal=gross/(1+vat),tax=gross-subtotal,employeeId=["maintenance_technician"].includes(role())?currentUser.id:($("msEmployee")?.value||null),code="MNT-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6),internal=["admin","supervisor"].includes(role());
