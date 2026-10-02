@@ -1984,7 +1984,7 @@ async function profileLoad(){
   else {const signed=await sb.storage.from("profile-media").createSignedUrl(data.avatar_url,3600);if(!signed.error)currentProfile.avatar_display_url=signed.data?.signedUrl||"";}
  }
 }
-async function ensureMFA(){const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(a.error)throw a.error;if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){$("mfa").classList.remove("hidden");return false}return true}
+async function ensureMFA(){const f=await sb.auth.mfa.listFactors();if(f.error)throw f.error;const verified=(f.data?.totp||[]).some(x=>x.status==="verified");if(!verified)return true;const a=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(a.error)throw a.error;if(a.data.currentLevel==="aal1"&&a.data.nextLevel==="aal2"){$("mfa").classList.remove("hidden");return false}return true}
 async function mfaVerify(){const code=$("mfaCode").value.trim();if(!code)return;$("mfaMsg").classList.add("hidden");const f=await sb.auth.mfa.listFactors();if(f.error||!f.data.totp.length){$("mfaMsg").textContent="No se encontró un factor TOTP activo.";$("mfaMsg").classList.remove("hidden");return}const factorId=f.data.totp[0].id;const c=await sb.auth.mfa.challenge({factorId});if(c.error){$("mfaMsg").textContent=c.error.message;$("mfaMsg").classList.remove("hidden");return}const v=await sb.auth.mfa.verify({factorId,challengeId:c.data.id,code});if(v.error){$("mfaMsg").textContent=v.error.message;$("mfaMsg").classList.remove("hidden");return}$("mfa").classList.add("hidden");showApp()}
 $("mfaBtn").onclick=mfaVerify;
 
