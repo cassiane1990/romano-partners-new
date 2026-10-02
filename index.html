@@ -2282,10 +2282,10 @@ async function deleteServiceMedia(mediaId,path,serviceId){
  await viewService(serviceId);
 }
 async function reviewServiceMedia(mediaId,path,serviceId){
- if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor o Administrador puede revisar las fotos.");return}
+ if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor o Administrador puede revisar las evidencias.");return}
  const r=await sb.rpc("review_cleaning_photo",{p_media_id:mediaId});if(r.error){toast(r.error.message);return}
- const u=await sb.storage.from("service-media").createSignedUrl(path,300);if(u.error){toast(u.error.message);return}
- window.open(u.data.signedUrl,"_blank","noopener");toast("✓ Foto abierta y registrada como revisada.");setTimeout(()=>viewService(serviceId),350);
+ const u=await sb.storage.from("service-media").createSignedUrl(path,300);if(u.error){toast("No se pudo abrir la evidencia: "+u.error.message);return}
+ window.open(u.data.signedUrl,"_blank","noopener");toast("✓ Evidencia abierta y registrada como revisada.");setTimeout(()=>viewService(serviceId),350);
 }
 async function approveCleaningService(serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor y Administrador pueden dar el OK.");return}
