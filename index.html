@@ -3198,25 +3198,41 @@ async function notificationAction(id,title,body){
  openPage("notifications");
 }
 async function notificationAction(id,title,body){
- const t=String(title||"").toLowerCase();
+ const t=String(title||"").toLowerCase(),b=String(body||"");
  await markNotificationRead(id,false);
- const m=String(body||"").match(/Servicio\\s+([A-Z0-9-]+)\\s*\\(([^)]+)\\)/i);
- const serviceId=m?.[2]||null;
  if(/servicio sin aceptar/.test(t)){
   if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede aceptar y designar.");return}
-  if(!serviceId){toast("No se pudo identificar el servicio de esta notificación.");return}
-  await openServiceAssignment(serviceId);
+  const codeMatch=b.match(/\\b(?:SRV|MNT)-[A-Z0-9-]+\\b/i);
+  const code=codeMatch?.[0]||null;
+  if(!code){toast("No se pudo identificar el servicio de esta notificación.");return}
+  const q=await sb.from("services").select("id,status,assigned_employee_id").eq("code",code).maybeSingle();
+  if(q.error||!q.data?.id){toast("No se pudo localizar el servicio "+code+".");return}
+  if(q.data.assigned_employee_id){toast("Este servicio ya tiene un funcionario designado.");return}
+  if(!["requested","scheduled"].includes(q.data.status)){toast("El servicio ya no está pendiente de designación.");return}
+  await openServiceAssignment(q.data.id);
   return;
  }
- if(/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
-  if(!["employee","maintenance_technician"].includes(role())){toast("Esta notificación no corresponde a su perfil.");return}
-  if(!serviceId){toast("No se pudo identificar el servicio.");return}
-  await acceptAssignedService(serviceId);
+ if(["employee","maintenance_technician"].includes(role())&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
+  const codeMatch=b.match(/\\b(?:SRV|MNT)-[A-Z0-9-]+\\b/i);
+  const code=codeMatch?.[0]||null;
+  if(code){
+   const q=await sb.from("services").select("id,assigned_employee_id").eq("code",code).maybeSingle();
+   if(q.data?.id&&q.data.assigned_employee_id===currentUser.id){
+    const a=await sb.rpc("employee_accept_service_assignment",{p_service_id:q.data.id});
+    if(a.error){toast("No se pudo aceptar: "+a.error.message);return}
+    toast("✓ Servicio aceptado. Estado: A camino.");
+    await renderServicesMaster();
+    return;
+   }
+  }
+  openPage("services");
   return;
  }
- if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){await openChatFromNotification(title,body);return}
- if(/incidencia|emergencia/.test(t)){toast("Alerta abierta.");return}
- toast("Notificación marcada como atendida.");
+ if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){
+  const opened=await openChatFromNotification(title,body);
+  if(opened)return;
+ }
+ openPage("notifications");
 }
 
 async function openNotification(id,title,body){
