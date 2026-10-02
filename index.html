@@ -4416,7 +4416,7 @@ function maintenanceServicePrice(rateKey,hours,customValue=0){
 async function newMaintenanceServicePremium(){
  const {clientMode,employeeMode,internalCreation,ownClient,clients,props}=await loadServiceCreationContext();
  let catalog=[];
- if(!demoMode){const catalogFields=canSeeFinance()?"id,code,name,description,unit,price,tax_included,active":"id,code,name,description,unit,active";const q=await sb.from("service_catalog").select(catalogFields).eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name");if(!q.error)catalog=q.data||[]}
+ if(!demoMode){const catalogSource=canSeeFinance()?"service_catalog":"service_catalog_operational";const catalogFields=canSeeFinance()?"id,code,name,description,unit,price,tax_included,active":"id,code,name,description,unit,active";const q=await sb.from(catalogSource).select(catalogFields).eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name");if(!q.error)catalog=q.data||[]}
  const clientOptions=clients.map(x=>"<option value='"+x.id+"'>"+esc(x.name)+"</option>").join("");
  const catalogOptions=catalog.map(x=>"<option value='"+x.id+"' data-price='"+Number(x.price||0)+"' data-tax='"+(x.tax_included?'1':'0')+"'>"+esc(x.name)+" · "+Number(x.price||0).toFixed(2)+" €"+(x.tax_included?" IVA incluido":" SIN IVA")+"</option>").join("");
  const typeOptions=MAINTENANCE_TYPES.map(x=>"<option value='"+x[0]+"'>"+x[1]+"</option>").join("");
