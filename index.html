@@ -2149,10 +2149,28 @@ function renderServiceItemsPremium(items,hideFinance=false){
 }
 function renderServiceAudit(auditRows,actorNames){
  if(!auditRows.length)return '<div class="empty">Sin registros de auditoría.</div>';
- return auditRows.map(a=>{
-  const label=a.action==="insert_service"?"Creado por":a.action==="update_service"?"Modificado por":a.action==="delete_service"?"Eliminado por":(a.action||"Acción");
-  return '<div class="line"><span><strong>'+esc(label)+': '+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.metadata?.status||"")+'</small></span><span>'+esc(new Date(a.created_at).toLocaleString("es-ES"))+'</span></div>';
+ const rows=[...auditRows].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+ const statusAt={};
+ rows.forEach(a=>{const st=String(a.metadata?.status||"");if(st&&!statusAt[st])statusAt[st]=a});
+ const fmt=d=>new Date(d).toLocaleString("es-ES",{timeZone:ROMANO_TIME_ZONE,day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+ const milestones=[
+  ["accepted","on_the_way","✓ Funcionario aceptó el servicio"],
+  ["started","in_progress","▶ Funcionario inició el servicio"],
+  ["supervision_pending","supervision_pending","🔎 Servicio enviado a supervisión"],
+  ["finished","completed","✓ Servicio finalizado"]
+ ];
+ const timeline=milestones.map(([key,status,label])=>{
+   const a=statusAt[status]; if(!a)return "";
+   return '<div class="line" style="border-left:3px solid #c59643;padding-left:12px"><span><strong>'+label+'</strong><br><small>Por: '+esc(actorNames[a.actor_id]||"Sistema")+'</small></span><span><strong>'+esc(fmt(a.created_at))+'</strong></span></div>';
  }).join("");
+ const timelineHtml=timeline
+   ? '<div class="notice" style="margin-bottom:12px"><strong>⏱ Linha do tempo do serviço</strong><div style="margin-top:8px">'+timeline+'</div></div>'
+   : "";
+ const history=rows.map(a=>{
+  const label=a.action==="insert_service"?"Creado por":a.action==="update_service"?"Modificado por":a.action==="delete_service"?"Eliminado por":(a.action||"Acción");
+  return '<div class="line"><span><strong>'+esc(label)+': '+esc(actorNames[a.actor_id]||"Sistema")+'</strong><br><small>'+esc(a.metadata?.status||"")+'</small></span><span>'+esc(fmt(a.created_at))+'</span></div>';
+ }).join("");
+ return timelineHtml+'<div style="margin-top:8px"><strong>Historial completo</strong></div>'+history;
 }
 const ROMANO_CLEANING_CHECKLIST=[
  {key:"quarto",label:"Quarto"},{key:"sala",label:"Sala"},{key:"banheiro",label:"Baño"},{key:"cozinha",label:"Cocina"},
