@@ -3197,6 +3197,28 @@ async function notificationAction(id,title,body){
  if(/incidencia|emergencia/.test(t)){openPage("emergency");return}
  openPage("notifications");
 }
+async function notificationAction(id,title,body){
+ const t=String(title||"").toLowerCase();
+ await markNotificationRead(id,false);
+ const m=String(body||"").match(/Servicio\\s+([A-Z0-9-]+)\\s*\\(([^)]+)\\)/i);
+ const serviceId=m?.[2]||null;
+ if(/servicio sin aceptar/.test(t)){
+  if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede aceptar y designar.");return}
+  if(!serviceId){toast("No se pudo identificar el servicio de esta notificación.");return}
+  await openServiceAssignment(serviceId);
+  return;
+ }
+ if(/nuevo servicio.*aceptaci[oó]n requerida/.test(t)){
+  if(!["employee","maintenance_technician"].includes(role())){toast("Esta notificación no corresponde a su perfil.");return}
+  if(!serviceId){toast("No se pudo identificar el servicio.");return}
+  await acceptAssignedService(serviceId);
+  return;
+ }
+ if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){await openChatFromNotification(title,body);return}
+ if(/incidencia|emergencia/.test(t)){toast("Alerta abierta.");return}
+ toast("Notificación marcada como atendida.");
+}
+
 async function openNotification(id,title,body){
  const t=String(title||"").toLowerCase();
  if(/nuevo mensaje/.test(t)||/💬/.test(String(title||""))){
@@ -3222,8 +3244,9 @@ async function renderNotifications(){
    const t=String(x.title||"").toLowerCase();
    const isMessage=/nuevo mensaje/.test(t)||/💬/.test(String(x.title||""));
    const isEmployeeAssignment=["employee","maintenance_technician"].includes(role())&&/nuevo servicio.*aceptaci[oó]n requerida/.test(t);
-   const action=(isMessage||isEmployeeAssignment||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
-   const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ ACEPTAR SERVICIO":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
+   const isPendingService=["admin","supervisor"].includes(role())&&/servicio sin aceptar/.test(t);
+   const action=(isMessage||isEmployeeAssignment||isPendingService||(/novo serviço|novo pedido de serviço|adelanto|check-in|incidencia|emergencia/.test(t)&&["admin","supervisor"].includes(role())));
+   const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ ACEPTAR SERVICIO":isPendingService?"✓ ACEPTAR Y DESIGNAR":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incidencia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
    return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(x.read_at?"opacity:.68":"border-color:#c59643;box-shadow:0 4px 14px #b7893f18")+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:#fbe5e3;color:#a52b25">NUEVA</span>':'')+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':"")+'</div>';
  }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';enableNotificationSwipe();
 }
