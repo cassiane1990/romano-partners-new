@@ -4261,7 +4261,7 @@ async function loadEvidenceArchive(){
  const ids=props.filter(p=>(!pt||(p.name+" "+p.code).toLowerCase().includes(pt))&&(!ct||(cm[p.client_id]||"").toLowerCase().includes(ct))).map(p=>p.id);
  if(!ids.length){box.innerHTML='<div class="empty">Nenhuma propriedade encontrada.</div>';return}
  let q=sb.from("property_media").select("id,property_id,service_id,archive_group_id,archive_group_name,media_type,title,storage_path,file_name,uploaded_by,created_at").eq("company_id",currentProfile.company_id).in("property_id",ids).order("created_at",{ascending:false}).limit(1000);
- if(["employee","maintenance_technician"].includes(role()))q=q.eq("uploaded_by",currentUser.id).like("title","[ARQUIVO PERMANENTE] Incidência %");
+ if(["employee","maintenance_technician"].includes(role()))q=q.eq("uploaded_by",currentUser.id).or('title.like."[ARQUIVO PERMANENTE] Incidência %",title.like."[ARQUIVO PERMANENTE] Reparação extraordinária %"');
  if(from)q=q.gte("created_at",new Date(from+"T00:00:00").toISOString());if(to)q=q.lt("created_at",new Date(new Date(to+"T00:00:00").getTime()+86400000).toISOString());
  const r=await q;if(r.error){box.innerHTML='<div class="msg">'+esc(r.error.message)+'</div>';return}if(!r.data?.length){box.innerHTML='<div class="empty">Não existem registos para estes filtros.</div>';return}
  const idsU=[...new Set(r.data.map(x=>x.uploaded_by).filter(Boolean))],ur=idsU.length?await sb.from("profiles").select("id,full_name").in("id",idsU):{data:[]},um=Object.fromEntries((ur.data||[]).map(x=>[x.id,x.full_name]));
