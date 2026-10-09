@@ -4274,6 +4274,24 @@ async function saveEvidenceArchive(e){
 }
 async function loadEvidenceArchive(){
  const box=$("evResults");if(!box)return;if(demoMode){box.innerHTML="Histórico disponível na sessão de produção.";return}
+ if(role()==="client"){
+  box.innerHTML='<div class="muted">A carregar as incidências das suas propriedades...</div>';
+  const props=window.__evProps||[],cm=window.__evClients||{},pt=($("evSearchProperty")?.value||"").toLowerCase().trim(),from=$("evFrom")?.value||"",to=$("evTo")?.value||"";
+  const ids=props.filter(p=>!pt||(p.name+" "+p.code+" "+p.address+" "+p.city).toLowerCase().includes(pt)).map(p=>p.id);
+  if(!ids.length){box.innerHTML='<div class="empty">Não foram encontradas propriedades suas com esse nome ou código.</div>';return}
+  let oq=sb.from("occurrences").select("id,property_id,service_id,category,priority,description,status,created_at").eq("company_id",currentProfile.company_id).in("property_id",ids).order("created_at",{ascending:false}).limit(300);
+  if(from)oq=oq.gte("created_at",new Date(from+"T00:00:00").toISOString());if(to)oq=oq.lt("created_at",new Date(new Date(to+"T00:00:00").getTime()+86400000).toISOString());
+  const incidents=await oq;if(incidents.error){box.innerHTML='<div class="msg">'+esc(incidents.error.message)+'</div>';return}
+  if(!incidents.data?.length){box.innerHTML='<div class="empty">Ainda não existem incidências registadas nas suas propriedades.</div>';return}
+  box.innerHTML=(await Promise.all(incidents.data.map(async occ=>{
+   const p=props.find(x=>x.id===occ.property_id),dt=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(occ.created_at));
+   const mr=await sb.from("property_media").select("id,file_name,media_type,storage_path,title,created_at").eq("company_id",currentProfile.company_id).eq("property_id",occ.property_id).eq("occurrence_id",occ.id).order("created_at",{ascending:true});
+   const files=mr.data||[];
+   const fileHtml=await Promise.all(files.map(async m=>{const signed=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 Vídeo · ":m.media_type==="image"?"📷 Foto · ":"📎 ")+esc(m.file_name)+'</b><br><small>'+esc(new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at)))+' · '+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><button class="btn" data-url="'+esc(signed.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
+   return '<details class="panel" style="margin:10px 0;padding:14px"><summary style="cursor:pointer;list-style:none"><div class="panel-head"><div><h3>📁 '+esc(occ.description||occ.category||"Incidência")+'</h3><div class="muted">'+esc(p?.name||"Apartamento")+' · '+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div><div class="muted">'+esc(dt)+' · '+esc(occ.status||"aberta")+'</div></div><span class="pill">'+files.length+' anexo(s)</span></div></summary><div style="margin-top:10px">'+(fileHtml.join("")||'<div class="empty">Incidência registada sem anexos associados.</div>')+'</div></details>';
+  }))).join("");
+  return;
+ }
  if(["employee","maintenance_technician"].includes(role())){
   box.innerHTML='<div class="muted">A carregar as suas incidências...</div>';
   const mine=await sb.from("occurrences").select("id,property_id,service_id,category,priority,description,status,created_at").eq("company_id",currentProfile.company_id).eq("created_by",currentUser.id).order("created_at",{ascending:false}).limit(200);
