@@ -4225,7 +4225,7 @@ async function saveEvidenceArchive(e){
  for(const file of files){if(!/^(image|video)\//.test(file.type)||file.size>52428800){errors.push(file.name+" (formato ou tamanho inválido)");continue}
  const ext=(file.name.split(".").pop()||"bin").toLowerCase().replace(/[^a-z0-9]/g,""),path=currentProfile.company_id+"/"+propertyId+"/"+crypto.randomUUID()+"."+ext;
  const up=await sb.storage.from("property-media").upload(path,file,{upsert:false,contentType:file.type});if(up.error){errors.push(file.name+": "+up.error.message);continue}
- const ins=await sb.from("property_media").insert({company_id:currentProfile.company_id,property_id:propertyId,media_type:file.type.startsWith("video/")?"video":"image",title:(kind+(notes?" · "+notes:"")).slice(0,1000),storage_path:path,file_name:file.name,mime_type:file.type,size_bytes:file.size,uploaded_by:currentUser.id});
+ const ins=await sb.from("property_media").insert({company_id:currentProfile.company_id,property_id:propertyId,media_type:file.type.startsWith("video/")?"video":"image",title:("[ARQUIVO PERMANENTE] "+kind+(notes?" · "+notes:"")).slice(0,1000),storage_path:path,file_name:file.name,mime_type:file.type,size_bytes:file.size,uploaded_by:currentUser.id});
  if(ins.error){await sb.storage.from("property-media").remove([path]);errors.push(file.name+": "+ins.error.message)}else saved++;
  }
  $("evFiles").value="";if(saved)toast(saved+" ficheiro(s) guardado(s) com data e hora.");if(errors.length)toast("Falhas: "+errors.join("; "));await loadEvidenceArchive();
