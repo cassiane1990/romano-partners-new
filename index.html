@@ -4254,6 +4254,7 @@ async function saveEvidenceArchive(e){
   const occ=await sb.from("occurrences").insert({company_id:currentProfile.company_id,property_id:propertyId,service_id:serviceId,created_by:currentUser.id,category,priority:"normal",description,status:"open",service_type:category==="cleaning"?"limpeza":"mantenimiento"}).select("id").single();
   if(occ.error||!occ.data){toast("Não foi possível criar a incidência: "+(occ.error?.message||"erro desconhecido"));return}
   occurrenceId=occ.data.id;
+  toast("Incidência criada com sucesso. A guardar os anexos…");
   const admins=await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).eq("role","admin");
   const supervisors=await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).eq("role","supervisor");
   const recipients=[...new Set([...(admins.data||[]),...(supervisors.data||[])].map(x=>x.id).filter(Boolean))];
@@ -4266,7 +4267,7 @@ async function saveEvidenceArchive(e){
  const ins=await sb.from("property_media").insert({company_id:currentProfile.company_id,property_id:propertyId,media_type:file.type.startsWith("video/")?"video":file.type.startsWith("audio/")?"audio":file.type.startsWith("image/")?"image":"document",title:("[ARQUIVO PERMANENTE] "+fileKind+(notes?" · "+notes:"")).slice(0,1000),storage_path:path,file_name:file.name,mime_type:file.type,size_bytes:file.size,uploaded_by:currentUser.id,service_id:serviceId,occurrence_id:occurrenceId,archive_group_id:archiveGroupId,archive_group_name:archiveGroupName});
  if(ins.error){await sb.storage.from("property-media").remove([path]);errors.push(file.name+": "+ins.error.message)}else saved++;
  }
- $("evFiles").value="";$("evBeforeFiles").value="";$("evAfterFiles").value="";if(saved)toast(saved+" ficheiro(s) guardado(s) na mesma pasta, com data e hora.");if(errors.length)toast("Falhas: "+errors.join("; "));await loadEvidenceArchive();
+ $("evFiles").value="";$("evBeforeFiles").value="";$("evAfterFiles").value="";if(saved)toast((occurrenceId?"Incidência registada · ":"")+saved+" ficheiro(s) guardado(s) na mesma pasta, com data e hora.");else if(occurrenceId)toast("A incidência ficou registada, mas nenhum anexo foi guardado. "+(errors.join("; ")||"Verifique os ficheiros selecionados."));if(errors.length)toast("Falhas nos anexos: "+errors.join("; "));await loadEvidenceArchive();
 }
 async function loadEvidenceArchive(){
  const box=$("evResults");if(!box)return;if(demoMode){box.innerHTML="Histórico disponível na sessão de produção.";return}
