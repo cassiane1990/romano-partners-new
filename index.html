@@ -3412,7 +3412,7 @@ async function openChatFromNotification(title,body){
 async function notificationAction(id,title,body){
  const t=String(title||"").toLowerCase(),raw=String(body||"");
  await markNotificationRead(id,false);
- if(/nova incidência no arquivo/.test(t)){const match=raw.match(/ArquivoID:\\s*([0-9a-f-]{36})/i);if(!match){toast("Não foi possível localizar a pasta desta incidência.");return}window.__evOpenGroupKey="archive:"+match[1];await openPage("evidence_archive");return}
+ if(/nova incidência no arquivo/.test(t)){const match=raw.match(/ArquivoID:\s*([0-9a-f-]{36})/i);if(!match){toast("Não foi possível localizar a pasta desta incidência.");return}window.__evOpenGroupKey="archive:"+match[1];await openPage("evidence_archive");return}
  if(/servicio sin aceptar/.test(t)){
   if(!["admin","supervisor"].includes(role())){toast("Solo Admin/Supervisor puede aceptar y designar.");return}
   const code=(raw.match(/(?:SRV|MNT)-[0-9A-Z-]+/i)||[])[0]||null;
