@@ -4253,12 +4253,27 @@ async function loadEvidenceArchive(){
  const grouped={};
  for(const m of r.data){const svc=(window.__evServices||[]).find(x=>x.id===m.service_id);const prop=props.find(x=>x.id===m.property_id);const key=m.service_id?"service:"+m.service_id:"property:"+m.property_id;if(!grouped[key])grouped[key]={service:svc,property:prop,items:[]};grouped[key].items.push(m)}
  box.innerHTML=(await Promise.all(Object.entries(grouped).map(async([key,g])=>{
-  const rows=await Promise.all(g.items.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600),date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));return '<div class="line" style="align-items:center;gap:10px"><span style="flex:1;min-width:0"><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(date)+' · '+esc(um[m.uploaded_by]||"Utilizador")+'</small><br><small>'+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn" data-id="'+m.id+'" onclick="editEvidenceArchiveItem(this.dataset.id)">Editar</button><button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>'}));
+  const rows=await Promise.all(g.items.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600),date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));return '<div class="line" style="align-items:center;gap:10px"><span style="flex:1;min-width:0"><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(date)+' · '+esc(um[m.uploaded_by]||"Utilizador")+'</small><br><small>'+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn" data-id="'+m.id+'" onclick="linkEvidenceArchiveItem(this.dataset.id)">Vincular a serviço</button><button class="btn" data-id="'+m.id+'" onclick="editEvidenceArchiveItem(this.dataset.id)">Editar</button><button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>'}));
   const heading=g.service?'Serviço '+esc(g.service.code)+' · '+esc(g.service.service_type):'Registos gerais do apartamento';
   return '<div class="panel" style="margin:10px 0;padding:14px"><div class="panel-head"><div><h3>'+heading+'</h3><div class="muted">'+esc(g.property?.name||"Propriedade")+' · Cliente: '+esc(cm[g.property?.client_id]||"—")+'</div></div><span class="pill">'+g.items.length+' ficheiro(s)</span></div>'+rows.join("")+'</div>';
  }))).join("");
 }
 function openEvidenceFile(url){if(url)window.open(url,"_blank","noopener")}
+async function linkEvidenceArchiveItem(id){
+ if(role()!=="admin"){toast("Só a Administração pode vincular registos.");return}
+ const item=await sb.from("property_media").select("property_id,service_id,file_name").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(item.error||!item.data){toast("Registo não encontrado.");return}
+ const services=await sb.from("services").select("id,code,service_type,scheduled_at").eq("company_id",currentProfile.company_id).eq("property_id",item.data.property_id).order("scheduled_at",{ascending:false}).limit(100);
+ if(services.error||!services.data?.length){toast("Não existem serviços para este apartamento.");return}
+ const choices=services.data.map((x,i)=>(i+1)+". "+x.code+" · "+x.service_type+" · "+(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("pt-PT"):"sem data")).join("\n");
+ const answer=prompt("Vincular "+item.data.file_name+" a qual serviço?\n0. Manter no arquivo geral\n"+choices,item.data.service_id?String(services.data.findIndex(x=>x.id===item.data.service_id)+1):"0");
+ if(answer===null)return;
+ const n=Number(answer);if(!Number.isInteger(n)||n<0||n>services.data.length){toast("Número de serviço inválido.");return}
+ const serviceId=n===0?null:services.data[n-1].id;
+ const updated=await sb.from("property_media").update({service_id:serviceId}).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+ if(updated.error||!updated.data){toast("Não foi possível vincular o registo: "+(updated.error?.message||"sem permissão"));return}
+ toast(serviceId?"Registo vinculado ao serviço.":"Registo mantido no arquivo geral.");await loadEvidenceArchive();
+}
 async function editEvidenceArchiveItem(id){
  if(role()!=="admin"){toast("Só a Administração pode editar o arquivo.");return}
  const row=await sb.from("property_media").select("title").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
