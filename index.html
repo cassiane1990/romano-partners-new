@@ -2472,10 +2472,20 @@ function renderServiceStatusActions(x){
 }
 async function renderServiceArchiveEvidence(rows){
  if(!rows.length)return '<div class="empty">Ainda não há fotos ou vídeos do arquivo permanente vinculados a este serviço.</div>';
- return (await Promise.all(rows.map(async m=>{
-  const signed=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);
-  const dt=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));
-  return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(dt)+' · '+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(signed.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>';
+ const grouped={};
+ for(const m of rows){
+  const beforeAfter=m.archive_group_name==="Fotos antes/depois do serviço";
+  const key=beforeAfter?"before-after":m.archive_group_id?"archive:"+m.archive_group_id:"legacy:"+String((m.title||"").replace("[ARQUIVO PERMANENTE] ","").split(" · ")[0]);
+  if(!grouped[key])grouped[key]={name:beforeAfter?"Fotos antes/depois do serviço":(m.archive_group_name||String((m.title||"").replace("[ARQUIVO PERMANENTE] ","").split(" · ")[0]||"Registo geral")),items:[]};
+  grouped[key].items.push(m);
+ }
+ return (await Promise.all(Object.entries(grouped).map(async([key,g])=>{
+  const files=await Promise.all(g.items.map(async m=>{
+   const signed=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);
+   const dt=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));
+   return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(dt)+' · '+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(signed.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>';
+  }));
+  return '<details class="panel" style="margin:10px 0;padding:12px"><summary style="cursor:pointer"><strong>📁 '+esc(g.name)+'</strong> <span class="pill">'+g.items.length+' ficheiro(s)</span></summary><div style="margin-top:10px">'+files.join("")+'</div></details>';
  }))).join("");
 }
 async function viewService(id){
@@ -2509,7 +2519,7 @@ async function viewService(id){
   sb.from("clients").select("id,name,profile_id").eq("id",x.client_id).maybeSingle(),
   sb.from("properties").select("id,name,code,address,city,country,latitude,longitude,photo_url").eq("id",x.property_id).maybeSingle(),
   sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30),
-  sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false})
+  sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at,archive_group_id,archive_group_name").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false})
  ]);
  const client=clientQ.data,prop=propQ.data;
  const auditRows=auditQ?.data||[];
