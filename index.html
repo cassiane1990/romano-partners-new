@@ -4247,6 +4247,8 @@ async function saveEvidenceArchive(e){
  const propertyId=$("evProperty").value,serviceId=$("evService")?.value||null,kind=$("evKind").value,notes=$("evNotes").value.trim(),archiveGroupId=crypto.randomUUID(),beforeFiles=Array.from($("evBeforeFiles")?.files||[]).map(file=>({file,kind:"Reparação extraordinária — Antes"})),afterFiles=Array.from($("evAfterFiles")?.files||[]).map(file=>({file,kind:"Reparação extraordinária — Depois"})),otherFiles=Array.from($("evFiles")?.files||[]).map(file=>({file,kind})),files=[...beforeFiles,...afterFiles,...otherFiles],archiveGroupName=(beforeFiles.length||afterFiles.length||kind.startsWith("Reparação extraordinária"))?"Reparação extraordinária — Antes/depois":(serviceId&&["Fotos antes do serviço","Fotos depois do serviço"].includes(kind))?"Fotos antes/depois do serviço":kind;
  if(!propertyId||!files.length){toast("Selecione o apartamento e anexe pelo menos um ficheiro.");return}
  const isIncident=kind.startsWith("Incidência")||kind.startsWith("Reparação extraordinária");
+ const saveButton=e.submitter||e.currentTarget?.querySelector("button[type=submit],button.primary");if(saveButton){saveButton.disabled=true;saveButton.textContent="A guardar…"}
+ try {
  let occurrenceId=null;
  if(isIncident){
   const category=kind.toLowerCase().includes("manutenção")||kind.toLowerCase().includes("reparação")?"maintenance":kind.toLowerCase().includes("limpeza")?"cleaning":kind.toLowerCase().includes("segurança")?"security":"damage";
@@ -4268,6 +4270,7 @@ async function saveEvidenceArchive(e){
  if(ins.error){await sb.storage.from("property-media").remove([path]);errors.push(file.name+": "+ins.error.message)}else saved++;
  }
  $("evFiles").value="";$("evBeforeFiles").value="";$("evAfterFiles").value="";if(saved)toast((occurrenceId?"Incidência registada · ":"")+saved+" ficheiro(s) guardado(s) na mesma pasta, com data e hora.");else if(occurrenceId)toast("A incidência ficou registada, mas nenhum anexo foi guardado. "+(errors.join("; ")||"Verifique os ficheiros selecionados."));if(errors.length)toast("Falhas nos anexos: "+errors.join("; "));await loadEvidenceArchive();
+ } finally {if(saveButton){saveButton.disabled=false;saveButton.textContent="Guardar no histórico"}}
 }
 async function loadEvidenceArchive(){
  const box=$("evResults");if(!box)return;if(demoMode){box.innerHTML="Histórico disponível na sessão de produção.";return}
