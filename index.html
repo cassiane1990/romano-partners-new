@@ -2960,7 +2960,7 @@ async function uploadEmployeeDocument(employeeProfileId,file,type="documento",ti
  const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"_"),path=currentProfile.company_id+"/employees/"+storageOwner+"/"+crypto.randomUUID()+"-"+safe;
  const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type||undefined});
  if(up.error){toast("No se pudo subir el documento: "+up.error.message);return false}
- const ins=await sb.from("employee_documents").insert({company_id:currentProfile.company_id,employee_id:employeeId,employee_profile_id:employeeProfileId,document_type:type,title,file_name:file.name,storage_path:path,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id,service_id:serviceId});
+ const ins=await sb.from("employee_documents").insert({company_id:currentProfile.company_id,employee_id:employeeId,employee_profile_id:employeeProfileId,document_type:type,title,file_name:file.name,storage_path:path,mime_type:file.type||null,size_bytes:file.size,uploaded_by:currentUser.id,service_id:serviceId,archive_group_id:serviceId?null:archiveGroupId,archive_group_name:kind});
  if(ins.error){await sb.storage.from("company-documents").remove([path]);toast("No se pudo registrar el documento: "+ins.error.message);return false}
  toast("✓ Documento guardado correctamente");await loadEmployeeDocuments(employeeProfileId);return true;
 }
@@ -4230,7 +4230,7 @@ async function renderEvidenceArchive(){
 }
 async function saveEvidenceArchive(e){
  e.preventDefault();if(demoMode){toast("Use a sessão de produção para guardar registos permanentes.");return}
- const propertyId=$("evProperty").value,serviceId=$("evService")?.value||null,files=Array.from($("evFiles").files||[]),kind=$("evKind").value,notes=$("evNotes").value.trim();
+ const propertyId=$("evProperty").value,serviceId=$("evService")?.value||null,files=Array.from($("evFiles").files||[]),kind=$("evKind").value,notes=$("evNotes").value.trim(),archiveGroupId=serviceId?null:crypto.randomUUID();
  if(!propertyId||!files.length)return;
  let saved=0,errors=[];
  for(const file of files){if(!/^(image|video)\//.test(file.type)||file.size>52428800){errors.push(file.name+" (formato ou tamanho inválido)");continue}
@@ -4246,17 +4246,22 @@ async function loadEvidenceArchive(){
  const props=window.__evProps||[],cm=window.__evClients||{},pt=($("evSearchProperty").value||"").toLowerCase().trim(),ct=($("evSearchClient").value||"").toLowerCase().trim(),from=$("evFrom").value,to=$("evTo").value;
  const ids=props.filter(p=>(!pt||(p.name+" "+p.code).toLowerCase().includes(pt))&&(!ct||(cm[p.client_id]||"").toLowerCase().includes(ct))).map(p=>p.id);
  if(!ids.length){box.innerHTML='<div class="empty">Nenhuma propriedade encontrada.</div>';return}
- let q=sb.from("property_media").select("id,property_id,service_id,media_type,title,storage_path,file_name,uploaded_by,created_at").eq("company_id",currentProfile.company_id).in("property_id",ids).order("created_at",{ascending:false}).limit(1000);
+ let q=sb.from("property_media").select("id,property_id,service_id,archive_group_id,archive_group_name,media_type,title,storage_path,file_name,uploaded_by,created_at").eq("company_id",currentProfile.company_id).in("property_id",ids).order("created_at",{ascending:false}).limit(1000);
  if(from)q=q.gte("created_at",new Date(from+"T00:00:00").toISOString());if(to)q=q.lt("created_at",new Date(new Date(to+"T00:00:00").getTime()+86400000).toISOString());
  const r=await q;if(r.error){box.innerHTML='<div class="msg">'+esc(r.error.message)+'</div>';return}if(!r.data?.length){box.innerHTML='<div class="empty">Não existem registos para estes filtros.</div>';return}
  const idsU=[...new Set(r.data.map(x=>x.uploaded_by).filter(Boolean))],ur=idsU.length?await sb.from("profiles").select("id,full_name").in("id",idsU):{data:[]},um=Object.fromEntries((ur.data||[]).map(x=>[x.id,x.full_name]));
  const grouped={};
- for(const m of r.data){const svc=(window.__evServices||[]).find(x=>x.id===m.service_id);const prop=props.find(x=>x.id===m.property_id);const key=m.service_id?"service:"+m.service_id:"property:"+m.property_id;if(!grouped[key])grouped[key]={service:svc,property:prop,items:[]};grouped[key].items.push(m)}
+ for(const m of r.data){
+  const svc=(window.__evServices||[]).find(x=>x.id===m.service_id),prop=props.find(x=>x.id===m.property_id);
+  const key=m.service_id?"service:"+m.service_id:m.archive_group_id?"archive:"+m.archive_group_id:"legacy:"+m.property_id+":"+String((m.title||"").replace("[ARQUIVO PERMANENTE] ","").split(" · ")[0])+":"+new Date(m.created_at).toISOString().slice(0,16);
+  if(!grouped[key])grouped[key]={service:svc,property:prop,groupName:m.archive_group_name||String((m.title||"").replace("[ARQUIVO PERMANENTE] ","").split(" · ")[0]||"Registo geral"),items:[]};
+  grouped[key].items.push(m);
+ }
  const cards=await Promise.all(Object.entries(grouped).map(async([key,g])=>{
   const rows=await Promise.all(g.items.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600),date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));return '<div class="line" style="align-items:center;gap:10px;padding:10px 0"><span style="flex:1;min-width:0"><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(date)+' · '+esc(um[m.uploaded_by]||"Utilizador")+'</small><br><small>'+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn" data-id="'+m.id+'" onclick="linkEvidenceArchiveItem(this.dataset.id)">Associar serviço</button><button class="btn" data-id="'+m.id+'" onclick="editEvidenceArchiveItem(this.dataset.id)">Editar</button><button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>'}));
-  const heading=g.service?'Serviço '+esc(g.service.code)+' · '+esc(g.service.service_type):'Sem serviço associado';
-  const sub=g.service?(g.service.scheduled_at?new Date(g.service.scheduled_at).toLocaleString("pt-PT"):"Data não definida"):"Estes registos pertencem ao apartamento, mas ainda não foram associados a um serviço.";
-  return '<details open class="panel" style="margin:12px 0;padding:14px"><summary style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;list-style-position:inside"><span><strong>'+heading+'</strong><br><small>'+esc(g.property?.name||"Propriedade")+' · Cliente: '+esc(cm[g.property?.client_id]||"—")+'</small><br><small class="muted">'+esc(sub)+'</small></span><span class="pill">'+g.items.length+' ficheiro(s)</span></summary><div style="margin-top:12px;border-top:1px solid var(--line,#e5d9c7)">'+rows.join("")+'</div></details>';
+  const heading=g.service?'Serviço '+esc(g.service.code)+' · '+esc(g.service.service_type):esc(g.groupName);
+  const sub=g.service?(g.service.scheduled_at?new Date(g.service.scheduled_at).toLocaleString("pt-PT"):"Data não definida"):"Incidência / registo independente · "+(g.items.length?new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"short"}).format(new Date(g.items[g.items.length-1].created_at)):"");
+  return '<details class="panel" style="margin:12px 0;padding:14px"><summary style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;list-style-position:inside"><span><strong>📁 '+heading+'</strong><br><small>'+esc(g.property?.name||"Propriedade")+' · Cliente: '+esc(cm[g.property?.client_id]||"—")+'</small><br><small class="muted">'+esc(sub)+'</small></span><span class="pill">'+g.items.length+' ficheiro(s)</span></summary><div style="margin-top:12px;border-top:1px solid var(--line,#e5d9c7)">'+rows.join("")+'</div></details>';
  }));
  box.innerHTML='<div class="muted" style="margin:8px 0">Agrupado por serviço e apartamento. Registos antigos sem associação podem ser vinculados pelo Administrador.</div>'+cards.join("");
 }
