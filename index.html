@@ -4239,26 +4239,30 @@ async function loadEvidenceArchive(){
  if(from)q=q.gte("created_at",new Date(from+"T00:00:00").toISOString());if(to)q=q.lt("created_at",new Date(new Date(to+"T00:00:00").getTime()+86400000).toISOString());
  const r=await q;if(r.error){box.innerHTML='<div class="msg">'+esc(r.error.message)+'</div>';return}if(!r.data?.length){box.innerHTML='<div class="empty">Não existem registos para estes filtros.</div>';return}
  const idsU=[...new Set(r.data.map(x=>x.uploaded_by).filter(Boolean))],ur=idsU.length?await sb.from("profiles").select("id,full_name").in("id",idsU):{data:[]},um=Object.fromEntries((ur.data||[]).map(x=>[x.id,x.full_name]));
- box.innerHTML=await Promise.all(r.data.map(async m=>{const p=props.find(x=>x.id===m.property_id),u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600),date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(p?.name||"")+' · '+esc(cm[p?.client_id]||"")+'</small><br><small>'+esc(date)+' · '+esc(um[m.uploaded_by]||"Utilizador")+'</small><br><small>'+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" onclick="openEvidenceFile(\\''+esc(u.data?.signedUrl||"")+'\\')">Abrir</button>'+(role()==="admin"?'<button class="btn" onclick="editEvidenceArchiveItem(\\''+m.id+'\\',\\''+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'\\')">Editar</button><button class="btn danger" onclick="deleteEvidenceArchiveItem(\\''+m.id+'\\',\\''+esc(m.storage_path)+'\\',\\''+esc(m.file_name)+'\\')">Apagar</button>':"")+'</span></div>'})).join("");
+ box.innerHTML=await Promise.all(r.data.map(async m=>{const p=props.find(x=>x.id===m.property_id),u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600),date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(p?.name||"")+' · '+esc(cm[p?.client_id]||"")+'</small><br><small>'+esc(date)+' · '+esc(um[m.uploaded_by]||"Utilizador")+'</small><br><small>'+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" onclick="openEvidenceFile(\\''+esc(u.data?.signedUrl||"")+'\\')">Abrir</button>'+(role()==="admin"?'<button class="btn" onclick="editEvidenceArchiveItem(\\''+m.id+'\\')">Editar</button><button class="btn danger" onclick="deleteEvidenceArchiveItem(\\''+m.id+'\\')">Apagar</button>':"")+'</span></div>'})).join("");
 }
 function openEvidenceFile(url){if(url)window.open(url,"_blank","noopener")}
-async function editEvidenceArchiveItem(id,currentTitle){
+async function editEvidenceArchiveItem(id){
  if(role()!=="admin"){toast("Só a Administração pode editar o arquivo.");return}
- const next=prompt("Editar descrição do registo:",currentTitle||"");if(next===null)return;
+ const row=await sb.from("property_media").select("title").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(row.error||!row.data){toast("Registo não encontrado.");return}
+ const current=(row.data.title||"").replace("[ARQUIVO PERMANENTE] ","");
+ const next=prompt("Editar descrição do registo:",current);if(next===null)return;
  const title="[ARQUIVO PERMANENTE] "+next.trim();
  const r=await sb.from("property_media").update({title:title.slice(0,1000)}).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
  if(r.error||!r.data){toast("Não foi possível editar: "+(r.error?.message||"sem permissão"));return}
  toast("Registo atualizado.");await loadEvidenceArchive();
 }
-async function deleteEvidenceArchiveItem(id,path,name){
+async function deleteEvidenceArchiveItem(id){
  if(role()!=="admin"){toast("Só a Administração pode apagar ficheiros do arquivo.");return}
- if(!confirm("Apagar definitivamente "+name+"? O ficheiro deixará de aparecer no histórico para todos os utilizadores."))return;
+ const q=await sb.from("property_media").select("storage_path,file_name").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(q.error||!q.data){toast("Registo não encontrado.");return}
+ if(!confirm("Apagar definitivamente "+q.data.file_name+"? O ficheiro deixará de aparecer no histórico para todos os utilizadores."))return;
  const row=await sb.from("property_media").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
  if(row.error||!row.data){toast("Não foi possível apagar o registo: "+(row.error?.message||"sem permissão"));return}
- const removed=await sb.storage.from("property-media").remove([path]);
- if(removed.error){toast("O registo foi removido do histórico, mas o ficheiro físico não pôde ser eliminado: "+removed.error.message);await loadEvidenceArchive();return}
- toast("Foto/vídeo apagado definitivamente do histórico.");
- await loadEvidenceArchive();
+ const removed=await sb.storage.from("property-media").remove([q.data.storage_path]);
+ if(removed.error){toast("Registo removido do histórico, mas o ficheiro físico não pôde ser eliminado: "+removed.error.message);await loadEvidenceArchive();return}
+ toast("Foto/vídeo apagado definitivamente do histórico.");await loadEvidenceArchive();
 }
 async function renderServiceHistoryPremium(){
  if(role()==="client"){return renderClientServiceHistoryPremium()}
