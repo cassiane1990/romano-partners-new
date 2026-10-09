@@ -4279,8 +4279,9 @@ async function loadEvidenceArchive(){
   box.innerHTML=(await Promise.all(mine.data.map(async occ=>{
    const p=props.find(x=>x.id===occ.property_id);
    const date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(occ.created_at));
-   const media=await sb.from("property_media").select("id,file_name,media_type,storage_path,created_at,title").eq("company_id",currentProfile.company_id).eq("occurrence_id",occ.id).order("created_at",{ascending:true});
-   const files=media.data||[];
+   let media=await sb.from("property_media").select("id,file_name,media_type,storage_path,created_at,title").eq("company_id",currentProfile.company_id).eq("occurrence_id",occ.id).order("created_at",{ascending:true});
+   let files=media.data||[];
+   if(!files.length){const grouped=await sb.from("property_media").select("id,file_name,media_type,storage_path,created_at,title").eq("company_id",currentProfile.company_id).eq("property_id",occ.property_id).eq("uploaded_by",currentUser.id).eq("archive_group_name","Reparação extraordinária — Antes/depois").gte("created_at",new Date(new Date(occ.created_at).getTime()-120000).toISOString()).lte("created_at",new Date(new Date(occ.created_at).getTime()+120000).toISOString()).order("created_at",{ascending:true});files=grouped.data||[];}
    const fileHtml=await Promise.all(files.map(async m=>{const signed=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</span><button class="btn" data-url="'+esc(signed.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
    return '<div class="panel" style="margin:10px 0;padding:14px"><div class="panel-head"><div><h3>'+esc(occ.description||occ.category||"Incidência")+'</h3><div class="muted">'+esc(p?.name||"Apartamento")+' · '+esc(cm[p?.client_id]||"")+'</div><div class="muted">'+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div><div class="muted">'+esc(date)+' · '+esc(occ.status||"aberta")+'</div></div><span class="pill">'+files.length+' anexo(s)</span></div>'+ (fileHtml.join("")||'<div class="empty">Incidência criada; ainda não há anexos associados.</div>')+'</div>';
   }))).join("");
