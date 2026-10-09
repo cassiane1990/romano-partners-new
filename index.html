@@ -4233,16 +4233,14 @@ function clientMonthBounds(value){
 }
 async function renderEvidenceArchive(){
  const isFieldStaff=["employee","maintenance_technician"].includes(role());
- const cq=demoMode?{data:DEMO_CLIENTS}:await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name");
- const pq=demoMode?{data:DEMO_PROPERTIES}:await sb.from("properties").select("id,name,code,client_id,address,city,country").eq("company_id",currentProfile.company_id).order("name");
- let clients=cq.data||[],props=pq.data||[];
- if(cq.error||pq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(cq.error?.message||pq.error?.message)+'</div></div>';return}
- // O cliente recebe apenas as propriedades ligadas ao seu próprio perfil.
- if(role()==="client"&&!demoMode){
-  const ownClient=await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).eq("profile_id",currentUser.id).maybeSingle();
-  if(ownClient.error||!ownClient.data){$("content").innerHTML='<div class="panel"><div class="empty">Não foi possível identificar a conta de cliente associada a este perfil.</div></div>';return}
-  clients=clients.filter(c=>c.id===ownClient.data.id);
-  props=props.filter(p=>p.client_id===ownClient.data.id);
+ let clients=[],props=[];
+ if(demoMode){clients=DEMO_CLIENTS||[];props=DEMO_PROPERTIES||[]}
+ else{
+  // Lista de clientes e imóveis exposta apenas através do seletor de incidências.
+  // Funcionários não ganham permissões gerais de leitura nas tabelas de clientes/propriedades.
+  const picker=await sb.rpc("incidence_property_picker");
+  if(picker.error||!picker.data){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(picker.error?.message||"Não foi possível carregar clientes e apartamentos para a incidência.")+'</div></div>';return}
+  clients=picker.data.clients||[];props=picker.data.properties||[];
  }
  const cm=Object.fromEntries(clients.map(c=>[c.id,c.name]));
  const servicesQ=demoMode?{data:[]}:await sb.from("services").select("id,code,service_type,scheduled_at,property_id,status").eq("company_id",currentProfile.company_id).order("scheduled_at",{ascending:false}).limit(1000);
