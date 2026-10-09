@@ -4246,6 +4246,19 @@ async function saveEvidenceArchive(e){
  e.preventDefault();if(demoMode){toast("Use a sessão de produção para guardar registos permanentes.");return}
  const propertyId=$("evProperty").value,serviceId=$("evService")?.value||null,kind=$("evKind").value,notes=$("evNotes").value.trim(),archiveGroupId=crypto.randomUUID(),beforeFiles=Array.from($("evBeforeFiles")?.files||[]).map(file=>({file,kind:"Reparação extraordinária — Antes"})),afterFiles=Array.from($("evAfterFiles")?.files||[]).map(file=>({file,kind:"Reparação extraordinária — Depois"})),otherFiles=Array.from($("evFiles")?.files||[]).map(file=>({file,kind})),files=[...beforeFiles,...afterFiles,...otherFiles],archiveGroupName=(beforeFiles.length||afterFiles.length||kind.startsWith("Reparação extraordinária"))?"Reparação extraordinária — Antes/depois":(serviceId&&["Fotos antes do serviço","Fotos depois do serviço"].includes(kind))?"Fotos antes/depois do serviço":kind;
  if(!propertyId||!files.length){toast("Selecione o apartamento e anexe pelo menos um ficheiro.");return}
+ const isIncident=kind.startsWith("Incidência")||kind.startsWith("Reparação extraordinária");
+ let occurrenceId=null;
+ if(isIncident){
+  const category=kind.toLowerCase().includes("manutenção")||kind.toLowerCase().includes("reparação")?"maintenance":kind.toLowerCase().includes("limpeza")?"cleaning":kind.toLowerCase().includes("segurança")?"security":"damage";
+  const description=[kind,notes||"Sem descrição adicional.",archiveGroupName].join(" — ");
+  const occ=await sb.from("occurrences").insert({company_id:currentProfile.company_id,property_id:propertyId,service_id:serviceId,created_by:currentUser.id,category,priority:"normal",description,status:"open",service_type:category==="cleaning"?"limpeza":"mantenimiento"}).select("id").single();
+  if(occ.error||!occ.data){toast("Não foi possível criar a incidência: "+(occ.error?.message||"erro desconhecido"));return}
+  occurrenceId=occ.data.id;
+  const admins=await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).eq("role","admin");
+  const supervisors=await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).eq("role","supervisor");
+  const recipients=[...new Set([...(admins.data||[]),...(supervisors.data||[])].map(x=>x.id).filter(Boolean))];
+  if(recipients.length)await sb.from("notifications").insert(recipients.map(recipient_id=>({company_id:currentProfile.company_id,recipient_id,title:"Nova incidência criada",body:kind+" · "+(window.__evProps||[]).find(p=>p.id===propertyId)?.name+" · Criada por "+(currentProfile.full_name||"funcionário"),severity:"warning",related_object_type:"occurrence",related_object_id:occurrenceId})));
+ }
  let saved=0,errors=[];
  for(const entry of files){const file=entry.file,fileKind=entry.kind;const fileExtension=(file.name.split(".").pop()||"").toLowerCase();const allowedType=/^(image|video|audio)\//.test(file.type)||["pdf","doc","docx","xls","xlsx","txt","csv"].includes(fileExtension);if(!allowedType||file.size>52428800){errors.push(file.name+" (formato não suportado ou tamanho acima de 50 MB)");continue}
  const ext=(file.name.split(".").pop()||"bin").toLowerCase().replace(/[^a-z0-9]/g,""),path=currentProfile.company_id+"/"+propertyId+"/"+currentUser.id+"/"+crypto.randomUUID()+"."+ext;
