@@ -4270,6 +4270,22 @@ async function saveEvidenceArchive(e){
 }
 async function loadEvidenceArchive(){
  const box=$("evResults");if(!box)return;if(demoMode){box.innerHTML="Histórico disponível na sessão de produção.";return}
+ if(["employee","maintenance_technician"].includes(role())){
+  box.innerHTML='<div class="muted">A carregar as suas incidências...</div>';
+  const mine=await sb.from("occurrences").select("id,property_id,service_id,category,priority,description,status,created_at").eq("company_id",currentProfile.company_id).eq("created_by",currentUser.id).order("created_at",{ascending:false}).limit(200);
+  if(mine.error){box.innerHTML='<div class="msg">'+esc(mine.error.message)+'</div>';return}
+  if(!mine.data?.length){box.innerHTML='<div class="empty">Ainda não tem incidências registadas. Depois de guardar uma incidência, ela aparecerá aqui.</div>';return}
+  const props=window.__evProps||[],cm=window.__evClients||{};
+  box.innerHTML=(await Promise.all(mine.data.map(async occ=>{
+   const p=props.find(x=>x.id===occ.property_id);
+   const date=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(occ.created_at));
+   const media=await sb.from("property_media").select("id,file_name,media_type,storage_path,created_at,title").eq("company_id",currentProfile.company_id).eq("occurrence_id",occ.id).order("created_at",{ascending:true});
+   const files=media.data||[];
+   const fileHtml=await Promise.all(files.map(async m=>{const signed=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</span><button class="btn" data-url="'+esc(signed.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
+   return '<div class="panel" style="margin:10px 0;padding:14px"><div class="panel-head"><div><h3>'+esc(occ.description||occ.category||"Incidência")+'</h3><div class="muted">'+esc(p?.name||"Apartamento")+' · '+esc(cm[p?.client_id]||"")+'</div><div class="muted">'+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div><div class="muted">'+esc(date)+' · '+esc(occ.status||"aberta")+'</div></div><span class="pill">'+files.length+' anexo(s)</span></div>'+ (fileHtml.join("")||'<div class="empty">Incidência criada; ainda não há anexos associados.</div>')+'</div>';
+  }))).join("");
+  return;
+ }
  const props=window.__evProps||[],cm=window.__evClients||{},pt=($("evSearchProperty").value||"").toLowerCase().trim(),ct=($("evSearchClient").value||"").toLowerCase().trim(),from=$("evFrom").value,to=$("evTo").value;
  const ids=props.filter(p=>(!pt||(p.name+" "+p.code).toLowerCase().includes(pt))&&(!ct||(cm[p.client_id]||"").toLowerCase().includes(ct))).map(p=>p.id);
  if(!ids.length){box.innerHTML='<div class="empty">Nenhuma propriedade encontrada.</div>';return}
