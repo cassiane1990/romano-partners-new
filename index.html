@@ -2535,7 +2535,9 @@ async function viewService(id){
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const adminDirectAssignmentButton=isPendingAdminDirect?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">DESIGNAR FUNCIONARIO</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
+ const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
+ const invoiceHtml=await Promise.all(invoiceDocs.map(async m=>{const u=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
+ const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
@@ -2544,6 +2546,7 @@ async function viewService(id){
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],["employee","maintenance_technician"].includes(role()))+'</div></div>'+
   (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"&&isCleaningServiceType(x.service_type)?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
  renderServiceStatusActions(x)+
+  (privateMaintenanceServiceType(x.service_type)?'<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Faturas, notas e comprovativos</h3><span class="pill">'+invoiceDocs.length+' documento(s)</span></div><div class="field"><label>Anexar faturas/notas deste serviço</label><input id="serviceInvoiceFiles" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,application/pdf,image/*"><button class="btn gold" type="button" style="margin-top:8px" onclick="uploadMaintenanceInvoices(\''+x.id+'\')">Guardar documentos</button></div>'+(invoiceHtml.join("")||'<div class="empty">Ainda não há faturas ou notas anexadas.</div>')+'</div>':"")+
   renderMaintenanceBillingSummary(x)+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+
  (x.assigned_employee_id?'<div class="notice" style="margin-bottom:10px"><strong>👤 Designado:</strong> '+esc(actorNames[x.assigned_employee_id]||"Funcionario/Técnico")+(["on_the_way","in_progress","completed","supervision_pending","supervised","approved"].includes(x.status)?"<br><small>✓ El profesional aceptó el servicio.</small>":"<br><small>⏳ Designación enviada · pendiente de aceptación.</small>")+'</div>':"")+
@@ -5010,7 +5013,19 @@ function maintenanceServiceCatalogChanged(){
  if($("msSub"))$("msSub").textContent=opt?.value?(visible?masterMoney(price)+" / h":"Tarifa de catálogo"):"—";
  if($("msTax"))$("msTax").textContent="Se calcula al finalizar";
  if($("msTotal"))$("msTotal").textContent="Se calcula al finalizar";
-}async function saveMaintenanceService(){
+}async function uploadMaintenanceInvoices(serviceId){
+ if(!privateMaintenanceServiceType((window.__romanoServiceVersions&&window.__romanoServiceVersions[serviceId])?.service_type||"mantenimiento")&&role()!=="admin"){toast("Este anexo é exclusivo dos serviços de manutenção.");return}
+ const input=$("serviceInvoiceFiles"),files=Array.from(input?.files||[]);if(!files.length){toast("Selecione pelo menos um documento.");return}
+ let saved=0,errors=[];
+ for(const file of files){if(file.size>50*1024*1024){errors.push(file.name+" excede 50 MB");continue}
+ const ext=(file.name.split(".").pop()||"bin").toLowerCase().replace(/[^a-z0-9]/g,""),path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
+ const up=await sb.storage.from("service-media").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream"});if(up.error){errors.push(file.name+": "+up.error.message);continue}
+ const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:"invoice_document",storage_path:path,file_name:file.name,mime_type:file.type||"application/octet-stream",size_bytes:file.size});
+ if(ins.error){await sb.storage.from("service-media").remove([path]);errors.push(file.name+": "+ins.error.message)}else saved++;
+ }
+ if(input)input.value="";if(saved)toast(saved+" documento(s) anexado(s).");if(errors.length)toast("Alguns documentos falharam: "+errors.join("; "));await viewService(serviceId);
+}
+async function saveMaintenanceService(){
  const prop=$("msProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
  const title=$("msTitle")?.value.trim();if(!title){toast("Indique el título del trabajo.");return}
  const date=new Date($("msDate")?.value||"");if(Number.isNaN(date.getTime())){toast("Seleccione una fecha y hora válidas.");return}
