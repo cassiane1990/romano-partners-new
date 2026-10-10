@@ -5019,7 +5019,7 @@ function maintenanceServiceCatalogChanged(){
  for(const file of files){if(file.size>50*1024*1024){errors.push(file.name+" excede 50 MB");continue}
  const ext=(file.name.split(".").pop()||"bin").toLowerCase().replace(/[^a-z0-9]/g,""),path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
  const up=await sb.storage.from("service-media").upload(path,file,{upsert:false,contentType:file.type||"application/octet-stream"});if(up.error){errors.push(file.name+": "+up.error.message);continue}
- const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:file.type.startsWith("image/")?"photo":file.type.startsWith("video/")?"video":file.type.startsWith("audio/")?"audio":"document",storage_path:path,file_name:file.name,mime_type:file.type||"application/octet-stream",size_bytes:file.size});
+ const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:"invoice_document",storage_path:path,file_name:file.name,mime_type:file.type||"application/octet-stream",size_bytes:file.size});
  if(ins.error){await sb.storage.from("service-media").remove([path]);errors.push(file.name+": "+ins.error.message)}else saved++;
  }
  if(input)input.value="";if(saved)toast(saved+" documento(s) anexado(s).");if(errors.length)toast("Alguns documentos falharam: "+errors.join("; "));await viewService(serviceId);
