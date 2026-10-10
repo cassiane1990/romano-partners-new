@@ -4140,13 +4140,27 @@ async function renderDocumentsPremium(){
 async function documentTemplateModal(id=null){
  if(!["admin","supervisor"].includes(role())){toast("Solo Administración/Supervisión puede gestionar plantillas.");return}
  let x=null;
- if(id){const q=await sb.from("document_templates").select("id,name,template_type,content").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}x=q.data}
- openModal(x?"Editar plantilla":"Nueva plantilla",'<form onsubmit="saveDocumentTemplate(event,'+(x?JSON.stringify(x.id):"null")+')"><div class="two"><div class="field"><label>Nombre</label><input id="dtName" required value="'+esc(x?.name||"")+'" placeholder="Contrato de trabajo"></div><div class="field"><label>Tipo</label><select id="dtType"><option value="employee_contract" '+(x?.template_type==="employee_contract"?"selected":"")+'>Contrato empleado</option><option value="supervisor_contract" '+(x?.template_type==="supervisor_contract"?"selected":"")+' >Contrato supervisor</option><option value="other" '+(x?.template_type==="other"?"selected":"")+'>Otro documento</option></select></div></div><div class="field"><label>Contenido editable</label><textarea id="dtContent" style="min-height:280px" required>'+esc(x?.content||"")+'</textarea></div><div class="muted">Puede usar marcadores como {{NOMBRE}}, {{NIF}}, {{FECHA_ENTRADA}}, {{FUNCION}} y {{SALARIO}} para completar posteriormente.</div><button class="primary" type="submit">Guardar plantilla</button></form>');
+ if(id){documentTemplateModalLoad(id);return}
+ openDocumentTemplateEditor(null);
+}
+async function documentTemplateModalLoad(id){
+ const q=await sb.from("document_templates").select("id,name,template_type,content").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ if(q.error){toast(q.error.message);return}openDocumentTemplateEditor(q.data);
+}
+function openDocumentTemplateEditor(x){
+ const content=x?.content||"";
+ openModal(x?"Editar plantilla":"Nueva plantilla",'<form onsubmit="saveDocumentTemplate(event,'+(x?JSON.stringify(x.id):"null")+')"><div class="two"><div class="field"><label>Nombre</label><input id="dtName" required value="'+esc(x?.name||"")+'" placeholder="Contrato de trabajo"></div><div class="field"><label>Formato de trabajo</label><select id="dtType"><option value="employee_contract" '+(x?.template_type==="employee_contract"?"selected":"")+'>Word · Contrato empleado</option><option value="supervisor_contract" '+(x?.template_type==="supervisor_contract"?"selected":"")+' >Word · Contrato supervisor</option><option value="excel" '+(x?.template_type==="excel"?"selected":"")+' >Excel · Hoja de cálculo</option><option value="other" '+(x?.template_type==="other"?"selected":"")+'>Word · Otro documento</option></select></div></div><div class="actions" style="margin:8px 0"><button type="button" class="btn" onclick="document.execCommand(\'bold\')"><b>B</b></button><button type="button" class="btn" onclick="document.execCommand(\'italic\')"><i>I</i></button><button type="button" class="btn" onclick="document.execCommand(\'insertUnorderedList\')">• Lista</button><button type="button" class="btn" onclick="document.execCommand(\'insertTable\')">Tabla*</button></div><div class="field"><label>Contenido editable</label><div id="dtContent" contenteditable="true" style="min-height:280px;max-height:55vh;overflow:auto;border:1px solid var(--line,#ddd);border-radius:12px;padding:14px;background:white;color:#222" data-placeholder="Escreva e formate o documento">'+content+'</div></div><div class="muted">Edite o texto diretamente. Pode guardar o modelo, descarregar uma versão compatível com Word/Excel ou imprimir para guardar em PDF.</div><div class="actions" style="margin-top:12px"><button type="button" class="btn" onclick="exportDocumentTemplate(\'word\')">Descarregar Word</button><button type="button" class="btn" onclick="exportDocumentTemplate(\'excel\')">Descarregar Excel</button><button type="button" class="btn" onclick="exportDocumentTemplate(\'pdf\')">Imprimir / PDF</button><button class="primary" type="submit">Guardar modelo</button></div></form>');
+}
+function exportDocumentTemplate(format){
+ const name=($("dtName")?.value||"Documento").trim(),type=$("dtType")?.value||"other",body=$("dtContent")?.innerHTML||"";
+ const html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{border-collapse:collapse;width:100%}td,th{border:1px solid #aaa;padding:6px}h1,h2,h3{color:#333}</style></head><body>'+body+'</body></html>';
+ if(format==="pdf"){const w=window.open("","_blank");if(!w){toast("Permita abrir a janela para imprimir em PDF.");return}w.document.open();w.document.write(html);w.document.close();w.focus();setTimeout(()=>w.print(),300);return}
+ const excel=format==="excel"||type==="excel",mime=excel?"application/vnd.ms-excel;charset=utf-8":"application/msword;charset=utf-8",ext=excel?".xls":".doc",blob=new Blob(["\ufeff",html],{type:mime}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name.replace(/[^a-z0-9_-]+/gi,"_")+ext;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 async function saveDocumentTemplate(e,id=null){
  e.preventDefault();
  if(!["admin","supervisor"].includes(role()))return;
- const payload={name:$("dtName").value.trim(),template_type:$("dtType").value,content:$("dtContent").value,updated_by:currentUser.id,updated_at:new Date().toISOString()};
+ const payload={name:$("dtName").value.trim(),template_type:$("dtType").value,content:$("dtContent").innerHTML,updated_by:currentUser.id,updated_at:new Date().toISOString()};
  const q=id?await sb.from("document_templates").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single():await sb.from("document_templates").insert({...payload,company_id:currentProfile.company_id}).select("id").single();
  if(q.error){toast(q.error.message);return}
  closeModal();toast("Plantilla guardada");renderDocumentsPremium();
