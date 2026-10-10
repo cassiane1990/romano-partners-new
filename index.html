@@ -4350,7 +4350,7 @@ async function saveEvidenceArchive(e){
  $("evFiles").value="";$("evBeforeFiles").value="";$("evAfterFiles").value="";if(saved)toast((occurrenceId?"Incidência registada · ":"")+saved+" ficheiro(s) guardado(s) na mesma pasta, com data e hora.");else if(occurrenceId)toast("A incidência ficou registada, mas nenhum anexo foi guardado. "+(errors.join("; ")||"Verifique os ficheiros selecionados."));if(errors.length)toast("Falhas nos anexos: "+errors.join("; "));await loadEvidenceArchive();
  } finally {if(saveButton){saveButton.disabled=false;saveButton.textContent="Guardar no histórico"}}
 }
-async function loadEvidenceArchive(){
+async function loadEvidenceArchiveInternal(){
  const box=$("evResults");if(!box)return;if(demoMode){box.innerHTML="Histórico disponível na sessão de produção.";return}
  if(role()==="client"){
   box.innerHTML='<div class="muted">A carregar as incidências das suas propriedades...</div>';
@@ -4410,6 +4410,19 @@ async function loadEvidenceArchive(){
  }));
  box.innerHTML='<div class="muted" style="margin:8px 0">Cada incidência tem a sua própria pasta; as fotos de antes e depois ficam juntas na pasta do serviço.</div>'+cards.join("");if(window.__evOpenGroupKey){const target=box.querySelector('[data-evidence-key="'+window.__evOpenGroupKey+'"]');if(target){target.open=true;target.scrollIntoView({behavior:"smooth",block:"start"});window.__evOpenGroupKey=null}}
 }
+
+async function loadEvidenceArchive(){
+ const box=$("evResults");
+ if(!box)return;
+ try{
+  await loadEvidenceArchiveInternal();
+ }catch(err){
+  const message=err?.message||String(err||"Erro desconhecido ao pesquisar o histórico.");
+  box.innerHTML='<div class="msg">Não foi possível carregar o histórico. Os registos não foram apagados. Tente novamente.<br><small>'+esc(message)+'</small></div><button type="button" class="btn gold" onclick="loadEvidenceArchive()">Tentar novamente</button>';
+  console.error("Erro ao pesquisar arquivo de incidências:",err);
+ }
+}
+
 function openEvidenceFile(url){if(url)window.open(url,"_blank","noopener")}
 async function linkEvidenceArchiveItem(id){
  if(role()!=="admin"){toast("Só a Administração pode vincular registos.");return}
