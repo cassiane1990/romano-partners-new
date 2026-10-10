@@ -5014,7 +5014,6 @@ function maintenanceServiceCatalogChanged(){
  if($("msTax"))$("msTax").textContent="Se calcula al finalizar";
  if($("msTotal"))$("msTotal").textContent="Se calcula al finalizar";
 }async function uploadMaintenanceInvoices(serviceId){
- if(!privateMaintenanceServiceType((window.__romanoServiceVersions&&window.__romanoServiceVersions[serviceId])?.service_type||"mantenimiento")&&role()!=="admin"){toast("Este anexo é exclusivo dos serviços de manutenção.");return}
  const input=$("serviceInvoiceFiles"),files=Array.from(input?.files||[]);if(!files.length){toast("Selecione pelo menos um documento.");return}
  let saved=0,errors=[];
  for(const file of files){if(file.size>50*1024*1024){errors.push(file.name+" excede 50 MB");continue}
