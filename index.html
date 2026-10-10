@@ -4082,18 +4082,38 @@ function emailMonthlyInvoiceSummary(){
 }
 async function renderInvoicesPremium(){
  let rows=[];
- if(demoMode) rows=DEMO_INVOICES||[];
- else {
-  const r=await sb.from("invoices").select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100);
-  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
-  rows=r.data||[];
+ let clientRows=[];
+ if(demoMode){
+  rows=DEMO_INVOICES||[];
+  clientRows=DEMO_CLIENTS||[];
+ }else{
+  const [r,c]=await Promise.all([
+   sb.from("invoices").select("id,number,client_id,service_id,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(1000),
+   sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name").limit(2000)
+  ]);
+  if(r.error||c.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error?.message||c.error?.message)+'</div></div>';return}
+  rows=r.data||[];clientRows=c.data||[];
  }
  Object.keys(__invoiceCache).forEach(k=>delete __invoiceCache[k]);
  rows.forEach(x=>{__invoiceCache[String(x.id)]=x});
- const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newInvoice()">+ Nueva factura</button><button class="btn" type="button" onclick="openMonthlyInvoiceSummary()">Resumen mensul</button>':'';
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Facturas</h3><div class="muted">Facturas separadas dos recibos de pagamento.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' factura(s)</span></div></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th><th>Ações</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td><td><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button> <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="sendInvoiceByEmail(this.dataset.invoiceId)">✉ E-mail</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas registradas.</div>')+'</div>';
+ const clientsById=Object.fromEntries(clientRows.map(c=>[String(c.id),c.name]));
+ const grouped={};
+ rows.forEach(x=>{const key=x.client_id||"no-client";if(!grouped[key])grouped[key]=[];grouped[key].push(x)});
+ const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newInvoice()">+ Nueva factura</button><button class="btn" type="button" onclick="openMonthlyInvoiceSummary()">Resumen mensual</button>':'';
+ const invoiceRow=x=>'<div class="line" style="align-items:flex-start;gap:12px"><div style="flex:1;min-width:0"><strong>'+esc(x.number||"—")+'</strong><br><span class="pill">'+esc(x.status||"—")+'</span><div class="muted" style="margin-top:5px">Creada: '+esc(romanoMadridLabel(x.created_at))+'</div><div class="muted">Vencimiento: '+esc(romanoMadridLabel(x.due_at))+'</div>'+(x.paid_at?'<div class="muted">Pagada: '+esc(romanoMadridLabel(x.paid_at))+'</div>':'')+'<div style="margin-top:6px">Base: '+Number(x.subtotal||0).toFixed(2)+' € · IVA: '+Number(x.tax_amount||0).toFixed(2)+' € · <strong>Total: '+Number(x.total||0).toFixed(2)+' €</strong></div></div><div class="actions"><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button> <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="sendInvoiceByEmail(this.dataset.invoiceId)">✉ E-mail</button>':'')+'</div></div>';
+ const folders=Object.entries(grouped).sort((a,b)=>{
+  const an=clientsById[a[0]]||"Cliente sem associação",bn=clientsById[b[0]]||"Cliente sem associação";
+  return an.localeCompare(bn,"pt");
+ }).map(([clientId,items])=>{
+  const name=clientsById[clientId]||"Cliente sem associação";
+  return '<details class="panel" style="margin-top:12px;padding:14px" '+(Object.keys(grouped).length===1?'open':'')+'><summary style="cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center"><span><strong>📁 '+esc(name)+'</strong><br><small class="muted">Pasta do cliente · '+items.length+' fatura(s)</small></span><span class="pill">'+items.length+'</span></summary><div style="margin-top:12px">'+items.map(invoiceRow).join("")+'</div></details>';
+ }).join("");
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Faturas por cliente</h3><div class="muted">Cada cliente tem uma pasta com todas as suas faturas. As datas e horas são apresentadas no fuso horário de Madrid.</div></div><div class="actions">'+createBtn+'<span class="pill">'+rows.length+' fatura(s)</span></div></div><div class="field"><label>Pesquisar cliente ou número da fatura</label><input id="invoiceFolderSearch" placeholder="Nome do cliente ou número..." oninput="filterInvoiceFolders()"></div><div id="invoiceFolderList">'+(folders||'<div class="empty">Não há faturas registadas.</div>')+'</div></div>';
 }
-
+function filterInvoiceFolders(){
+ const term=String($("invoiceFolderSearch")?.value||"").trim().toLocaleLowerCase("pt");
+ document.querySelectorAll("#invoiceFolderList details").forEach(folder=>{folder.style.display=folder.innerText.toLocaleLowerCase("pt").includes(term)?"":"none"});
+}
 async function renderDocumentsPremium(){
  const isClient=role()==="client";
  if(demoMode){
