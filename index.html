@@ -3175,7 +3175,7 @@ async function romanoStockModal(id){
  let x=null;
  if(id){const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("id",id).eq("company_id",currentProfile.company_id).single();if(r.error){toast(r.error.message);return}x=r.data}
  openModal(x?"Editar material":"Nuevo material",
- '<div class="two"><div class="field"><label>Material</label><input id="rsName" value="'+esc(x?.name||"")+'" required></div><div class="field"><label>SKU</label><input id="rsSku" value="'+esc(x?.sku||"")+'"></div></div>'+
+ '<div class="two"><div class="field"><label>Material</label><input id="rsName" value="'+esc(x?.name||"")+'" required></div><div class="field"><label>Código numérico automático</label><input id="rsSku" value="'+esc(x?.sku||"")+'" readonly placeholder="Será gerado ao guardar"><small class="muted">O sistema atribui um número automaticamente. Não é necessário escrever o código.</small></div></div>'+
  '<div class="two"><div class="field"><label>Unidad</label><input id="rsUnit" value="'+esc(x?.unit||"unidad")+'"></div><div class="field"><label>Categoría</label><input id="rsCategory" value="'+esc(x?.category||"material")+'"></div></div>'+
  '<div class="two"><div class="field"><label>Cantidad actual</label><input id="rsQty" type="number" min="0" step="0.01" value="'+Number(x?.quantity||0)+'"></div><div class="field"><label>Mínimo</label><input id="rsMin" type="number" min="0" step="0.01" value="'+Number(x?.min_quantity||0)+'"></div></div>'+
  '<div class="field"><label>Coste unitario (€)</label><input id="rsCost" type="number" min="0" step="0.01" value="'+Number(x?.unit_cost||0)+'"></div><div class="field"><label>Notas</label><textarea id="rsNotes">'+esc(x?.notes||"")+'</textarea></div>'+
