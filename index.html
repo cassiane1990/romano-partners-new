@@ -3294,7 +3294,7 @@ async function quotes(){
  });
  const tabBar='<div class="actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0">'+tabs.map(([key,label])=>'<button class="btn '+(romanoQuoteTab===key?'gold':'')+'" onclick="romanoQuoteSetTab(\''+key+'\')">'+label+'</button>').join("")+'</div>';
  const settingsHtml=isAdmin&&romanoQuoteTab==="settings"?'<div class="panel" style="margin-top:12px"><h3>Configuración del e-mail responsable</h3><p class="muted">Se utilizará como dirección responsable asociada a los presupuestos. Guardar la dirección no confirma el envío automático de correos; para eso hace falta una integración de correo activa.</p><div class="two"><div class="field"><label>E-mail único responsable</label><input id="quoteResponsibleEmail" type="email" value="'+esc(settingR.data?.responsible_email||"")+'" placeholder="responsable@empresa.com"></div><div class="field" style="justify-content:end"><button class="btn gold" onclick="saveQuoteResponsibleEmail()">Guardar e-mail</button></div></div></div>':"";
- const cards=filtered.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><h3>'+esc(x.number||"Sin referencia")+' · '+esc(x.title||"Presupuesto")+'</h3><div class="muted">Cliente: '+esc(clientNames[x.client_id]||"—")+' · Apartamento: '+esc(propertyNames[x.property_id]||"—")+'</div><div class="muted">Creado: '+esc(romanoMadridLabel(x.created_at))+' · Validez: '+esc(x.valid_until||"—")+(x.decision_at?' · Decisión: '+esc(romanoMadridLabel(x.decision_at)):"")+'</div></div><span class="pill">'+esc(romanoQuoteStateLabel(x.status))+'</span></div><div>'+esc(x.service_description||x.notes||"Sin descripción")+'</div><div style="margin-top:8px">Base: '+masterMoney(x.subtotal)+' · IVA: '+masterMoney(x.tax_amount)+' · <b>Total: '+masterMoney(x.total)+'</b></div>'+(x.approval_required&&["pending_approval","pending"].includes(x.status)&&isClient?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideQuote(\''+x.id+'\',true)">Aceptar presupuesto</button><button class="btn danger" onclick="decideQuote(\''+x.id+'\',false)">Rechazar</button></div>':"")+(x.invoice_id?'<div class="notice" style="margin-top:8px">Factura asociada: '+esc(x.invoice_id)+'</div>':"")+(isAdmin?'<div class="actions" style="margin-top:10px"><button class="btn" onclick="romanoQuoteModal(\''+x.id+'\')">Editar</button><button class="btn danger" onclick="romanoQuoteDelete(\''+x.id+'\')">Eliminar</button></div>':"")+'</div>').join("");
+ const cards=filtered.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><h3>'+esc(x.number||"Sin referencia")+' · '+esc(x.title||"Presupuesto")+'</h3><div class="muted">Cliente: '+esc(clientNames[x.client_id]||"—")+' · Apartamento: '+esc(propertyNames[x.property_id]||"—")+'</div><div class="muted">Creado: '+esc(romanoMadridLabel(x.created_at))+' · Validez: '+esc(x.valid_until||"—")+(x.decision_at?' · Decisión: '+esc(romanoMadridLabel(x.decision_at)):"")+'</div></div><span class="pill">'+esc(romanoQuoteStateLabel(x.status))+'</span></div><div>'+esc(x.service_description||x.notes||"Sin descripción")+'</div><div style="margin-top:8px">Base: '+masterMoney(x.subtotal)+' · IVA: '+masterMoney(x.tax_amount)+' · <b>Total: '+masterMoney(x.total)+'</b></div>'+(x.approval_required&&["pending_approval","pending"].includes(x.status)&&isClient?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideQuote(\''+x.id+'\',true)">Aceptar presupuesto</button><button class="btn danger" onclick="decideQuote(\''+x.id+'\',false)">Rechazar</button></div>':"")+(x.invoice_id?'<div class="notice" style="margin-top:8px">Factura asociada: '+esc(x.invoice_id)+(isAdmin?' <button class="btn" style="margin-left:8px" onclick="sendInvoiceByEmail(\\''+x.invoice_id+'\\')">✉ Preparar e-mail</button>':"")+'</div>':"")+(isAdmin?'<div class="actions" style="margin-top:10px"><button class="btn" onclick="romanoQuoteModal(\''+x.id+'\')">Editar</button><button class="btn danger" onclick="romanoQuoteDelete(\''+x.id+'\')">Eliminar</button></div>':"")+'</div>').join("");
  let title=isClient?"Mis presupuestos":({pending:"Presupuestos pendientes de aprobación",accepted:"Presupuestos aceptados",rejected:"Presupuestos rechazados",invoices:"Facturas generadas",settings:"Configuración de correo",history:"Histórico de presupuestos"}[romanoQuoteTab]||"Presupuestos");
  if(isAdmin&&romanoQuoteTab==="new"){await romanoQuoteModal(null);return}
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>'+title+'</h3><div class="muted">Historial por cliente, apartamento, fecha, estado, decisión y factura asociada.</div></div></div>'+(isAdmin?tabBar:"")+(settingsHtml||((romanoQuoteTab==="settings"&&isAdmin)?"":(filtered.length?cards:'<div class="empty">No hay presupuestos en esta sección.</div>')))+'</div>';
@@ -3331,19 +3331,26 @@ async function romanoQuoteSave(id){
  if(settings.error){toast("Não foi possível carregar o e-mail responsável: "+settings.error.message);return}
  const responsibleEmail=settings.data?.responsible_email||null;
  const needsApproval=total>50;
- const payload={number:$("qNumber").value.trim()||("ORC-"+Date.now()),title,status:needsApproval?"pending_approval":"sent",client_id:clientId,property_id:propertyId,service_id:serviceId,subtotal,tax_amount:tax,total,vat_rate:vat,approval_required:needsApproval,service_description:title,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,responsible_email:responsibleEmail,updated_at:new Date().toISOString()};
+ let existingInvoiceId=null;
+ if(id){
+   const existing=await sb.from("quotes").select("invoice_id").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
+   if(existing.error){toast("Não foi possível verificar a fatura existente: "+existing.error.message);return}
+   existingInvoiceId=existing.data?.invoice_id||null;
+ }
+ const payload={number:$("qNumber").value.trim()||("ORC-"+Date.now()),title,status:needsApproval?"pending_approval":(existingInvoiceId?"invoiced":"sent"),client_id:clientId,property_id:propertyId,service_id:serviceId,subtotal,tax_amount:tax,total,vat_rate:vat,approval_required:needsApproval,service_description:title,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,responsible_email:responsibleEmail,updated_at:new Date().toISOString()};
  const r=id?await sb.from("quotes").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single():await sb.from("quotes").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
  if(r.error){toast("Não foi possível guardar o orçamento: "+r.error.message);return}
- let invoiceId=null;
- if(!needsApproval){
+ let invoiceId=existingInvoiceId;
+ if(!needsApproval&&!invoiceId){
    const inv=await sb.from("invoices").insert({company_id:currentProfile.company_id,client_id:clientId,service_id:serviceId,number:"INV-"+Date.now(),status:"draft",subtotal,tax_rate:vat,tax_amount:tax,total}).select("id").single();
    if(inv.error){toast("Orçamento guardado, mas a fatura não foi criada: "+inv.error.message);closeModal();await quotes();return}
    invoiceId=inv.data.id;
-   const link=await sb.from("quotes").update({invoice_id:invoiceId}).eq("id",r.data.id).eq("company_id",currentProfile.company_id);
+   const link=await sb.from("quotes").update({invoice_id:invoiceId,status:"invoiced"}).eq("id",r.data.id).eq("company_id",currentProfile.company_id);
    if(link.error){toast("A fatura foi criada, mas não foi associada ao orçamento: "+link.error.message);closeModal();await quotes();return}
  }
  closeModal();
- toast(needsApproval?"Orçamento guardado e aguarda aprovação do cliente.":"Orçamento guardado e fatura em rascunho criada. O envio por e-mail ainda depende de integração.");
+ toast(needsApproval?"Orçamento guardado e aguarda aprovação do cliente. A fatura será gerada após a aceitação.":"Orçamento guardado e fatura em rascunho criada. Pode prepará-la para envio por e-mail na área Faturas.");
+ romanoQuoteTab=invoiceId?"invoices":(needsApproval?"pending":"history");
  await quotes();
 }
 
