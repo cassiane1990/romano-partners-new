@@ -5002,13 +5002,51 @@ function stopServiceGPS(){if(window.__romanoWatchId!=null){navigator.geolocation
 async function renderQualityPremium(){return quality()}
 async function renderEmergencyPremium(){return emergency()}
 async function openEmergencyRecord(id){
- const q=await sb.from("occurrences").select("id,service_id,property_id,service_type,category,priority,description,status,resolution,created_at,created_by,assigned_employee_id").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ const q=await sb.from("occurrences").select("id,service_id,property_id,service_type,category,priority,description,status,resolution,created_at,created_by,assigned_employee_id,accepted_at,started_at,finished_at").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error||!q.data){toast("No se pudo abrir la emergencia: "+(q.error?.message||"registro no encontrado"));return}
  const x=q.data;let p=null,cl=null,creator=null,worker=null;
  if(x.property_id){const pr=await sb.from("properties").select("id,name,code,address,city,client_id").eq("id",x.property_id).maybeSingle();p=pr.data;if(p?.client_id){const cr=await sb.from("clients").select("name,phone,email").eq("id",p.client_id).maybeSingle();cl=cr.data}}
  if(x.created_by){const cr=await sb.from("profiles").select("full_name").eq("id",x.created_by).maybeSingle();creator=cr.data?.full_name}
  if(x.assigned_employee_id){const wr=await sb.from("profiles").select("full_name").eq("id",x.assigned_employee_id).maybeSingle();worker=wr.data?.full_name}
- openModal("🚨 Emergencia 24H · "+(p?.name||p?.code||"Incidencia"),'<div class="notice" style="border:2px solid #b00020;background:#fff0f0;color:#7a0015"><b>EMERGENCIA 24H — TARIFA ESPECIAL</b><br>Creada: '+esc(romanoMadridLabel(x.created_at))+'</div><div class="panel"><b>Cliente</b><div>'+esc(cl?.name||"—")+'</div><b>Apartamento</b><div>'+esc(p?.name||p?.code||"—")+'</div><b>Dirección</b><div>'+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"—")+'</div><b>Tipo</b><div>'+esc(x.service_type||x.category||"—")+'</div><b>Estado</b><div>'+esc(x.status)+'</div><b>Creada por</b><div>'+esc(creator||"—")+'</div><b>Funcionario</b><div>'+esc(worker||"—")+'</div><b>Descripción</b><div style="white-space:pre-wrap">'+esc(x.description)+'</div>'+(x.resolution?'<b>Resolución</b><div>'+esc(x.resolution)+'</div>':"")+'</div><div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button>'+(role()==="admin"?'<button class="btn danger" onclick="deleteEmergencyRecord(\''+x.id+'\')">Eliminar incidencia</button>':"")+'</div>');
+ const isAssignedWorker=x.assigned_employee_id===currentUser.id&&["employee","maintenance_technician"].includes(role());
+ const timeline='<div class="panel" style="margin-top:10px"><h3>Control de tiempo · 60 €/hora</h3><div>Creada: <b>'+esc(romanoMadridLabel(x.created_at))+'</b></div><div>Aceptada por el funcionario: <b>'+esc(x.accepted_at?romanoMadridLabel(x.accepted_at):"Pendiente de aceptación")+'</b></div><div>Inicio del trabajo: <b>'+esc(x.started_at?romanoMadridLabel(x.started_at):"No iniciado")+'</b></div><div>Finalización: <b>'+esc(x.finished_at?romanoMadridLabel(x.finished_at):"No finalizado")+'</b></div>'+(x.started_at&&x.finished_at?'<div style="margin-top:8px;font-size:18px"><b>Tiempo trabajado: '+esc((Math.max(0,new Date(x.finished_at)-new Date(x.started_at))/3600000).toFixed(2).replace(".",","))+' h</b><br><b>Importe estimado: '+esc((Math.max(0,new Date(x.finished_at)-new Date(x.started_at))/3600000*60).toLocaleString("es-ES",{style:"currency",currency:"EUR"}))+'</b></div>':"")+'</div>';
+ const workerActions=isAssignedWorker&&x.status!=="resolved"&&x.status!=="rejected"?(x.status==="open"?'<button class="btn gold" onclick="updateEmergencyStage(\''+x.id+'\',\'accept\')">✓ Aceptar emergencia</button>':"")+(x.status==="accepted"?'<button class="btn gold" onclick="updateEmergencyStage(\''+x.id+'\',\'start\')">▶ Iniciar trabajo</button>':"")+(x.status==="in_progress"?'<div class="field"><label>Fotos/vídeos de la reparación finalizada (obligatorio, mínimo 1)</label><input id="emergencyFinalMedia" type="file" accept="image/*,video/*" multiple required><small>Debe anexar al menos una foto o vídeo antes de finalizar.</small></div><button class="btn gold" onclick="updateEmergencyStage(\''+x.id+'\',\'finish\')">✓ Finalizar emergencia</button>':""):"";
+ const mediaResult=await sb.from("occurrence_media").select("id,file_name,media_type,storage_path,created_at,uploaded_by").eq("company_id",currentProfile.company_id).eq("occurrence_id",x.id).order("created_at",{ascending:true});
+ let mediaHtml='<div class="panel" style="margin-top:10px"><h3>Evidencias</h3>';
+ if(mediaResult.data?.length){for(const m of mediaResult.data){const u=await sb.storage.from("company-documents").createSignedUrl(m.storage_path,600);mediaHtml+='<div class="line"><span>'+(m.media_type==="video"?"🎥":"📷")+' '+esc(m.file_name)+' · '+esc(romanoMadridLabel(m.created_at))+'</span><button class="btn" onclick="window.open(\''+esc(u.data?.signedUrl||"")+'\',\'_blank\',\'noopener\')">Abrir</button></div>'}}else mediaHtml+='<div class="muted">Ainda sem fotos ou vídeos anexados.</div>';mediaHtml+='</div>';
+ openModal("🚨 Emergencia 24H · "+(p?.name||p?.code||"Incidencia"),'<div class="notice" style="border:2px solid #b00020;background:#fff0f0;color:#7a0015"><b>EMERGÊNCIA 24H — TARIFA ESPECIAL: 60 €/hora</b><br>Creada: '+esc(romanoMadridLabel(x.created_at))+'</div><div class="panel"><b>Cliente</b><div>'+esc(cl?.name||"—")+'</div><b>Apartamento</b><div>'+esc(p?.name||p?.code||"—")+'</div><b>Dirección</b><div>'+esc([p?.address,p?.city].filter(Boolean).join(" · ")||"—")+'</div><b>Tipo</b><div>'+esc(x.service_type||x.category||"—")+'</div><b>Estado</b><div>'+esc(x.status)+'</div><b>Criada por</b><div>'+esc(creator||"—")+'</div><b>Funcionário designado</b><div>'+esc(worker||"—")+'</div><b>Descrição</b><div style="white-space:pre-wrap">'+esc(x.description)+'</div>'+(x.resolution?'<b>Resolução</b><div>'+esc(x.resolution)+'</div>':"")+'</div>'+timeline+mediaHtml+'<div class="actions">'+workerActions+'<button class="btn" onclick="closeModal()">Cerrar</button>'+(role()==="admin"?'<button class="btn danger" onclick="deleteEmergencyRecord(\''+x.id+'\')">Eliminar incidencia</button>':"")+'</div>');
+}
+async function updateEmergencyStage(id,action){
+ const allowed=["employee","maintenance_technician"].includes(role());
+ const q=await sb.from("occurrences").select("id,status,assigned_employee_id,created_by,description,company_id").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ if(q.error||!q.data){toast("Não foi possível carregar a emergência.");return}
+ const x=q.data,isAdmin=["admin","supervisor"].includes(role());
+ if(!isAdmin&&(!allowed||x.assigned_employee_id!==currentUser.id)){toast("Só o funcionário designado pode atualizar esta emergência.");return}
+ const now=new Date().toISOString();let update={};
+ if(action==="accept"){if(x.status!=="open")return;update={status:"accepted",accepted_at:now}}
+ else if(action==="start"){if(x.status!=="accepted"){toast("Aceite a emergência antes de iniciar.");return}update={status:"in_progress",started_at:now}}
+ else if(action==="finish"){
+  if(x.status!=="in_progress" ){toast("Inicie o trabalho antes de finalizar.");return}
+  const files=Array.from($("emergencyFinalMedia")?.files||[]);if(!files.length){toast("Obrigatório anexar pelo menos uma foto ou vídeo da reparação finalizada.");return}
+  let saved=0,errors=[];
+  for(const file of files){if(!/^(image|video)\//.test(file.type||"")||file.size>25*1024*1024){errors.push(file.name+" (formato/tamanho inválido)");continue}
+   const safe=(file.name||"final").replace(/[^a-zA-Z0-9._-]+/g,"_"),path=currentProfile.company_id+"/"+currentUser.id+"/occurrences/"+id+"/"+crypto.randomUUID()+"-"+safe;
+   const up=await sb.storage.from("company-documents").upload(path,file,{upsert:false,contentType:file.type});
+   if(up.error){errors.push(file.name+": "+up.error.message);continue}
+   const ins=await sb.from("occurrence_media").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,occurrence_id:id,uploaded_by:currentUser.id,media_type:file.type.startsWith("video/")?"video":"photo",file_name:file.name,storage_path:path});
+   if(ins.error){await sb.storage.from("company-documents").remove([path]);errors.push(file.name+": "+ins.error.message)}else saved++;
+  }
+  if(!saved){toast("Não foi possível guardar a evidência final. A emergência continua aberta. "+errors.join("; "));return}
+  const all=await sb.from("occurrence_media").select("id").eq("company_id",currentProfile.company_id).eq("occurrence_id",id);
+  if(all.error||!all.data?.length){toast("Não foi possível confirmar a foto final. A emergência continua aberta.");return}
+  update={status:"resolved",finished_at:now,resolved_at:now,resolution:"Emergência 24H concluída com "+saved+" ficheiro(s) final(is)."};
+ }else return;
+ const r=await sb.from("occurrences").update(update).eq("id",id).eq("company_id",currentProfile.company_id).select("id").maybeSingle();
+ if(r.error||!r.data){toast("Não foi possível atualizar a emergência: "+(r.error?.message||"sem permissão"));return}
+ const admins=await sb.from("profiles").select("id").eq("company_id",currentProfile.company_id).in("role",["admin","supervisor"]);
+ const recipients=[...new Set((admins.data||[]).map(p=>p.id))];
+ if(recipients.length)await sb.from("notifications").insert(recipients.map(recipient_id=>({company_id:currentProfile.company_id,recipient_id,title:action==="accept"?"Emergência 24H aceite":action==="start"?"Emergência 24H iniciada":"Emergência 24H finalizada",body:"Emergência atualizada por "+(currentProfile.full_name||"funcionário")+".",severity:"urgent",related_object_type:"occurrence",related_object_id:id})));
+ toast(action==="accept"?"Emergência aceite.":action==="start"?"Trabalho iniciado.":"Emergência finalizada com evidência.");await openEmergencyRecord(id);
 }
 async function deleteEmergencyRecord(id){
  if(role()!=="admin"){toast("Solo el Administrador puede eliminar una emergencia.");return}
