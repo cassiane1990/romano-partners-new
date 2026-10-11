@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   patch-responsive-agenda:
-    if: ${{ !contains(github.event.head_commit.message, '[responsive-patch]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[responsive-patch]') && !contains(github.event.head_commit.message, 'Fix quote invoice creation and validation') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
