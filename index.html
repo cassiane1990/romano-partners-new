@@ -3371,7 +3371,7 @@ async function decideQuote(id,accept){
  toast(accept?"Orçamento aceite. Fatura criada.":"Orçamento recusado.");await quotes();
 }
 async function romanoQuoteModal(id){
- if(role()!=="admin"){toast("Só o Administrador pode criar e editar orçamentos.");return}
+ if(!["admin","supervisor"].includes(role())){toast("Solo Administración o Supervisión puede crear y editar presupuestos.");return}
  let x=null;if(id){const r=await sb.from("quotes").select("*").eq("id",id).eq("company_id",currentProfile.company_id).single();if(r.error){toast(r.error.message);return}x=r.data}
  const [clients,props,services]=await Promise.all([sb.from("clients").select("id,name,email").eq("company_id",currentProfile.company_id).order("name"),sb.from("properties").select("id,name,code,client_id").eq("company_id",currentProfile.company_id).order("name"),sb.from("services").select("id,code,service_type,property_id,client_id").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(500)]);
  if(clients.error||props.error){toast(clients.error?.message||props.error?.message);return}
@@ -3379,7 +3379,7 @@ async function romanoQuoteModal(id){
  const clientSel=$("qClient"),propertySel=$("qProperty");const filterProps=()=>{[...propertySel.options].forEach(o=>{if(!o.value)return;o.hidden=!!clientSel.value&&o.dataset.client!==clientSel.value})};clientSel.addEventListener("change",filterProps);filterProps();
 }
 async function romanoQuoteSave(id){
- if(role()!=="admin")return;
+ if(!["admin","supervisor"].includes(role())){toast("Solo Administración o Supervisión puede guardar presupuestos.");return}
  const subtotal=Math.max(0,Number($("qSubtotal").value||0));
  const vat=Math.max(0,Number($("qVat").value||0));
  const tax=Math.round(subtotal*vat)/100;
@@ -3414,7 +3414,7 @@ async function romanoQuoteSave(id){
  await quotes();
 }
 
-async function romanoQuoteDelete(id){if(role()!=="admin")return;if(!confirm("Eliminar este orçamento?"))return;const r=await sb.from("quotes").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast(r.error.message);return}await quotes();toast("Orçamento eliminado.");}
+async function romanoQuoteDelete(id){if(!["admin","supervisor"].includes(role()))return;if(!confirm("Eliminar este orçamento?"))return;const r=await sb.from("quotes").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast(r.error.message);return}await quotes();toast("Orçamento eliminado.");}
 
 async function renderStock(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("company_id",currentProfile.company_id).order("name");
