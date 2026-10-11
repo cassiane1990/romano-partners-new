@@ -102,6 +102,18 @@ button.dark,.btn.dark{background:#1c1c19;border-color:#1c1c19;color:#fff}
 button.danger,.btn.danger{background:#fff5f3;border-color:#e5b9b1;color:#8a4137}
 .primary{min-height:48px;border-radius:var(--rpc-button-radius);font-family:Inter,system-ui,sans-serif}
 .rpc-home-action{border-radius:var(--rpc-button-radius);font-family:Inter,system-ui,sans-serif}
+/* Restore requested primary action color: brown/gold for enter, create and save actions */
+#loginForm .primary,#recoveryBtn,#mfaBtn,button.primary,button.primary-q,
+button[id*="create" i],button[id*="save" i],button[id*="submit" i],
+button[data-action="create"],button[data-action="save"]{
+ background:#8b642c!important;border-color:#8b642c!important;color:#fff!important;
+}
+#loginForm .primary:hover,#recoveryBtn:hover,#mfaBtn:hover,button.primary:hover,button.primary-q:hover{
+ background:#725020!important;border-color:#725020!important;
+}
+#loginForm .actions #signupBtn,#loginForm .actions #resetBtn{
+ background:#fffdf9;border-color:#e5dac8;color:#5c4325;
+}
 </style></style></style><style id="romano-urgent-cleaning-style">.service-urgent-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:5px 9px;border-radius:999px;background:#fff0ed;color:#a72d20;border:1px solid #efb7ad;font-size:10px;font-weight:800;letter-spacing:.06em}.services-flow{flex-wrap:wrap}.services-flow span{white-space:nowrap}</style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
