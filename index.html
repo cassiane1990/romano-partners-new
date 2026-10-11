@@ -1500,8 +1500,30 @@ async function renderLocationsMaster(){
  const seen={};(loc.data||[]).forEach(x=>{if(seen[x.profile_id])return;seen[x.profile_id]=1;L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Última actualización: "+romanoMadridLabel(x.recorded_at))});
 }
 async function renderMaterialsMaster(){
- const r=await sb.from("material_requests").select("item_name,quantity,unit,status,created_at").order("created_at",{ascending:false}).limit(100);
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Solicitações de materiais</h3><div class="muted">Sacos de lixo · vidro · móvel · WC · ferramentas · outros</div></div><button class="btn gold" onclick="masterMaterialRequest()">＋ Pedir material</button></div>'+(r.data?.length?r.data.map(x=>'<div class="line-item"><span><b>'+esc(x.item_name)+'</b> · '+esc(x.quantity)+" "+esc(x.unit)+'<br><small>'+esc(romanoMadridShortDateTime(x.created_at))+'</small></span><span class="status">'+esc(x.status)+'</span></div>').join(""):'<div class="empty">Sin solicitudes.</div>')+'</div>';
+ const r=await sb.from("material_requests").select("id,company_id,requested_by,item_name,quantity,unit,status,created_at,notes").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(200);
+ if(r.error){$("content").innerHTML='<div class="panel"><h3>Solicitações de materiais</h3><div class="empty">'+esc(r.error.message)+'</div></div>';return}
+ const canManage=["admin","supervisor"].includes(role());
+ const resolved=s=>["resolved","completed","done","closed"].includes(String(s||"").toLowerCase());
+ const statusLabel=s=>resolved(s)?"Resolvido":String(s||"requested")==="requested"?"Solicitado":String(s||"");
+ const rows=r.data||[];
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Solicitações de materiais</h3><div class="muted">Sacos de lixo · vidro · móvel · WC · ferramentas · outros</div></div><button class="btn gold" onclick="masterMaterialRequest()">＋ Pedir material</button></div>'+(rows.length?rows.map(x=>'<div class="line-item" style="align-items:center;gap:12px"><span style="flex:1"><b>'+esc(x.item_name)+'</b> · '+esc(x.quantity)+' '+esc(x.unit||"un")+'<br><small>'+esc(romanoMadridShortDateTime(x.created_at))+'</small>'+(x.notes?'<br><small>'+esc(x.notes)+'</small>':"")+'</span><span class="status">'+esc(statusLabel(x.status))+'</span>'+(canManage&&!resolved(x.status)?'<button class="btn" onclick="resolveMasterMaterial(\''+x.id+'\')">Marcar resolvido</button>':"")+(canManage&&resolved(x.status)?'<button class="btn danger" onclick="deleteResolvedMasterMaterial(\''+x.id+'\')">Apagar</button>':"")+'</div>').join(""):'<div class="empty">Sem solicitações.</div>')+'</div>';
+}
+async function resolveMasterMaterial(id){
+ if(!["admin","supervisor"].includes(role())){toast("Só o administrador ou supervisor pode resolver pedidos.");return}
+ if(!confirm("Marcar esta solicitação de material como resolvida?"))return;
+ const r=await sb.from("material_requests").update({status:"resolved"}).eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("Não foi possível resolver: "+r.error.message);return}
+ toast("Solicitação marcada como resolvida.");await renderMaterialsMaster();
+}
+async function deleteResolvedMasterMaterial(id){
+ if(!["admin","supervisor"].includes(role())){toast("Só o administrador ou supervisor pode apagar pedidos.");return}
+ const check=await sb.from("material_requests").select("id,status").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ if(check.error){toast("Não foi possível verificar a solicitação: "+check.error.message);return}
+ if(!["resolved","completed","done","closed"].includes(String(check.data.status||"").toLowerCase())){toast("Só é possível apagar solicitações resolvidas.");return}
+ if(!confirm("Apagar definitivamente esta solicitação já resolvida? Esta ação não pode ser desfeita."))return;
+ const r=await sb.from("material_requests").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("Não foi possível apagar: "+r.error.message);return}
+ toast("Solicitação resolvida e apagada.");await renderMaterialsMaster();
 }
 function masterMaterialRequest(){openModal("Pedir material","<form onsubmit='saveMasterMaterial(event)'><div class='two'><div class='field'><label>Material</label><input id='mmName' required placeholder='Sacos de lixo, produto vidro...'></div><div class='field'><label>Quantidade</label><input id='mmQty' type='number' min='1' value='1'></div></div><div class='field'><label>Observación</label><textarea id='mmNote'></textarea></div><button class='primary'>Enviar al supervisor</button></form>")}
 async function saveMasterMaterial(e){e.preventDefault();const r=await sb.from("material_requests").insert({company_id:currentProfile.company_id,requested_by:currentUser.id,item_name:$("mmName").value.trim(),quantity:Number($("mmQty").value||1),unit:"un",notes:$("mmNote").value.trim()||null});if(r.error)toast(r.error.message);else{closeModal();toast("Pedido de material enviado");renderMaterialsMaster()}}
