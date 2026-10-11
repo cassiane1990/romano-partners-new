@@ -3264,39 +3264,50 @@ async function audit(){
 async function privacy(){
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Privacidad / RGPD</h3><div class="muted">Centro de información y control de privacidad de ROMANO PARTNERS.</div></div></div><div class="master-cols"><div class="panel"><h3>Datos y acceso</h3><p>Los datos están separados por empresa y el acceso depende del perfil y las políticas del backend.</p><p>Clientes y funcionarios deben ver únicamente la información que corresponde a sus permisos.</p></div><div class="panel"><h3>Buenas prácticas</h3><p>Evita compartir contraseñas. Los documentos y comunicaciones deben permanecer dentro de los espacios autorizados.</p></div></div></div>';
 }
-async function quotes(){
- if(!canManage()){ $("content").innerHTML='<div class="panel"><div class="msg">Los presupuestos están disponibles para Administrador y Supervisor.</div></div>'; return; }
- const r=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false});
- if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">No se pudieron cargar los presupuestos: '+esc(r.error.message)+'</div></div>';return}
- const rows=r.data||[];
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Presupuestos</h3><div class="muted">Crea, edita, guarda y elimina presupuestos.</div></div><button class="btn gold" onclick="romanoQuoteModal(null)">＋ Nuevo presupuesto</button></div>'+(rows.length?'<table class="table"><thead><tr><th>Nº</th><th>Título</th><th>Estado</th><th>Total</th><th>Válido hasta</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.status)+'</td><td>'+masterMoney(x.total)+'</td><td>'+esc(x.valid_until||"—")+'</td><td><button class="btn" onclick="romanoQuoteModal('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" onclick="romanoQuoteDelete('+JSON.stringify(x.id)+')">Eliminar</button></td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay presupuestos.</div>')+'</div>';
+async async function quotes(){
+ const isAdmin=role()==="admin",isClient=role()==="client";
+ if(!isAdmin&&!isClient){$("content").innerHTML='<div class="panel"><div class="msg">Los presupuestos están disponibles para Administración y el cliente destinatario.</div></div>';return}
+ const q=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at,approval_required,decision_at,invoice_id,service_description,vat_rate").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(1000);
+ if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">No se pudieron cargar los presupuestos: '+esc(q.error.message)+'</div></div>';return}
+ let rows=q.data||[];
+ if(isClient){const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();rows=rows.filter(x=>x.client_id===c.data?.id)}
+ let settingsHtml="";
+ if(isAdmin){const setting=await sb.from("quote_settings").select("responsible_email").eq("company_id",currentProfile.company_id).maybeSingle();settingsHtml='<div class="panel" style="margin-top:12px"><h3>E-mail responsável pelos orçamentos</h3><div class="two"><div class="field"><label>E-mail único</label><input id="quoteResponsibleEmail" type="email" value="'+esc(setting.data?.responsible_email||"")+'" placeholder="responsavel@empresa.com"></div><div class="field" style="justify-content:end"><button class="btn" onclick="saveQuoteResponsibleEmail()">Guardar e-mail</button></div></div></div>'}
+ const cards=rows.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><h3>'+esc(x.number)+' · '+esc(x.title)+'</h3><div class="muted">Criado: '+esc(romanoMadridLabel(x.created_at))+' · Validade: '+esc(x.valid_until||"—")+'</div></div><span class="pill">'+esc(x.status)+'</span></div><div>'+esc(x.service_description||x.notes||"Sem descrição")+'</div><div style="margin-top:8px">Base: '+masterMoney(x.subtotal)+' · IVA: '+masterMoney(x.tax_amount)+' · <b>Total: '+masterMoney(x.total)+'</b></div>'+(x.approval_required&&x.status==="pending_approval"&&isClient?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideQuote(\''+x.id+'\',true)">Aceitar orçamento</button><button class="btn danger" onclick="decideQuote(\''+x.id+'\',false)">Recusar</button></div>':"")+(x.invoice_id?'<div class="notice" style="margin-top:8px">Fatura gerada: '+esc(x.invoice_id)+'</div>':"")+(isAdmin?'<div class="actions" style="margin-top:10px"><button class="btn" onclick="romanoQuoteModal(\''+x.id+'\')">Editar</button><button class="btn danger" onclick="romanoQuoteDelete(\''+x.id+'\')">Eliminar</button></div>':"")+'</div>').join("");
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>'+ (isAdmin?'Orçamentos e aprovação':'Os meus orçamentos')+'</h3><div class="muted">Histórico permanente por cliente, apartamento, estado e fatura.</div></div>'+(isAdmin?'<button class="btn gold" onclick="romanoQuoteModal(null)">＋ Novo orçamento</button>':"")+'</div>'+(cards||'<div class="empty">Não existem orçamentos para apresentar.</div>')+'</div>'+settingsHtml;
+}
+async function saveQuoteResponsibleEmail(){
+ if(role()!=="admin")return;const email=String($("quoteResponsibleEmail")?.value||"").trim();
+ if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast("E-mail inválido.");return}
+ const r=await sb.from("quote_settings").upsert({company_id:currentProfile.company_id,responsible_email:email||null,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:"company_id"});
+ if(r.error){toast("Não foi possível guardar: "+r.error.message);return}toast("E-mail responsável guardado.");
+}
+async function decideQuote(id,accept){
+ if(role()!=="client")return;const r=await sb.rpc("client_decide_quote",{p_quote_id:id,p_accept:accept});
+ if(r.error){toast("Não foi possível registar a decisão: "+r.error.message);return}
+ toast(accept?"Orçamento aceite. Fatura criada.":"Orçamento recusado.");await quotes();
 }
 async function romanoQuoteModal(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede gestionar presupuestos.");return}
+ if(role()!=="admin"){toast("Só o Administrador pode criar e editar orçamentos.");return}
  let x=null;if(id){const r=await sb.from("quotes").select("*").eq("id",id).eq("company_id",currentProfile.company_id).single();if(r.error){toast(r.error.message);return}x=r.data}
- const clients=await sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name");
- const props=await sb.from("properties").select("id,name,code").eq("company_id",currentProfile.company_id).order("name");
- if(clients.error){toast("No se pudieron cargar los clientes: "+clients.error.message);return}
- if(props.error){toast("No se pudieron cargar las propiedades: "+props.error.message);return}
- openModal(x?"Editar presupuesto":"Nuevo presupuesto",
- '<div class="two"><div class="field"><label>Número</label><input id="qNumber" value="'+esc(x?.number||("P-"+Date.now()))+'"></div><div class="field"><label>Estado</label><select id="qStatus"><option value="draft">Borrador</option><option value="sent">Enviado</option><option value="accepted">Aceptado</option><option value="rejected">Rechazado</option><option value="expired">Vencido</option></select></div></div>'+
- '<div class="field"><label>Título</label><input id="qTitle" value="'+esc(x?.title||"")+'" required></div>'+
- '<div class="two"><div class="field"><label>Cliente</label><select id="qClient"><option value="">—</option>'+(clients.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.client_id?"selected":"")+'>'+esc(v.name)+'</option>').join("")+'</select></div><div class="field"><label>Propiedad</label><select id="qProperty"><option value="">—</option>'+(props.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.property_id?"selected":"")+'>'+esc(v.name)+' · '+esc(v.code||"")+'</option>').join("")+'</select></div></div>'+
- '<div class="two"><div class="field"><label>Subtotal (€)</label><input id="qSubtotal" type="number" min="0" step="0.01" value="'+Number(x?.subtotal||0)+'"></div><div class="field"><label>IVA (€)</label><input id="qTax" type="number" min="0" step="0.01" value="'+Number(x?.tax_amount||0)+'"></div></div>'+
- '<div class="field"><label>Válido hasta</label><input id="qValid" type="date" value="'+esc(x?.valid_until||"")+'"></div><div class="field"><label>Notas</label><textarea id="qNotes">'+esc(x?.notes||"")+'</textarea></div>'+
- '<button type="button" class="primary" onclick="romanoQuoteSave('+JSON.stringify(id||null)+')">Guardar</button>');
- if(x)$("qStatus").value=x.status||"draft";
+ const [clients,props,services]=await Promise.all([sb.from("clients").select("id,name,email").eq("company_id",currentProfile.company_id).order("name"),sb.from("properties").select("id,name,code,client_id").eq("company_id",currentProfile.company_id).order("name"),sb.from("services").select("id,code,service_type,property_id,client_id").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(500)]);
+ if(clients.error||props.error){toast(clients.error?.message||props.error?.message);return}
+ openModal(x?"Editar orçamento":"Novo orçamento",'<div class="two"><div class="field"><label>Número de referência</label><input id="qNumber" value="'+esc(x?.number||("ORC-"+Date.now()))+'"></div><div class="field"><label>Validade</label><input id="qValid" type="date" value="'+esc(x?.valid_until||"")+'"></div></div><div class="field"><label>Cliente</label><select id="qClient" required><option value="">Selecione</option>'+(clients.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.client_id?"selected":"")+'>'+esc(v.name)+'</option>').join("")+'</select></div><div class="field"><label>Apartamento</label><select id="qProperty"><option value="">Selecione</option>'+(props.data||[]).map(v=>'<option value="'+v.id+'" data-client="'+v.client_id+'" '+(v.id===x?.property_id?"selected":"")+'>'+esc(v.name)+' · '+esc(v.code||"")+'</option>').join("")+'</select></div><div class="field"><label>Serviço relacionado (opcional)</label><select id="qService"><option value="">Sem serviço existente</option>'+(services.data||[]).map(v=>'<option value="'+v.id+'" '+(v.id===x?.service_id?"selected":"")+'>'+esc(v.code)+' · '+esc(v.service_type)+'</option>').join("")+'</select></div><div class="field"><label>Descrição do serviço / orçamento</label><input id="qTitle" value="'+esc(x?.title||"")+'" required placeholder="Ex.: Reparação extraordinaria"></div><div class="field"><label>Materiais e observações</label><textarea id="qNotes">'+esc(x?.notes||"")+'</textarea></div><div class="two"><div class="field"><label>Valor sem IVA (€)</label><input id="qSubtotal" type="number" min="0" step=".01" value="'+Number(x?.subtotal||0)+'"></div><div class="field"><label>IVA (%)</label><input id="qVat" type="number" min="0" max="100" step=".01" value="'+Number(x?.vat_rate||0)+'"></div></div><div class="notice">Até 50 €: notificação de fatura. Acima de 50 €: o cliente terá de aprovar antes da emissão da fatura.</div><button class="primary" onclick="romanoQuoteSave(\''+(x?.id||"")+'\')">Guardar orçamento</button>');
+ const clientSel=$("qClient"),propertySel=$("qProperty");const filterProps=()=>{[...propertySel.options].forEach(o=>{if(!o.value)return;o.hidden=!!clientSel.value&&o.dataset.client!==clientSel.value})};clientSel.addEventListener("change",filterProps);filterProps();
 }
 async function romanoQuoteSave(id){
- if(!canManage()){toast("Solo Admin/Supervisor puede guardar presupuestos.");return}
- const subtotal=Math.max(0,Number($("qSubtotal").value||0)),tax=Math.max(0,Number($("qTax").value||0));
- const payload={number:$("qNumber").value.trim()||("P-"+Date.now()),title:$("qTitle").value.trim(),status:$("qStatus").value,client_id:$("qClient").value||null,property_id:$("qProperty").value||null,subtotal,tax_amount:tax,total:subtotal+tax,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,updated_at:new Date().toISOString()};
- if(!payload.title){toast("Indique el título.");return}
+ if(role()!=="admin")return;const subtotal=Math.max(0,Number($("qSubtotal").value||0)),vat=Math.max(0,Number($("qVat").value||0)),tax=Math.round(subtotal*vat)/100;
+ const clientId=$("qClient").value,propertyId=$("qProperty").value||null,serviceId=$("qService").value||null,title=$("qTitle").value.trim();
+ if(!clientId||!title){toast("Selecione o cliente e indique a descrição.");return}
+ const settings=await sb.from("quote_settings").select("responsible_email").eq("company_id",currentProfile.company_id).maybeSingle();
+ const payload={number:$("qNumber").value.trim()||("ORC-"+Date.now()),title,status:(subtotal+tax)>50?"pending_approval":"sent",client_id:clientId,property_id:propertyId,service_id:serviceId,subtotal,tax_amount:tax,total:subtotal+tax,vat_rate:vat,approval_required:(subtotal+tax)>50,service_description:title,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,responsible_email:settings.data?.responsible_email||null,updated_at:new Date().toISOString()};
  const r=id?await sb.from("quotes").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single():await sb.from("quotes").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
- if(r.error){toast("No se pudo guardar el presupuesto: "+r.error.message);return}
- closeModal();toast("Presupuesto guardado correctamente");await quotes();
+ if(r.error){toast("Não foi possível guardar o orçamento: "+r.error.message);return}
+ if((subtotal+tax)<=50){const inv=await sb.from("invoices").insert({company_id:currentProfile.company_id,client_id:clientId,service_id:serviceId,number:"INV-"+Date.now(),status:"draft",subtotal,tax_rate:vat,tax_amount:tax,total:subtotal+tax}).select("id").single();if(!inv.error)await sb.from("quotes").update({invoice_id:inv.data.id}).eq("id",r.data.id).eq("company_id",currentProfile.company_id)}
+ const client=clients.data;
+ closeModal();toast("Orçamento guardado.");await quotes();
 }
-async function romanoQuoteDelete(id){if(!canManage()){toast("Solo Admin/Supervisor puede eliminar presupuestos.");return}if(!confirm("¿Eliminar este presupuesto?"))return;const r=await sb.from("quotes").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se pudo eliminar el presupuesto: "+r.error.message);return}toast("Presupuesto eliminado correctamente");await quotes()}
+async function romanoQuoteDelete(id){if(role()!=="admin")return;if(!confirm("Eliminar este orçamento?"))return;const r=await sb.from("quotes").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast(r.error.message);return}await quotes();toast("Orçamento eliminado.");}
 
 async function renderStock(){
  const r=await sb.from("stock_items").select("id,name,sku,unit,quantity,min_quantity,category,unit_cost,notes").eq("company_id",currentProfile.company_id).order("name");
