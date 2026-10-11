@@ -3296,17 +3296,34 @@ async function romanoQuoteModal(id){
  const clientSel=$("qClient"),propertySel=$("qProperty");const filterProps=()=>{[...propertySel.options].forEach(o=>{if(!o.value)return;o.hidden=!!clientSel.value&&o.dataset.client!==clientSel.value})};clientSel.addEventListener("change",filterProps);filterProps();
 }
 async function romanoQuoteSave(id){
- if(role()!=="admin")return;const subtotal=Math.max(0,Number($("qSubtotal").value||0)),vat=Math.max(0,Number($("qVat").value||0)),tax=Math.round(subtotal*vat)/100;
+ if(role()!=="admin")return;
+ const subtotal=Math.max(0,Number($("qSubtotal").value||0));
+ const vat=Math.max(0,Number($("qVat").value||0));
+ const tax=Math.round(subtotal*vat)/100;
+ const total=Math.round((subtotal+tax)*100)/100;
  const clientId=$("qClient").value,propertyId=$("qProperty").value||null,serviceId=$("qService").value||null,title=$("qTitle").value.trim();
  if(!clientId||!title){toast("Selecione o cliente e indique a descrição.");return}
+ if(!Number.isFinite(subtotal)||!Number.isFinite(vat)||vat>100){toast("Verifique o valor e a taxa de IVA.");return}
  const settings=await sb.from("quote_settings").select("responsible_email").eq("company_id",currentProfile.company_id).maybeSingle();
- const payload={number:$("qNumber").value.trim()||("ORC-"+Date.now()),title,status:(subtotal+tax)>50?"pending_approval":"sent",client_id:clientId,property_id:propertyId,service_id:serviceId,subtotal,tax_amount:tax,total:subtotal+tax,vat_rate:vat,approval_required:(subtotal+tax)>50,service_description:title,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,responsible_email:settings.data?.responsible_email||null,updated_at:new Date().toISOString()};
+ if(settings.error){toast("Não foi possível carregar o e-mail responsável: "+settings.error.message);return}
+ const responsibleEmail=settings.data?.responsible_email||null;
+ const needsApproval=total>50;
+ const payload={number:$("qNumber").value.trim()||("ORC-"+Date.now()),title,status:needsApproval?"pending_approval":"sent",client_id:clientId,property_id:propertyId,service_id:serviceId,subtotal,tax_amount:tax,total,vat_rate:vat,approval_required:needsApproval,service_description:title,valid_until:$("qValid").value||null,notes:$("qNotes").value.trim()||null,responsible_email:responsibleEmail,updated_at:new Date().toISOString()};
  const r=id?await sb.from("quotes").update(payload).eq("id",id).eq("company_id",currentProfile.company_id).select("id").single():await sb.from("quotes").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id}).select("id").single();
  if(r.error){toast("Não foi possível guardar o orçamento: "+r.error.message);return}
- if((subtotal+tax)<=50){const inv=await sb.from("invoices").insert({company_id:currentProfile.company_id,client_id:clientId,service_id:serviceId,number:"INV-"+Date.now(),status:"draft",subtotal,tax_rate:vat,tax_amount:tax,total:subtotal+tax}).select("id").single();if(!inv.error)await sb.from("quotes").update({invoice_id:inv.data.id}).eq("id",r.data.id).eq("company_id",currentProfile.company_id)}
- const client=clients.data;
- closeModal();toast("Orçamento guardado.");await quotes();
+ let invoiceId=null;
+ if(!needsApproval){
+   const inv=await sb.from("invoices").insert({company_id:currentProfile.company_id,client_id:clientId,service_id:serviceId,number:"INV-"+Date.now(),status:"draft",subtotal,tax_rate:vat,tax_amount:tax,total}).select("id").single();
+   if(inv.error){toast("Orçamento guardado, mas a fatura não foi criada: "+inv.error.message);closeModal();await quotes();return}
+   invoiceId=inv.data.id;
+   const link=await sb.from("quotes").update({invoice_id:invoiceId}).eq("id",r.data.id).eq("company_id",currentProfile.company_id);
+   if(link.error){toast("A fatura foi criada, mas não foi associada ao orçamento: "+link.error.message);closeModal();await quotes();return}
+ }
+ closeModal();
+ toast(needsApproval?"Orçamento guardado e aguarda aprovação do cliente.":"Orçamento guardado e fatura em rascunho criada. O envio por e-mail ainda depende de integração.");
+ await quotes();
 }
+
 async function romanoQuoteDelete(id){if(role()!=="admin")return;if(!confirm("Eliminar este orçamento?"))return;const r=await sb.from("quotes").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast(r.error.message);return}await quotes();toast("Orçamento eliminado.");}
 
 async function renderStock(){
