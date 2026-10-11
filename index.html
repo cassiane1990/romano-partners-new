@@ -3294,7 +3294,7 @@ async function quotes(){
  });
  const tabBar='<div class="actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0">'+tabs.map(([key,label])=>'<button class="btn '+(romanoQuoteTab===key?'gold':'')+'" onclick="romanoQuoteSetTab(\''+key+'\')">'+label+'</button>').join("")+'</div>';
  const settingsHtml=isAdmin&&romanoQuoteTab==="settings"?'<div class="panel" style="margin-top:12px"><h3>Configuración del e-mail responsable</h3><p class="muted">Se utilizará como dirección responsable asociada a los presupuestos. Guardar la dirección no confirma el envío automático de correos; para eso hace falta una integración de correo activa.</p><div class="two"><div class="field"><label>E-mail único responsable</label><input id="quoteResponsibleEmail" type="email" value="'+esc(settingR.data?.responsible_email||"")+'" placeholder="responsable@empresa.com"></div><div class="field" style="justify-content:end"><button class="btn gold" onclick="saveQuoteResponsibleEmail()">Guardar e-mail</button></div></div></div>':"";
- const cards=filtered.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><h3>'+esc(x.number||"Sin referencia")+' · '+esc(x.title||"Presupuesto")+'</h3><div class="muted">Cliente: '+esc(clientNames[x.client_id]||"—")+' · Apartamento: '+esc(propertyNames[x.property_id]||"—")+'</div><div class="muted">Creado: '+esc(romanoMadridLabel(x.created_at))+' · Validez: '+esc(x.valid_until||"—")+(x.decision_at?' · Decisión: '+esc(romanoMadridLabel(x.decision_at)):"")+'</div></div><span class="pill">'+esc(romanoQuoteStateLabel(x.status))+'</span></div><div>'+esc(x.service_description||x.notes||"Sin descripción")+'</div><div style="margin-top:8px">Base: '+masterMoney(x.subtotal)+' · IVA: '+masterMoney(x.tax_amount)+' · <b>Total: '+masterMoney(x.total)+'</b></div>'+(x.approval_required&&["pending_approval","pending"].includes(x.status)&&isClient?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideQuote(\''+x.id+'\',true)">Aceptar presupuesto</button><button class="btn danger" onclick="decideQuote(\''+x.id+'\',false)">Rechazar</button></div>':"")+(x.invoice_id?'<div class="notice" style="margin-top:8px">Factura asociada: '+esc(x.invoice_id)+(isAdmin?' <button class="btn" style="margin-left:8px" onclick="sendInvoiceByEmail(\''+x.invoice_id+'\')">✉ Enviar ao cliente</button>':"")+'</div>':"")+(isAdmin?'<div class="actions" style="margin-top:10px"><button class="btn" onclick="romanoQuoteModal(\''+x.id+'\')">Editar</button><button class="btn danger" onclick="romanoQuoteDelete(\''+x.id+'\')">Eliminar</button></div>':"")+'</div>').join("");
+ const cards=filtered.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><h3>'+esc(x.number||"Sin referencia")+' · '+esc(x.title||"Presupuesto")+'</h3><div class="muted">Cliente: '+esc(clientNames[x.client_id]||"—")+' · Apartamento: '+esc(propertyNames[x.property_id]||"—")+'</div><div class="muted">Creado: '+esc(romanoMadridLabel(x.created_at))+' · Validez: '+esc(x.valid_until||"—")+(x.decision_at?' · Decisión: '+esc(romanoMadridLabel(x.decision_at)):"")+'</div></div><span class="pill">'+esc(romanoQuoteStateLabel(x.status))+'</span></div><div>'+esc(x.service_description||x.notes||"Sin descripción")+'</div><div style="margin-top:8px">Base: '+masterMoney(x.subtotal)+' · IVA: '+masterMoney(x.tax_amount)+' · <b>Total: '+masterMoney(x.total)+'</b></div>'+(x.approval_required&&["pending_approval","pending"].includes(x.status)&&isClient?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideQuote(\''+x.id+'\',true)">Aceptar presupuesto</button><button class="btn danger" onclick="decideQuote(\''+x.id+'\',false)">Rechazar</button></div>':"")+(x.invoice_id?'<div class="notice" style="margin-top:8px">Factura asociada: '+esc(x.invoice_id)+(isAdmin?' <button class="btn" style="margin-left:8px" onclick="sendQuoteInvoiceByEmail(\''+x.id+'\',\''+x.invoice_id+'\')">✉ Enviar ao cliente</button>':"")+'</div>':"")+(isAdmin?'<div class="actions" style="margin-top:10px"><button class="btn" onclick="romanoQuoteModal(\''+x.id+'\')">Editar</button><button class="btn danger" onclick="romanoQuoteDelete(\''+x.id+'\')">Eliminar</button></div>':"")+'</div>').join("");
  let title=isClient?"Mis presupuestos":({pending:"Presupuestos pendientes de aprobación",accepted:"Presupuestos aceptados",rejected:"Presupuestos rechazados",invoices:"Facturas generadas",settings:"Configuración de correo",history:"Histórico de presupuestos"}[romanoQuoteTab]||"Presupuestos");
  if(isAdmin&&romanoQuoteTab==="new"){await romanoQuoteModal(null);return}
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>'+title+'</h3><div class="muted">Historial por cliente, apartamento, fecha, estado, decisión y factura asociada.</div></div></div>'+(isAdmin?tabBar:"")+(settingsHtml||((romanoQuoteTab==="settings"&&isAdmin)?"":(filtered.length?cards:'<div class="empty">No hay presupuestos en esta sección.</div>')))+'</div>';
@@ -4142,6 +4142,46 @@ async function sendFinancialPdfEmail(kind,id){
     toast("E-mail aberto para o cliente. Anexe o PDF descarregado e carregue em Enviar.");
   }
  }catch(e){if(e?.name!=="AbortError")toast("No se pudo preparar el PDF: "+(e?.message||e))}
+}
+async function sendQuoteInvoiceByEmail(quoteId,invoiceId){
+ if(role()!=="admin")return;
+ try{
+  const [qr,ir]=await Promise.all([
+   sb.from("quotes").select("id,number,title,service_description,property_id,client_id,company_id").eq("id",quoteId).eq("company_id",currentProfile.company_id).single(),
+   sb.from("invoices").select("*").eq("id",invoiceId).eq("company_id",currentProfile.company_id).single()
+  ]);
+  if(qr.error)throw qr.error;if(ir.error)throw ir.error;
+  const quote=qr.data,invoice=ir.data;
+  if(invoice.client_id!==quote.client_id){toast("A fatura não corresponde ao cliente deste orçamento.");return}
+  const [cr,pr]=await Promise.all([
+   sb.from("clients").select("name,email").eq("id",quote.client_id).eq("company_id",currentProfile.company_id).single(),
+   quote.property_id?sb.from("properties").select("name,code").eq("id",quote.property_id).eq("company_id",currentProfile.company_id).maybeSingle():Promise.resolve({data:null,error:null})
+  ]);
+  if(cr.error)throw cr.error;if(pr.error)throw pr.error;
+  const client=cr.data,property=pr.data;
+  if(!client?.email){toast("O cliente não tem e-mail registado na ficha.");return}
+  const description=quote.service_description||quote.title||"Serviço";
+  const rows=[
+   {label:"Servicio / presupuesto: "+description,value:""},
+   {label:"Apartamento: "+(property?.name||"—")+(property?.code?" · "+property.code:""),value:""},
+   {label:"Base imponible",value:Number(invoice.subtotal||0).toFixed(2)+" EUR"},
+   {label:"IVA ("+Number(invoice.tax_rate||0)+"%)",value:Number(invoice.tax_amount||0).toFixed(2)+" EUR"},
+   {label:"Vencimiento",value:invoice.due_at?new Date(invoice.due_at).toLocaleDateString("es-ES"):"—"}
+  ];
+  const pdf=await buildRomanoPdf("FACTURA",invoice.number,client,rows,"TOTAL",invoice.total);
+  const fileName="Factura-"+String(invoice.number||invoice.id).replace(/[^a-zA-Z0-9_-]/g,"_")+".pdf";
+  const file=new File([pdf],fileName,{type:"application/pdf"});
+  const subject="Factura "+(invoice.number||"")+" · ROMANO PROPERTY CARE";
+  const body=["Estimado/a "+(client.name||"cliente")+",","","Adjuntamos la factura correspondiente al servicio: "+description+(property?.name?" · Apartamento: "+property.name:"")+".","","Saludos,","ROMANO PROPERTY CARE"].join("\n");
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({title:subject,text:body,files:[file]});
+   toast("Fatura preparada para partilhar. Confirme o envio na aplicação escolhida.");
+  }else{
+   const url=URL.createObjectURL(file);const a=document.createElement("a");a.href=url;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+   window.location.href="mailto:"+encodeURIComponent(client.email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+   toast("E-mail do cliente aberto. Anexe a fatura PDF descarregada e carregue em Enviar.");
+  }
+ }catch(e){if(e?.name!=="AbortError")toast("Não foi possível preparar a fatura deste orçamento: "+(e?.message||e))}
 }
 async function sendInvoiceByEmail(id){return sendFinancialPdfEmail("invoice",id);}
 async function openMonthlyInvoiceSummary(){
