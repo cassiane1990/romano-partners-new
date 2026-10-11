@@ -3766,7 +3766,7 @@ function applyRomanoLanguage(root=document.body){
  const selector=document.getElementById("romanoLanguageSelect");if(selector&&selector.value!==lang)selector.value=lang;
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
  const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
- for(const n of nodes){if(!n.nodeValue||!n.nodeValue.trim()||n.parentElement?.closest("script,style,textarea,input,select,option,code"))continue;n.nodeValue=romanoTranslateText(n.nodeValue,lang)}
+ for(const n of nodes){if(!n.nodeValue||!n.nodeValue.trim()||n.parentElement?.closest("script,style,textarea,input,select,option,code"))continue;const translated=romanoTranslateText(n.nodeValue,lang);if(translated!==n.nodeValue)n.nodeValue=translated}
  root.querySelectorAll("[placeholder],[title],[aria-label]").forEach(el=>{for(const a of ["placeholder","title","aria-label"]){const v=el.getAttribute(a);if(v)el.setAttribute(a,romanoTranslateText(v,lang))}});
 }
 function setRomanoLanguage(lang){
@@ -3778,7 +3778,7 @@ function initRomanoLanguage(){
  if(selector){selector.value=romanoLang()}
  applyRomanoLanguage();
  if(!window.__romanoLanguageObserver){
-  window.__romanoLanguageObserver=new MutationObserver(records=>{if(window.__romanoLanguageBusy)return;window.__romanoLanguageBusy=true;for(const r of records){if(r.type==="childList"){r.addedNodes.forEach(n=>{if(n.nodeType===Node.ELEMENT_NODE)applyRomanoLanguage(n);else if(n.nodeType===Node.TEXT_NODE)n.nodeValue=romanoTranslateText(n.nodeValue,romanoLang())})}else if(r.type==="characterData")r.target.nodeValue=romanoTranslateText(r.target.nodeValue,romanoLang())}window.__romanoLanguageBusy=false});
+  window.__romanoLanguageObserver=new MutationObserver(records=>{if(window.__romanoLanguageBusy)return;window.__romanoLanguageBusy=true;for(const r of records){if(r.type==="childList"){r.addedNodes.forEach(n=>{if(n.nodeType===Node.ELEMENT_NODE)applyRomanoLanguage(n);else if(n.nodeType===Node.TEXT_NODE){const t=romanoTranslateText(n.nodeValue,romanoLang());if(t!==n.nodeValue)n.nodeValue=t}})}else if(r.type==="characterData"){const t=romanoTranslateText(r.target.nodeValue,romanoLang());if(t!==r.target.nodeValue)r.target.nodeValue=t}}window.__romanoLanguageBusy=false});
   window.__romanoLanguageObserver.observe(document.body,{subtree:true,childList:true,characterData:true});
  }
 }
