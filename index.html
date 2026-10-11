@@ -3329,8 +3329,8 @@ var romanoQuoteTab = "history";
 function romanoQuoteSetTab(tab){romanoQuoteTab=tab;quotes();}
 function romanoQuoteStateLabel(status){const labels={draft:"Borrador",sent:"Enviado",pending_approval:"Esperando aprobación",accepted:"Aceptado",approved:"Aceptado",rejected:"Rechazado",declined:"Rechazado",invoiced:"Factura generada",cancelled:"Cancelado"};return labels[status]||status||"Sin estado";}
 async function quotes(){
- const isAdmin=role()==="admin",isClient=role()==="client";
- if(!isAdmin&&!isClient){$("content").innerHTML='<div class="panel"><div class="msg">Los presupuestos están disponibles para Administración y el cliente destinatario.</div></div>';return}
+ const isAdmin=role()==="admin",isSupervisor=role()==="supervisor",isClient=role()==="client";
+ if(!isAdmin&&!isSupervisor&&!isClient){$("content").innerHTML='<div class="panel"><div class="msg">Los presupuestos están disponibles para Administración, Supervisión y el cliente destinatario.</div></div>';return}
  const q=await sb.from("quotes").select("id,number,title,status,subtotal,tax_amount,total,valid_until,client_id,property_id,notes,created_at,approval_required,decision_at,decision_by,invoice_id,service_description,vat_rate,responsible_email").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(1000);
  if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">No se pudieron cargar los presupuestos: '+esc(q.error.message)+'</div></div>';return}
  let rows=q.data||[];
@@ -3342,7 +3342,7 @@ async function quotes(){
  ]);
  const clientNames=Object.fromEntries((clientsR.data||[]).map(x=>[x.id,x.name||"Cliente"]));
  const propertyNames=Object.fromEntries((propsR.data||[]).map(x=>[x.id,(x.name||"Apartamento")+(x.code?" · "+x.code:"")]));
- const tabs=isAdmin?[
+ const tabs=(isAdmin||isSupervisor)?[
   ["new","＋ Novo orçamento"],["pending","Aguardando aprovação"],["accepted","Aceites"],["rejected","Recusados"],["invoices","Faturas geradas"],["history","Histórico de orçamentos"],["settings","Configuração do e-mail responsável"]
  ]:[["history","Os meus orçamentos"]];
  const filtered=rows.filter(x=>{
@@ -3358,7 +3358,7 @@ async function quotes(){
  const cards=filtered.map(x=>'<div class="panel" style="margin-top:10px"><div class="panel-head"><div><h3>'+esc(x.number||"Sin referencia")+' · '+esc(x.title||"Presupuesto")+'</h3><div class="muted">Cliente: '+esc(clientNames[x.client_id]||"—")+' · Apartamento: '+esc(propertyNames[x.property_id]||"—")+'</div><div class="muted">Creado: '+esc(romanoMadridLabel(x.created_at))+' · Validez: '+esc(x.valid_until||"—")+(x.decision_at?' · Decisión: '+esc(romanoMadridLabel(x.decision_at)):"")+'</div></div><span class="pill">'+esc(romanoQuoteStateLabel(x.status))+'</span></div><div>'+esc(x.service_description||x.notes||"Sin descripción")+'</div><div style="margin-top:8px">Base: '+masterMoney(x.subtotal)+' · IVA: '+masterMoney(x.tax_amount)+' · <b>Total: '+masterMoney(x.total)+'</b></div>'+(x.approval_required&&["pending_approval","pending"].includes(x.status)&&isClient?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="decideQuote(\''+x.id+'\',true)">Aceptar presupuesto</button><button class="btn danger" onclick="decideQuote(\''+x.id+'\',false)">Rechazar</button></div>':"")+(isManager?'<div class="actions" style="margin-top:10px"><button class="btn gold" onclick="sendQuoteByEmail(\''+x.id+'\')">✉ Enviar orçamento ao cliente</button>'+(x.invoice_id?'<button class="btn" onclick="sendQuoteInvoiceByEmail(\''+x.id+'\',\''+x.invoice_id+'\')">Enviar esta fatura ao cliente</button>':"")+'<button class="btn" onclick="romanoQuoteModal(\''+x.id+'\')">Editar</button><button class="btn danger" onclick="romanoQuoteDelete(\''+x.id+'\')">Eliminar</button></div>':"")+'</div>').join("");
  let title=isClient?"Mis presupuestos":({pending:"Presupuestos pendientes de aprobación",accepted:"Presupuestos aceptados",rejected:"Presupuestos rechazados",invoices:"Facturas generadas",settings:"Configuración de correo",history:"Histórico de presupuestos"}[romanoQuoteTab]||"Presupuestos");
  if(isAdmin&&romanoQuoteTab==="new"){await romanoQuoteModal(null);return}
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>'+title+'</h3><div class="muted">Historial por cliente, apartamento, fecha, estado, decisión y factura asociada.</div></div></div>'+(isAdmin?tabBar:"")+(settingsHtml||((romanoQuoteTab==="settings"&&isAdmin)?"":(filtered.length?cards:'<div class="empty">No hay presupuestos en esta sección.</div>')))+'</div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>'+title+'</h3><div class="muted">Historial por cliente, apartamento, fecha, estado, decisión y factura asociada.</div></div></div>'+((isAdmin||isSupervisor)?tabBar:"")+(settingsHtml||((romanoQuoteTab==="settings"&&isAdmin)?"":(filtered.length?cards:'<div class="empty">No hay presupuestos en esta sección.</div>')))+'</div>';
 }
 async function saveQuoteResponsibleEmail(){
  if(role()!=="admin")return;const email=String($("quoteResponsibleEmail")?.value||"").trim();
