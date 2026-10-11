@@ -814,10 +814,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .modal-card .wizard-grid .two{grid-template-columns:1fr!important}
   .modal-card .wizard-grid input,.modal-card .wizard-grid select,.modal-card .wizard-grid textarea{min-width:0!important;max-width:100%!important;font-size:16px!important}
 }
-</style><style>/* Seletor de idioma acessível em todos os perfis, inclusive no dashboard compacto do Supervisor */
-#romanoLanguageFloating{position:fixed;right:14px;bottom:14px;z-index:99999;display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #dfc9a8;border-radius:14px;background:rgba(255,253,249,.97);box-shadow:0 4px 18px rgba(48,34,16,.14);font:600 12px Inter,system-ui,sans-serif;color:#5a4528}
-#romanoLanguageFloating select{max-width:155px;border:1px solid #e5dac8;border-radius:9px;background:#fffdf9;padding:7px;color:#34291d;font:600 12px Inter,system-ui,sans-serif}
-@media(max-width:560px){#romanoLanguageFloating{right:10px;bottom:10px;padding:6px 8px}#romanoLanguageFloating select{max-width:135px}}</style></head>
+</style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
 <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
@@ -4308,7 +4305,7 @@ async function loadMonthlyInvoiceSummary(){
 function printMonthlyInvoiceSummary(){
  const s=window.__monthlyInvoiceSummary;if(!s){toast("Primero cargue el resumen.");return}
  const w=window.open("","_blank");if(!w){toast("El navegador bloqueó la ventana.");return}
- w.document.write('<html><head><title>Resumen mensul</title></head><body style="font-family:Arial;padding:30px"><h1>ROMANO PROPERTY CARE</h1><h2>Resumen mensul · '+esc(s.month)+'</h2><p><b>Cliente:</b> '+esc(s.client?.name||"")+'</p><table style="width:100%;border-collapse:collapse"><tr><th style="text-align:left">Factura</th><th>Fecha</th><th>Estado</th><th>Total</th></tr>'+s.rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+new Date(x.created_at).toLocaleDateString("es-ES")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.total||0).toFixed(2)+' €</td></tr>').join("")+'</table><h3>Total: '+s.total.toFixed(2)+' €</h3><div id="romanoLanguageFloating" aria-label="Idioma de la aplicación"><label for="romanoLanguageFloatingSelect">Idioma</label><select id="romanoLanguageFloatingSelect" aria-label="Idioma de la aplicación" onchange="setRomanoLanguage(this.value)"><option value="es">Español</option><option value="pt">Português (original)</option></select></div><script>(function(){const s=document.getElementById("romanoLanguageFloatingSelect");if(s){s.value=localStorage.getItem("romano_language")==="pt"?"pt":"es";}const sync=()=>{const lang=localStorage.getItem("romano_language")==="pt"?"pt":"es";const a=document.getElementById("romanoLanguageSelect");const b=document.getElementById("romanoLanguageFloatingSelect");if(a&&a.value!==lang)a.value=lang;if(b&&b.value!==lang)b.value=lang;};window.addEventListener("pageshow",sync);})();</script></body></html>');w.document.close();w.print();
+ w.document.write('<html><head><title>Resumen mensul</title></head><body style="font-family:Arial;padding:30px"><h1>ROMANO PROPERTY CARE</h1><h2>Resumen mensul · '+esc(s.month)+'</h2><p><b>Cliente:</b> '+esc(s.client?.name||"")+'</p><table style="width:100%;border-collapse:collapse"><tr><th style="text-align:left">Factura</th><th>Fecha</th><th>Estado</th><th>Total</th></tr>'+s.rows.map(x=>'<tr><td>'+esc(x.number||"—")+'</td><td>'+new Date(x.created_at).toLocaleDateString("es-ES")+'</td><td>'+esc(x.status||"—")+'</td><td>'+Number(x.total||0).toFixed(2)+' €</td></tr>').join("")+'</table><h3>Total: '+s.total.toFixed(2)+' €</h3></body></html>');w.document.close();w.print();
 }
 function emailMonthlyInvoiceSummary(){
  const s=window.__monthlyInvoiceSummary;if(!s?.client?.email){toast("Cargue primero un cliente con e-mail.");return}
