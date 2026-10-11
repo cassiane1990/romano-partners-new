@@ -834,6 +834,20 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .modal-card .wizard-grid .two{grid-template-columns:1fr!important}
   .modal-card .wizard-grid input,.modal-card .wizard-grid select,.modal-card .wizard-grid textarea{min-width:0!important;max-width:100%!important;font-size:16px!important}
 }
+</style><style id="romano-global-button-standard">
+/* One shared button component across Admin, Supervisor, employees and clients */
+:root{--rpc-button-height:36px;--rpc-button-radius:11px;--rpc-button-border:#e5dac8;--rpc-button-bg:#fffdf9;--rpc-button-text:#342e25;--rpc-button-gold:#b7893f}
+button:not(.nav button):not(.mobile-menu-toggle):not(.romano-chat-contact):not(.romano-chat-mobile-back):not(.romano-bubble-more):not(.romano-chat-attach),
+input[type=button],input[type=submit],input[type=reset],.btn,.sj-btn,.rpc-calendar-actions button{
+ box-sizing:border-box;min-height:var(--rpc-button-height);border:1px solid var(--rpc-button-border);border-radius:var(--rpc-button-radius);background:var(--rpc-button-bg);color:var(--rpc-button-text);padding:8px 12px;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;font-weight:650;line-height:1.25;box-shadow:none;transition:background-color .15s,border-color .15s,box-shadow .15s
+}
+button:not(.nav button):not(.mobile-menu-toggle):not(.romano-chat-contact):not(.romano-chat-mobile-back):not(.romano-bubble-more):not(.romano-chat-attach):hover,.btn:hover,.sj-btn:hover{border-color:#c9a66b;box-shadow:0 3px 10px #5b46320d}
+button.gold,.btn.gold,button.primary-q,.primary-q{background:var(--rpc-button-gold);border-color:var(--rpc-button-gold);color:#fff}
+button.dark,.btn.dark{background:#1c1c19;border-color:#1c1c19;color:#fff}
+button.danger,.btn.danger{background:#fff5f3;border-color:#e5b9b1;color:#8a4137}
+button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
+.rpc-home-action{box-sizing:border-box;border-radius:var(--rpc-button-radius);font-family:Inter,system-ui,sans-serif}
+.rpc-home-language select,.romano-language-select{min-height:36px;border:1px solid var(--rpc-button-border);border-radius:var(--rpc-button-radius);background:var(--rpc-button-bg);color:var(--rpc-button-text);padding:8px 12px;font:650 12px Inter,system-ui,sans-serif}
 </style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
