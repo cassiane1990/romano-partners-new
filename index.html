@@ -2470,7 +2470,7 @@ async function viewRelatedCleaning(id){
 }
 function renderServiceStatusActions(x){
  const r=role();
- const isAssignedEmployee=r==="employee"&&x.assigned_employee_id===currentUser.id;
+ const isAssignedEmployee=["employee","maintenance_technician"].includes(r)&&x.assigned_employee_id===currentUser.id;
  if(!["admin","supervisor"].includes(r)&&!isAssignedEmployee)return "";
  if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(x.status))
    return '<div class="notice" style="margin-top:12px"><b>Estado bloqueado.</b><br>Este servicio ya fue verificado/finalizado y no se puede retroceder.</div>';
