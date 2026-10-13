@@ -960,7 +960,7 @@ function buildMasterNav(){
 async function renderDashboardMaster(){
  const name=currentProfile?.full_name||currentUser?.email||"equipo";updateDate();
  let counts=[0,0,0,0,0,0,0];
- if(!demoMode) counts=await Promise.all(["services","clients","properties","employee_profiles","notifications","invoices","stock_items"].map(count));
+ if(!demoMode) counts=await Promise.all(["services","clients","properties","employee_profiles","notifications","invoices","stock_items"].map(async table=>{try{return await count(table)}catch(err){console.warn("Dashboard count unavailable:",table,err);return 0}}));
  else counts=[5,3,4,16,4,4,18];
  $("content").innerHTML='<div class="master-hero"><h1>'+greeting()+', '+esc(name)+'</h1><p>ROMANO PARTNERS · gestión empresarial, limpieza premium, mantenimiento y operación en tiempo real.</p><div class="master-sign">PROPIEDADES IMPECABLES</div></div><div class="master-kpis">'+[
  ["Servicios hoy",counts[0]],["Clientes",counts[1]],["Propiedades",counts[2]],["Profesionales",counts[3]],["Alertas",counts[4]],["Facturado",canSeeFinance()?counts[5]:"—"],["Stock",counts[6]]
