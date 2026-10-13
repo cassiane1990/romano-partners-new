@@ -47,7 +47,7 @@ begin
 
   v_total := round(v_ind*18.84 + v_double*20.41 + v_single*13.25 + v_amenities*1.50,2);
   insert into public.romano_pack_orders(company_id,client_profile_id,property_id,items,estimated_total,requested_date,customer_notes)
-  values(v_profile.company_id,case when v_profile.role = 'client' then auth.uid() else null end,p_property_id,
+  values(v_profile.company_id,auth.uid(),p_property_id,
     jsonb_build_object('individual',v_ind,'double',v_double,'single_beds',v_single,'amenities',v_amenities),
     v_total,p_requested_date,left(coalesce(p_customer_notes,''),1000))
   returning id into v_id;
