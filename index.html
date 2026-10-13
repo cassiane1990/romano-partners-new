@@ -929,7 +929,7 @@ const SERVICE_CLEANING_CATALOG={
 
 function buildMasterNav(){
  const groups=[
-  ["INICIO",[["dashboard","◈","Dashboard 360"],["packs_amenities","📦","Packs de ropa y amenities"]]],
+  ["INICIO",[["dashboard","◈","Dashboard 360"]]],
   ["OPERACIÓN",[["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio ▾"],["emergency","🚨","Urgencia 24H"],["calendar","▦","Calendario / Agenda"],["change_requests","⚡","Solicitudes de cambio de horario"],["maintenance_catalog","€","Catálogo de Mantenimiento"],["cleaning_catalog","🧹","Catálogo de Limpieza"]]],
   ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"],["prepostos","♙","Representantes"]]],
   ["EQUIPO · JORNADAS",[["employees","♧","Empleados"],["teams","♙","Equipos / Plan mensul"],["journey","◷","Mi Jornada"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"],["stock_inventory","📦","Stock de productos y materiales"]]],
@@ -948,6 +948,7 @@ function buildMasterNav(){
    if(i[0]==="newservice"){
     if(ok.includes("newservice_cleaning")) h+='<button data-page="newservice_cleaning"><span class="nav-icon">🧹</span><span>Crear servicio de limpieza</span></button>';
     if(ok.includes("newservice_maintenance")) h+='<button data-page="newservice_maintenance"><span class="nav-icon">🔧</span><span>Crear servicio de mantenimiento</span></button>';
+    if(ok.includes("packs_amenities")) h+='<button data-page="packs_amenities"><span class="nav-icon">📦</span><span>Packs de ropa y amenities</span></button>';
     return;
    }
    h+='<button data-page="'+i[0]+'"><span class="nav-icon">'+i[1]+'</span><span>'+i[2]+'</span></button>';
