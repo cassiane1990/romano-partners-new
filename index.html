@@ -238,7 +238,7 @@ async function renderExtraOrders(){
  }else{
   const pr=await sb.from("properties").select("id,code,name,client_id").order("name");
   if(pr.error)throw pr.error; props=pr.data||[];
-  let q=sb.from("extra_orders").select("id,company_id,property_id,client_id,requested_by,assigned_to,delivery_date,delivery_window,items,amenities_quantity,amenities_unit_price,total,pricing_pending,status,notes,status_history,created_at,updated_at").order("created_at",{ascending:false}).limit(200);
+  let q=sb.from("extra_orders").select("id,company_id,property_id,property_code_snapshot,property_name_snapshot,client_id,requested_by,assigned_to,delivery_date,delivery_window,items,amenities_quantity,amenities_unit_price,total,pricing_pending,status,notes,status_history,created_at,updated_at").order("created_at",{ascending:false}).limit(200);
   const rr=await q; if(rr.error)throw rr.error; orders=rr.data||[];
   if(["admin","supervisor"].includes(role())){
    const sr=await sb.from("profiles").select("id,full_name,email,role").eq("active",true).eq("role","maintenance_technician").order("full_name");
@@ -289,17 +289,15 @@ async function saveExtraOrder(e){
   window.__extraOrderDemo.unshift({id:"demo-"+Date.now(),property_id:propertyId,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value,status_history:hist,assigned_to:null,created_at:new Date().toISOString()});
   toast("Pedido guardado en la demostración.");return renderExtraOrders();
  }
- let clientId=null;
+ const propertyRow=await sb.from("properties").select("id,client_id,code,name").eq("id",propertyId).maybeSingle();
+ if(propertyRow.error||!propertyRow.data){toast(propertyRow.error?.message||"No se encontró el apartamento seleccionado.");return}
+ let clientId=propertyRow.data.client_id;
  if(role()==="client"){
   const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle();
   if(c.error||!c.data){toast(c.error?.message||"No se encontró el cliente asociado a este acceso.");return}
   clientId=c.data.id;
- }else{
-  const p=await sb.from("properties").select("client_id").eq("id",propertyId).maybeSingle();
-  if(p.error||!p.data?.client_id){toast(p.error?.message||"No se encontró el cliente del apartamento.");return}
-  clientId=p.data.client_id;
  }
- const payload={property_id:propertyId,client_id:clientId,requested_by:currentUser.id,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value||null,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value||null,status_history:hist};
+ const payload={property_id:propertyId,property_code_snapshot:propertyRow.data.code,property_name_snapshot:propertyRow.data.name,client_id:clientId,requested_by:currentUser.id,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value||null,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value||null,status_history:hist};
  const r=await sb.from("extra_orders").insert(payload);
  if(r.error){toast(r.error.message);return}
  toast("Pedido extra creado correctamente.");await renderExtraOrders();
