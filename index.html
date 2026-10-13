@@ -122,14 +122,15 @@ const MASTER_PRICES={
 function masterMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}
 function buildMasterNav(){
  const allowed={
-  admin:["dashboard","simulation","operations","services","newservice","calendar","emergency","maintenance","quality","checkin","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
-  supervisor:["dashboard","simulation","operations","services","newservice","calendar","emergency","maintenance","quality","checkin","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
-  employee:["dashboard","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
-  client:["dashboard","services","newservice","calendar","properties","documents","chat","notifications","finance","invoices","receipts","emergency","sync","profile"]
+  admin:["dashboard","extra_orders","simulation","operations","services","newservice","calendar","emergency","maintenance","quality","checkin","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","finance","receipts","invoices","documents","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"],
+  supervisor:["dashboard","extra_orders","simulation","operations","services","newservice","calendar","emergency","maintenance","quality","checkin","clients","properties","units","employees","teams","journey","locations","materialsreq","stock","linen","laundry","amenities","recurring","catalog","quotes","documents","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"],
+  employee:["dashboard","extra_orders","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
+  maintenance_technician:["dashboard","extra_orders","services","calendar","journey","locations","materialsreq","stock","linen","laundry","chat","notifications","quality","emergency","sync","profile"],
+  client:["dashboard","extra_orders","services","newservice","calendar","properties","documents","chat","notifications","finance","invoices","receipts","emergency","sync","profile"]
  };
  const groups=[
   ["INICIO",[["dashboard","◈","Dashboard 360"]]],
-  ["OPERACIÓN",[["simulation","◉","Simulação 360"],["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["emergency","⚠","Emergencia 24H"],["maintenance","⌁","Mantenimiento / Proyectos"],["quality","✓","Checklists / Calidad"],["checkin","↗","Solicitudes de check-in"]]],
+  ["OPERACIÓN",[["extra_orders","📦","Pedidos extra"],["simulation","◉","Simulação 360"],["operations","⌖","Centro operativo"],["services","◉","Servicios"],["newservice","＋","Nuevo servicio"],["calendar","▦","Calendario / Agenda"],["emergency","⚠","Emergencia 24H"],["maintenance","⌁","Mantenimiento / Proyectos"],["quality","✓","Checklists / Calidad"],["checkin","↗","Solicitudes de check-in"]]],
   ["CLIENTES · PROPIEDADES",[["clients","♙","Clientes"],["properties","⌂","Propiedades / Apartamentos"],["units","▤","Unidades / Áreas"]]],
   ["EQUIPO · JORNADAS",[["employees","♧","Funcionarios"],["teams","♙","Equipos / Plan mensual"],["journey","◷","Mi Jornada"],["locations","◎","Geolocalización / Radar"],["materialsreq","▥","Solicitudes de materiales"]]],
   ["RECURSOS",[["stock","▥","Materiales / Stock"],["linen","▤","Ropa / Linen"],["laundry","◌","Lavandería"],["amenities","▥","Amenities opcionales"]]],
@@ -202,7 +203,7 @@ const SUPABASE_URL="https://ztjfvqcutwlfbqmtclyv.supabase.co";
 const SUPABASE_KEY="sb_publishable_OwekejMFUr_3hdujnJzxOw_SI-5vEJj";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id); let currentUser=null,currentProfile=null,demoMode=false;
-const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",client:"Cliente"};
+const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario",maintenance_technician:"Mantenimiento",client:"Cliente"};
 const statusNames={requested:"Solicitado",scheduled:"Programado",on_the_way:"A camino",in_progress:"Iniciado",paused:"Pausado",supervised:"Supervisado",completed:"Finalizado",approved:"Aprobado",rejected:"Rechazado",returned:"Devuelto",cancelled:"Cancelado"};
 const DEMO_CLIENTS=[{id:"demo-c1",name:"Alehost",email:"operaciones@alehost.demo",phone:"+34 600 100 201",created_at:"2026-09-20T09:00:00Z"},{id:"demo-c2",name:"Booking Premium Madrid",email:"madrid@booking.demo",phone:"+34 600 100 202",created_at:"2026-09-19T10:00:00Z"},{id:"demo-c3",name:"Málaga Luxury Stays",email:"malaga@luxury.demo",phone:"+34 600 100 203",created_at:"2026-09-18T11:00:00Z"},{id:"demo-c4",name:"Clínica Retiro",email:"contacto@clinica.demo",phone:"+34 600 100 204",created_at:"2026-09-17T12:00:00Z"},{id:"demo-c5",name:"Hotel Boutique Salamanca",email:"hotel@boutique.demo",phone:"+34 600 100 205",created_at:"2026-09-16T13:00:00Z"}];
 const DEMO_PROPERTIES=[{id:"demo-p1",code:"ALE-T2-001",name:"Apartamento Alehost · Serrano",property_type:"T2",address:"Calle de Serrano 42",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p2",code:"ALE-T1-002",name:"Apartamento Alehost · Retiro",property_type:"T1",address:"Calle de Alcalá 118",city:"Madrid",country:"España",client_id:"demo-c1",status:"Activo"},{id:"demo-p3",code:"BKG-T4-003",name:"Villa Premium · Marbella",property_type:"T4",address:"Nueva Andalucía",city:"Marbella",country:"España",client_id:"demo-c2",status:"En servicio"},{id:"demo-p4",code:"MLS-T3-004",name:"Luxury Stay · Málaga Centro",property_type:"T3",address:"Calle Larios 18",city:"Málaga",country:"España",client_id:"demo-c3",status:"Activo"},{id:"demo-p5",code:"CLI-T2-005",name:"Clínica Retiro",property_type:"T2",address:"Calle Ibiza 11",city:"Madrid",country:"España",client_id:"demo-c4",status:"Mantenimiento"}];
@@ -211,7 +212,128 @@ const DEMO_INVOICES=[{number:"DEMO-RPC-001",status:"paid",subtotal:420,tax_rate:
 const DEMO_PAYMENTS=[{amount:508.2,method:"Transferencia",paid_at:"2026-09-22T14:00:00Z"},{amount:242,method:"Tarjeta",paid_at:"2026-09-21T12:30:00Z"},{amount:180,method:"Transferencia",paid_at:"2026-09-19T16:00:00Z"}];
 const DEMO_SERVICES=[{id:"demo-s1",code:"DEMO-SRV-001",service_type:"Limpieza 5★",typology:"T2",status:"on_the_way",priority:"normal",scheduled_at:"2026-09-23T08:15:00+02:00",assigned_employee_id:"demo-e1",property_id:"demo-p1",employee_name:"Ana Silva"},{id:"demo-s2",code:"DEMO-SRV-002",service_type:"Limpieza Airbnb",typology:"T4",status:"in_progress",priority:"high",scheduled_at:"2026-09-23T08:30:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p3",employee_name:"Carla Santos"},{id:"demo-s3",code:"DEMO-SRV-003",service_type:"Supervisión",typology:"T1",status:"supervised",priority:"normal",scheduled_at:"2026-09-23T10:20:00+02:00",assigned_employee_id:"demo-e2",property_id:"demo-p2",employee_name:"Laura Mendes"},{id:"demo-s4",code:"DEMO-SRV-004",service_type:"Pintura",typology:"T3",status:"in_progress",priority:"normal",scheduled_at:"2026-09-23T09:00:00+02:00",assigned_employee_id:"demo-e3",property_id:"demo-p4",employee_name:"Pedro Costa"},{id:"demo-s5",code:"DEMO-SRV-005",service_type:"Mantenimiento",typology:"T2",status:"completed",priority:"normal",scheduled_at:"2026-09-23T11:45:00+02:00",assigned_employee_id:"demo-e4",property_id:"demo-p5",employee_name:"João Martins"}];
 
-const pages={simulation:["Simulação 360",renderSimulation360],dashboard:["Dashboard 360",renderDashboardReference],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],checkin:["Solicitudes de check-in",renderCheckinRequests],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
+
+const EXTRA_PACKS=[
+ {code:"individual",label:"Pack individual",price:18.84},
+ {code:"doble",label:"Pack casal / doble / king",price:20.41},
+ {code:"adicional",label:"Pack adicional individual",price:13.25}
+];
+const EXTRA_PIECES=[
+ {code:"toalla_bano",label:"Toalla de baño"},
+ {code:"toalla_mano",label:"Toalla de manos"},
+ {code:"sabana_bajera",label:"Sábana bajera"},
+ {code:"sabana_encimera",label:"Sábana encimera"},
+ {code:"funda_almohada",label:"Funda de almohada"},
+ {code:"funda_nordica",label:"Funda nórdica"}
+];
+const EXTRA_STATUS={requested:"Solicitado",approved:"Aprobado",preparing:"Preparando",delivered:"Entregado",cancelled:"Cancelado"};
+function extraOrderMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}
+async function renderExtraOrders(){
+ const isStaff=["admin","supervisor","employee","maintenance_technician"].includes(role());
+ const canCreate=["admin","supervisor","client"].includes(role());
+ let props=[], orders=[], staff=[];
+ if(demoMode){
+  orders=window.__extraOrderDemo||(window.__extraOrderDemo=[]);
+  props=(role()==="client"?DEMO_PROPERTIES.filter(p=>p.client_id===DEMO_PROPERTIES[0]?.client_id):DEMO_PROPERTIES).map(p=>({id:p.id,code:p.code,name:p.name,client_id:p.client_id}));
+ }else{
+  const pr=await sb.from("properties").select("id,code,name,client_id").order("name");
+  if(pr.error)throw pr.error; props=pr.data||[];
+  let q=sb.from("extra_orders").select("id,company_id,property_id,client_id,requested_by,assigned_to,delivery_date,delivery_window,items,amenities_quantity,amenities_unit_price,total,pricing_pending,status,notes,status_history,created_at,updated_at").order("created_at",{ascending:false}).limit(200);
+  const rr=await q; if(rr.error)throw rr.error; orders=rr.data||[];
+  if(["admin","supervisor"].includes(role())){
+   const sr=await sb.from("profiles").select("id,full_name,email,role").eq("active",true).eq("role","maintenance_technician").order("full_name");
+   staff=sr.data||[];
+  }
+ }
+ const ownClient=role()==="client"&&!demoMode?await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle():null;
+ let h='<div class="panel"><div class="panel-head"><div><h3>Pedidos extra</h3><div class="muted">Solicitudes independientes de ropa y amenities · entrega por apartamento · historial propio</div></div><button class="btn" onclick="reloadCurrentPage()">Actualizar</button></div>';
+ if(canCreate){
+  h+='<form class="panel" style="background:var(--surface,#fffdf9);margin:12px 0" onsubmit="saveExtraOrder(event)"><div class="panel-head"><h3>Nuevo pedido</h3><span class="pill">Pedido independiente</span></div><div class="two"><div class="field"><label>Apartamento</label><select id="extraProperty" required><option value="">Seleccionar apartamento</option>'+props.map(p=>'<option value="'+esc(p.id)+'">'+esc((p.code?p.code+" · ":"")+p.name)+'</option>').join("")+'</select></div><div class="field"><label>Fecha de entrega</label><input id="extraDeliveryDate" type="date" min="'+new Date().toISOString().slice(0,10)+'" required value="'+new Date().toISOString().slice(0,10)+'"></div></div><div class="two"><div class="field"><label>Franja horaria (opcional)</label><input id="extraDeliveryWindow" placeholder="Ej. 10:00–13:00"></div><div class="field"><label>Amenities (€1,50 / unidad)</label><input id="extraAmenities" type="number" min="0" step="1" value="0"></div></div><div class="panel" style="margin:10px 0"><h4>Packs de ropa</h4><div class="three">'+EXTRA_PACKS.map((p,i)=>'<div class="field"><label>'+esc(p.label)+' · '+extraOrderMoney(p.price)+'</label><input id="extraPack'+i+'" type="number" min="0" step="1" value="0"></div>').join("")+'</div><div class="muted">Tarifas actuales del catálogo; confirma los importes antes de emitir cualquier factura.</div></div><div class="panel" style="margin:10px 0"><h4>Piezas sueltas</h4><div class="three">'+EXTRA_PIECES.map((p,i)=>'<div class="field"><label>'+esc(p.label)+'</label><input id="extraPiece'+i+'" type="number" min="0" step="1" value="0"></div>').join("")+'</div><div class="muted">Las piezas sueltas quedan pendientes de valoración hasta que administración confirme su precio.</div></div><div class="field"><label>Notas de entrega</label><textarea id="extraNotes" rows="2" placeholder="Instrucciones para el apartamento"></textarea></div><button class="btn gold" type="submit">＋ Crear pedido extra</button></form>';
+ }
+ h+='<div class="panel-head"><h3>Historial de pedidos</h3><span class="pill">'+orders.length+' pedidos</span></div>';
+ if(!orders.length)h+='<div class="empty">Todavía no hay pedidos extra.</div>';
+ else h+='<div class="table-wrap"><table class="table"><thead><tr><th>Pedido / entrega</th><th>Apartamento</th><th>Detalle</th><th>Total</th><th>Estado</th><th>Asignación / acciones</th></tr></thead><tbody>'+orders.map(o=>{
+  const p=props.find(x=>x.id===o.property_id);
+  const items=Array.isArray(o.items)?o.items:[];
+  const detail=items.map((it,idx)=>esc(it.label||it.code)+' × '+esc(it.qty)+' '+(it.unit_price==null||Number(it.unit_price)===0&&it.type==="piece"?'(pendiente de precio)':extraOrderMoney(Number(it.unit_price||0)*Number(it.qty||0)))).join('<br>');
+  const status=EXTRA_STATUS[o.status]||o.status;
+  let actions='';
+  if(["admin","supervisor"].includes(role())&&!demoMode){
+   actions+='<div class="field"><label>Asignar a mantenimiento</label><select onchange="assignExtraOrder(\''+o.id+'\',this.value)"><option value="">Sin asignar</option>'+staff.map(u=>'<option value="'+u.id+'" '+(o.assigned_to===u.id?'selected':'')+'>'+esc(u.full_name||u.email)+'</option>').join("")+'</select></div>';
+   actions+='<div class="field"><label>Estado</label><select onchange="changeExtraOrderStatus(\''+o.id+'\',this.value)">'+Object.keys(EXTRA_STATUS).map(k=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+EXTRA_STATUS[k]+'</option>').join("")+'</select></div>';
+  }else if(["employee","maintenance_technician"].includes(role())&&o.assigned_to===currentUser?.id&&!demoMode){
+   actions+='<div class="field"><label>Estado</label><select onchange="changeExtraOrderStatus(\''+o.id+'\',this.value)">'+["approved","preparing","delivered"].map(k=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+EXTRA_STATUS[k]+'</option>').join("")+'</select></div>';
+  }else actions+='<span class="muted">'+(o.assigned_to?"Asignado":"Pendiente de asignación")+'</span>';
+  if(o.pricing_pending&&["admin","supervisor"].includes(role())){
+   actions+='<div class="muted">Valorar piezas sueltas</div>'+items.map((it,idx)=>it.type==="piece"?'<div class="field"><label>'+esc(it.label)+' · '+it.qty+' ud.</label><input type="number" min="0" step="0.01" placeholder="€/unidad" value="'+(it.unit_price||"")+'" onchange="setExtraPiecePrice(\''+o.id+'\','+idx+',this.value)"></div>':'').join("");
+  }
+  const hist=Array.isArray(o.status_history)?o.status_history:[];
+  return '<tr><td><b>#'+esc(o.id.slice(0,8).toUpperCase())+'</b><br>'+esc(o.delivery_date)+'<br><small>'+esc(o.delivery_window||"")+'</small></td><td><b>'+esc(p?.code||"")+'</b><br>'+esc(p?.name||"Apartamento")+'</td><td>'+(detail||"—")+(Number(o.amenities_quantity)>0?'<br>Amenities × '+o.amenities_quantity+' · '+extraOrderMoney(Number(o.amenities_quantity)*Number(o.amenities_unit_price||1.5)):"")+(o.notes?'<br><small>'+esc(o.notes)+'</small>':"")+(hist.length?'<details><summary>Historial ('+hist.length+')</summary>'+hist.slice().reverse().map(ev=>'<div class="muted">'+esc(ev.at?new Date(ev.at).toLocaleString("es-ES"):"")+' · '+esc(ev.text||ev.status||"Actualización")+'</div>').join("")+'</details>':"")+'</td><td><b>'+extraOrderMoney(o.total)+'</b>'+(o.pricing_pending?'<br><small class="status urgent">Pendiente de valoración</small>':"")+'</td><td><span class="status '+(o.status==="delivered"?"approved":o.status==="cancelled"?"urgent":"pending")+'">'+esc(status)+'</span></td><td>'+actions+'</td></tr>';
+ }).join("")+'</tbody></table></div>';
+ h+='<div class="muted" style="margin-top:12px">Los pedidos se guardan en la base de datos de ROMANO PARTNERS y no crean automáticamente servicios de limpieza ni facturas fiscales.</div></div>';
+ $("content").innerHTML=h;
+}
+async function saveExtraOrder(e){
+ e.preventDefault();
+ const propertyId=$("extraProperty").value, propText=$("extraProperty").selectedOptions[0]?.textContent||"";
+ const items=[];
+ EXTRA_PACKS.forEach((p,i)=>{const qty=Number($("extraPack"+i)?.value||0);if(qty>0)items.push({type:"pack",code:p.code,label:p.label,qty,unit_price:p.price})});
+ EXTRA_PIECES.forEach((p,i)=>{const qty=Number($("extraPiece"+i)?.value||0);if(qty>0)items.push({type:"piece",code:p.code,label:p.label,qty,unit_price:null})});
+ const amenities=Number($("extraAmenities").value||0);
+ if(!items.length&&!amenities){toast("Añade al menos un pack, una pieza o un amenity.");return}
+ const pending=items.some(x=>x.type==="piece"&&x.unit_price==null);
+ const total=items.reduce((sum,x)=>sum+(Number(x.unit_price||0)*x.qty),0)+amenities*1.5;
+ const hist=[{at:new Date().toISOString(),status:"requested",text:"Pedido creado"}];
+ if(demoMode){
+  window.__extraOrderDemo=window.__extraOrderDemo||[];
+  window.__extraOrderDemo.unshift({id:"demo-"+Date.now(),property_id:propertyId,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value,status_history:hist,assigned_to:null,created_at:new Date().toISOString()});
+  toast("Pedido guardado en la demostración.");return renderExtraOrders();
+ }
+ let clientId=null;
+ if(role()==="client"){
+  const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle();
+  if(c.error||!c.data){toast(c.error?.message||"No se encontró el cliente asociado a este acceso.");return}
+  clientId=c.data.id;
+ }else{
+  const p=await sb.from("properties").select("client_id").eq("id",propertyId).maybeSingle();
+  if(p.error||!p.data?.client_id){toast(p.error?.message||"No se encontró el cliente del apartamento.");return}
+  clientId=p.data.client_id;
+ }
+ const payload={property_id:propertyId,client_id:clientId,requested_by:currentUser.id,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value||null,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value||null,status_history:hist};
+ const r=await sb.from("extra_orders").insert(payload);
+ if(r.error){toast(r.error.message);return}
+ toast("Pedido extra creado correctamente.");await renderExtraOrders();
+}
+async function changeExtraOrderStatus(id,status){
+ if(demoMode){const o=(window.__extraOrderDemo||[]).find(x=>x.id===id);if(o){o.status=status;o.status_history=[...(o.status_history||[]),{at:new Date().toISOString(),status,text:"Estado: "+(EXTRA_STATUS[status]||status)}]}return renderExtraOrders()}
+ const q=await sb.from("extra_orders").select("status,status_history").eq("id",id).maybeSingle();if(q.error||!q.data){toast(q.error?.message||"Pedido no encontrado.");return}
+ const hist=[...(Array.isArray(q.data.status_history)?q.data.status_history:[]),{at:new Date().toISOString(),status,text:"Estado: "+(EXTRA_STATUS[status]||status)}];
+ const r=await sb.from("extra_orders").update({status,status_history:hist}).eq("id",id);
+ if(r.error){toast(r.error.message);return}toast("Estado actualizado.");await renderExtraOrders();
+}
+async function assignExtraOrder(id,profileId){
+ if(demoMode)return;
+ const r=await sb.from("extra_orders").update({assigned_to:profileId||null,status_history:sb.raw?undefined:undefined}).eq("id",id);
+ if(r.error){toast(r.error.message);return}
+ toast("Asignación actualizada.");await renderExtraOrders();
+}
+async function setExtraPiecePrice(id,index,value){
+ if(demoMode)return;
+ const q=await sb.from("extra_orders").select("items,status_history").eq("id",id).maybeSingle();if(q.error||!q.data){toast(q.error?.message||"Pedido no encontrado.");return}
+ const items=Array.isArray(q.data.items)?q.data.items:[];
+ const price=Number(value);if(!Number.isFinite(price)||price<0){toast("Introduce un precio válido.");return}
+ if(!items[index]||items[index].type!=="piece")return;
+ items[index]={...items[index],unit_price:price};
+ const pending=items.some(x=>x.type==="piece"&&(x.unit_price==null||Number(x.unit_price)===0));
+ const total=items.reduce((sum,x)=>sum+Number(x.unit_price||0)*Number(x.qty||0),0);
+ const hist=[...(Array.isArray(q.data.status_history)?q.data.status_history:[]),{at:new Date().toISOString(),text:"Precio de pieza actualizado"}];
+ const row=await sb.from("extra_orders").select("amenities_quantity,amenities_unit_price").eq("id",id).maybeSingle();
+ const fullTotal=total+Number(row.data?.amenities_quantity||0)*Number(row.data?.amenities_unit_price||1.5);
+ const r=await sb.from("extra_orders").update({items,pricing_pending:pending,total:fullTotal,status_history:hist}).eq("id",id);
+ if(r.error){toast(r.error.message);return}toast("Precio actualizado.");await renderExtraOrders();
+}
+
+const pages={extra_orders:["Pedidos extra",renderExtraOrders],simulation:["Simulação 360",renderSimulation360],dashboard:["Dashboard 360",renderDashboardReference],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",newServicePremium],calendar:["Calendario",renderCalendar],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],quality:["Checklists / Calidad",renderQualityPremium],checkin:["Solicitudes de check-in",renderCheckinRequests],clients:["Clientes",renderClientsPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensual",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock:["Materiales / Stock",renderStockPremium],linen:["Ropa / Linen",renderLinenPremium],laundry:["Lavandería",renderLaundryPremium],amenities:["Amenities opcionales",renderAmenitiesPremium],recurring:["Servicios recurrentes",renderRecurringPremium],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],receipts:["Recibos / Comprobantes",renderFinancePremium],invoices:["Facturas",renderFinancePremium],documents:["Documentos / Contratos",renderDocumentsPremium],chat:["Chat",renderChatPremium],notifications:["Alertas",renderNotificationsPremium],search:["Pesquisa global",renderSearchPremium],reports:["Relatórios",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
