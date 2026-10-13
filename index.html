@@ -1889,7 +1889,7 @@ async function renderPacksAmenities(){
    const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle();
    if(c.error)throw c.error;
    if(c.data){const p=await sb.from("properties").select("id,name,code,address,city").eq("client_id",c.data.id).order("name");if(p.error)throw p.error;properties=p.data||[];}
-  }
+  }else if(admin){const p=await sb.from("properties").select("id,name,code,address,city").eq("company_id",currentProfile.company_id).order("name");if(p.error)throw p.error;properties=p.data||[];}
   let q=sb.from("romano_pack_orders").select("id,order_code,property_id,client_profile_id,company_id,items,estimated_total,requested_date,status,admin_notes,assigned_to,created_at,updated_at").order("created_at",{ascending:false}).limit(150);
   const r=await q;if(r.error)throw r.error;orders=r.data||[];
  }catch(e){error=e?.message||String(e)}
