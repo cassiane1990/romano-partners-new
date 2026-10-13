@@ -1874,17 +1874,18 @@ function romanoPackStatus(s){return ROMANO_PACK_STATUSES[s]||s||"—"}
 function romanoPackTotal(items){return (Number(items?.individual||0)*ROMANO_PACK_PRICES.individual)+(Number(items?.double||0)*ROMANO_PACK_PRICES.double)+(Number(items?.single_beds||0)*ROMANO_PACK_PRICES.single_beds)+(Number(items?.amenities||0)*ROMANO_PACK_PRICES.amenities)}
 async function renderPacksAmenities(){
  const admin=["admin","supervisor"].includes(role()),client=role()==="client";
- let properties=[],orders=[],error=null;
+ let properties=[],orders=[],profiles=[],error=null;
  try{
   if(client){
    const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle();
    if(c.error)throw c.error;
    if(c.data){const p=await sb.from("properties").select("id,name,code,address,city").eq("client_id",c.data.id).order("name");if(p.error)throw p.error;properties=p.data||[];}
-  }else if(admin){const p=await sb.from("properties").select("id,name,code,address,city").eq("company_id",currentProfile.company_id).order("name");if(p.error)throw p.error;properties=p.data||[];}
-  let q=sb.from("romano_pack_orders").select("id,order_code,property_id,client_profile_id,company_id,items,estimated_total,requested_date,status,admin_notes,assigned_to,created_at,updated_at").order("created_at",{ascending:false}).limit(150);
+  }else if(admin){const p=await sb.from("properties").select("id,name,code,address,city").eq("company_id",currentProfile.company_id).order("name");if(p.error)throw p.error;properties=p.data||[];const cp=await sb.from("profiles").select("id,full_name,email").eq("company_id",currentProfile.company_id).eq("active",true);if(cp.error)throw cp.error;profiles=cp.data||[];}
+  let q=sb.from("romano_pack_orders").select("id,order_code,property_id,client_profile_id,company_id,items,estimated_total,requested_date,status,admin_notes,assigned_to,created_at,updated_at").order("created_at",{ascending:false}).limit(500);
   const r=await q;if(r.error)throw r.error;orders=r.data||[];
  }catch(e){error=e?.message||String(e)}
  const propertyMap=new Map(properties.map(p=>[p.id,p]));
+ const profileMap=new Map(profiles.map(p=>[p.id,p]));
  const statusOptions=Object.entries(ROMANO_PACK_STATUSES).map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join("");
  let html='<div class="rpc-home"><div class="rpc-home-top"><div class="rpc-home-welcome"><h1>Solicitar pack ropa</h1><p>Solicitudes adicionales independientes de los servicios de limpieza.</p></div><div class="pill">IVA incluido · precio sujeto a validación</div></div>';
  if(error)html+='<div class="panel"><div class="msg">No se pudieron cargar los pedidos o las propiedades: '+esc(error)+'. Compruebe que la migración de base de datos está aplicada y que su perfil tiene acceso.</div></div>';
@@ -1898,7 +1899,7 @@ async function renderPacksAmenities(){
  if(admin)html+='<div class="two" style="margin-bottom:14px"><div class="field"><label for="rpcPackSearch">Buscar por cliente, apartamento o pedido</label><input id="rpcPackSearch" type="search" placeholder="Nombre, email, código o apartamento"></div><div class="field"><label for="rpcPackFrom">Solicitado desde (fecha y hora)</label><input id="rpcPackFrom" type="datetime-local"></div><div class="field"><label for="rpcPackTo">Solicitado hasta (fecha y hora)</label><input id="rpcPackTo" type="datetime-local"></div><div class="field"><label for="rpcPackRequestedDate">Fecha deseada de entrega</label><input id="rpcPackRequestedDate" type="date"></div></div>';
  if(!orders.length)html+='<div class="empty">Todavía no hay pedidos.</div>';
  else html+='<div style="overflow-x:auto"><table class="table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Apartamento</th><th>Productos</th><th>Total estimado</th><th>Entrega deseada</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>'+orders.map(o=>{
-  const p=propertyMap.get(o.property_id);const items=o.items||{};
+  const p=propertyMap.get(o.property_id),profile=profileMap.get(o.client_profile_id);const items=o.items||{};
   const products=[Number(items.individual||0)?Number(items.individual)+' × Individual':"",Number(items.double||0)?Number(items.double)+' × Double/King':"",Number(items.single_beds||0)?Number(items.single_beds)+' × Camas individuales':"",Number(items.amenities||0)?Number(items.amenities)+' × Amenities':""].filter(Boolean).join("<br>");
   let actions="";
   if(admin)actions='<button class="btn" onclick="reviewRomanoPackOrder(\''+o.id+'\')">Gestionar</button> <button class="btn" style="border-color:#b42318;color:#b42318" onclick="deleteRomanoPackOrder(\''+o.id+'\')">Eliminar</button>';
@@ -1907,6 +1908,10 @@ async function renderPacksAmenities(){
  }).join("")+'</tbody></table></div>';
  html+='</div></div>';
  $("content").innerHTML=html;
+ if(admin){
+  const applyPackFilters=()=>{const term=($("rpcPackSearch")?.value||"").trim().toLowerCase(),from=$("rpcPackFrom")?.value?new Date($("rpcPackFrom").value).getTime():null,to=$("rpcPackTo")?.value?new Date($("rpcPackTo").value).getTime():null,requested=$("rpcPackRequestedDate")?.value||"";document.querySelectorAll("#content tbody tr[data-pack-search]").forEach(tr=>{const created=Date.parse(tr.dataset.packCreated||"");const show=(!term||tr.dataset.packSearch.includes(term))&&(!from||created>=from)&&(!to||created<=to)&&(!requested||tr.dataset.packRequested===requested);tr.style.display=show?"":"none";});};
+  ["rpcPackSearch","rpcPackFrom","rpcPackTo","rpcPackRequestedDate"].forEach(id=>$(id)?.addEventListener("input",applyPackFilters));
+ }
  if(client&&properties.length){
   const updateTotal=()=>{const items={individual:$("rpcPackIndividual")?.value,double:$("rpcPackDouble")?.value,single_beds:$("rpcPackSingleBeds")?.value,amenities:$("rpcPackAmenities")?.value};const el=$("rpcPackTotal");if(el)el.textContent=romanoPackMoney(romanoPackTotal(items));};
   ["rpcPackIndividual","rpcPackDouble","rpcPackSingleBeds","rpcPackAmenities"].forEach(id=>$(id)?.addEventListener("input",updateTotal));
