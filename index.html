@@ -313,7 +313,9 @@ async function changeExtraOrderStatus(id,status){
 }
 async function assignExtraOrder(id,profileId){
  if(demoMode)return;
- const r=await sb.from("extra_orders").update({assigned_to:profileId||null,status_history:sb.raw?undefined:undefined}).eq("id",id);
+ const q=await sb.from("extra_orders").select("status_history").eq("id",id).maybeSingle();if(q.error||!q.data){toast(q.error?.message||"Pedido no encontrado.");return}
+ const hist=[...(Array.isArray(q.data.status_history)?q.data.status_history:[]),{at:new Date().toISOString(),text:profileId?"Pedido asignado a mantenimiento":"Asignación retirada"}];
+ const r=await sb.from("extra_orders").update({assigned_to:profileId||null,status_history:hist}).eq("id",id);
  if(r.error){toast(r.error.message);return}
  toast("Asignación actualizada.");await renderExtraOrders();
 }
