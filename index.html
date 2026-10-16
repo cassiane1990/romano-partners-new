@@ -2205,19 +2205,19 @@ async function deleteClient(id){
  if(!canManage()||!id)return;
  if(demoMode){const i=DEMO_CLIENTS.findIndex(x=>x.id===id);if(i<0){toast("Cliente no encontrado.");return}if(!confirm("¿Eliminar este cliente ficticio?"))return;DEMO_CLIENTS.splice(i,1);renderClients();toast("Cliente eliminado.");return}
  const q=await sb.from("clients").select("name").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}
- if(!confirm("¿Eliminar el cliente "+(q.data?.name||"")+"? Esta acción no se puede deshacer."))return;
- const b=await sb.from("laundry_orders").delete().eq("client_id",id);if(b.error){toast("No se puede eliminar el cliente: "+b.error.message);return}
- const r=await sb.from("clients").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar este cliente: "+r.error.message);return}
- toast("Cliente eliminado.");await renderClients();
+ if(!confirm("¿Eliminar el cliente "+(q.data?.name||"")+" y sus propiedades y servicios asociados? La operación se bloqueará si hay registros financieros protegidos. Esta acción no se puede deshacer."))return;
+ const r=await sb.rpc("romano_delete_client_property",{p_kind:"client",p_id:id});
+ if(r.error){toast("No se puede eliminar el cliente: "+r.error.message);return}
+ toast("Cliente eliminado con sus dependencias.");await renderClients();
 }
 async function deleteProperty(id){
  if(!canManage()||!id)return;
  if(demoMode){const i=DEMO_PROPERTIES.findIndex(x=>x.id===id);if(i<0){toast("Propiedad no encontrada.");return}if(!confirm("¿Eliminar esta propiedad ficticia?"))return;DEMO_PROPERTIES.splice(i,1);renderProperties();toast("Propiedad eliminada.");return}
  const q=await sb.from("properties").select("name,code").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}
- if(!confirm("¿Eliminar la propiedad "+(q.data?.name||q.data?.code||"")+"? Esta acción no se puede deshacer."))return;
- for(const pair of [["laundry_orders","property_id"],["occurrences","property_id"]]){const b=await sb.from(pair[0]).delete().eq(pair[1],id);if(b.error){toast("No se puede eliminar la propiedad: "+b.error.message);return}}
- const r=await sb.from("properties").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar la propiedad: "+r.error.message);return}
- toast("Propiedad eliminada.");await renderProperties();
+ if(!confirm("¿Eliminar la propiedad "+(q.data?.name||q.data?.code||"")+" y sus servicios asociados? La operación se bloqueará si hay registros financieros protegidos. Esta acción no se puede deshacer."))return;
+ const r=await sb.rpc("romano_delete_client_property",{p_kind:"property",p_id:id});
+ if(r.error){toast("No se puede eliminar la propiedad: "+r.error.message);return}
+ toast("Propiedad eliminada con sus dependencias.");await renderProperties();
 }
 async function deleteEmployee(id){
  if(!canManage()||!id)return;
