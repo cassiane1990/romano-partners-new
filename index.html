@@ -2215,6 +2215,9 @@ async function deleteProperty(id){
  if(!canManage()||!id)return;
  if(demoMode){const i=DEMO_PROPERTIES.findIndex(x=>x.id===id);if(i<0){toast("Propiedad no encontrada.");return}if(!confirm("¿Eliminar esta propiedad ficticia?"))return;DEMO_PROPERTIES.splice(i,1);renderProperties();toast("Propiedad eliminada.");return}
  const q=await sb.from("properties").select("name,code").eq("id",id).eq("company_id",currentProfile.company_id).single();if(q.error){toast(q.error.message);return}
+ const linked=await sb.from("services").select("id",{count:"exact",head:true}).eq("property_id",id);
+ if(linked.error){toast("No se pudo comprobar si la propiedad tiene servicios vinculados: "+linked.error.message);return}
+ if((linked.count||0)>0){toast("No se puede eliminar esta propiedad porque tiene servicios vinculados. Para conservar el historial y los datos del cliente, primero debe desactivarse o archivarse.");return}
  if(!confirm("¿Eliminar la propiedad "+(q.data?.name||q.data?.code||"")+"? Esta acción no se puede deshacer."))return;
  for(const pair of [["laundry_orders","property_id"],["occurrences","property_id"]]){const b=await sb.from(pair[0]).delete().eq(pair[1],id);if(b.error){toast("No se puede eliminar la propiedad: "+b.error.message);return}}
  const r=await sb.from("properties").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("No se puede eliminar la propiedad: "+r.error.message);return}
