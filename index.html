@@ -5475,7 +5475,7 @@ async function loadServiceCreationContext(){
  return {clientMode,employeeMode,internalCreation,ownClient,clients,props,employees};
 }
 function openNewServiceMenu(){
- if(!romanoProfileCan("newservice")){toast("Este perfil no puede crear servicios.");return}
+ if(!["admin","supervisor","client","maintenance_technician"].includes(role())){toast("Este perfil no puede crear servicios.");return}
  const employeeOnly=role()==="maintenance_technician";
  const buttons=employeeOnly
   ? "<button type='button' class='btn gold' style='min-height:110px;font-size:15px' onclick='closeModal();newMaintenanceServicePremium()'>🔧<br><strong>Servicio mantenimiento</strong><small style='display:block;margin-top:6px'>Crear mantenimiento para cualquier cliente y apartamento</small></button>"
