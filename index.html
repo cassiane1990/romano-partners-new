@@ -5519,10 +5519,11 @@ async function newMaintenanceServicePremium(){
 }
 function maintenanceServiceFilterProperties(){
  const cid=$("msClient")?.value,sel=$("msProperty");if(!sel)return;
- const rows=(window.__mpProps||[]).filter(p=>!cid||p.client_id===cid);
- sel.innerHTML=rows.map(p=>"<option value='"+p.id+"'>"+esc(p.name)+" · "+esc(p.code||"")+" · "+esc([p.address,p.city].filter(Boolean).join(", "))+"</option>").join("");
- if(rows.length&&!sel.value)sel.value=rows[0].id;
+ const rows=cid?(window.__mpProps||[]).filter(p=>p.client_id===cid):[];
+ sel.innerHTML=rows.length?rows.map(p=>"<option value='"+p.id+"'>"+esc(p.name)+" · "+esc(p.code||"")+" · "+esc([p.address,p.city].filter(Boolean).join(", "))+"</option>").join(""):"<option value=''>"+(cid?"Este cliente não tem apartamentos registados":"Selecione primeiro um cliente")+"</option>";
+ if(rows.length)sel.value=rows[0].id;
 }
+
 function maintenanceServiceSyncClient(){
  const prop=$("msProperty")?.value,row=(window.__mpProps||[]).find(p=>p.id===prop);if(!row)return;
  const client=(window.__mpClients||[]).find(c=>c.id===row.client_id);
@@ -5585,7 +5586,15 @@ function toggleCleaningUrgency24(){
  p.value=p.value==="urgent"?"normal":"urgent";
  toast(p.value==="urgent"?"🚨 Limpieza marcada como urgente":"Urgencia de limpieza retirada");
 }
-function masterFilterProperties(){const cid=$("mpClient")?.value,sel=$("mpProperty");if(!sel)return;const props=demoMode?DEMO_PROPERTIES:((window.__mpProps||[])),own=props.filter(x=>!cid||x.client_id===cid);sel.innerHTML=own.length?own.map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option value=''>Sin propiedades para este cliente</option>";masterLoadPropertyBeds()}
+function masterFilterProperties(){
+ const cid=$("mpClient")?.value,sel=$("mpProperty");if(!sel)return;
+ const props=demoMode?DEMO_PROPERTIES:(window.__mpProps||[]);
+ const own=cid?props.filter(x=>x.client_id===cid):[];
+ sel.innerHTML=own.length?own.map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option value=''>"+(cid?"Este cliente não tem apartamentos registados":"Selecione primeiro um cliente")+"</option>";
+ if(own.length)sel.value=own[0].id;
+ masterLoadPropertyBeds();
+}
+
 function masterRecalc(){const vat=Number($("mpVat")?.value||21)/100,clean=masterSelectedCleaning(),lines=[];if(clean.price!=null)lines.push({name:(clean.opt?.name||"Limpieza")+" · "+masterMoney(clean.price)+" SIN IVA",price:clean.price*clean.qty,qty:clean.qty,tax:clean.cat.tax});masterItemRows().forEach(x=>{if(x.invalid)lines.push({name:x.name+" · "+x.detail,price:0,qty:x.quantity,tax:true,invalid:true});else if(x.unit_price>0)lines.push({name:x.name,price:x.unit_price*x.quantity,qty:x.quantity,tax:x.tax,detail:x.detail||""})});let sub=0,tax=0,total=0;lines.forEach(x=>{if(x.invalid)return;const gross=x.price;if(x.tax){const net=gross/(1+vat);sub+=net;tax+=gross-net;total+=gross}else{sub+=gross;tax+=gross*vat;total+=gross*(1+vat)}});$("mpLines").innerHTML=lines.length?lines.map(x=>"<div class='line-item'><span>"+esc(x.name)+(x.qty>1?" × "+x.qty:"")+(x.detail?"<small class='muted' style='display:block'>"+esc(x.detail)+"</small>":"")+"</span><b>"+masterMoney(x.price)+"</b></div>").join(""):"<div class='empty'>Seleccione una tarifa o añada elementos.</div>";if(clean.price==null)$("mpLines").innerHTML="<div class='notice'>"+esc(clean.opt?.name||"Tarifa a confirmar")+" · no se suma hasta confirmar el precio.</div>"+$("mpLines").innerHTML;$("mpSub").textContent=masterMoney(sub);$("mpTax").textContent=masterMoney(tax);$("mpTotal").textContent=masterMoney(total);$("mpSub").dataset.v=sub;$("mpTax").dataset.v=tax;$("mpTotal").dataset.v=total}
 async function savePremiumService(){
  const prop=$("mpProperty")?.value;if(!prop){toast("Seleccione un apartamento.");return}
