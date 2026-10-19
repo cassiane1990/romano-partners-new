@@ -5292,7 +5292,10 @@ async function uploadEmergencyMedia(occurrenceId,files){
  }
 }
 async function saveEmergency(e){
- e.preventDefault();
+ if(e){e.preventDefault();e.stopPropagation()}
+ const submitButton=e?.submitter||e?.target?.querySelector('button[type="submit"],button.primary');
+ if(submitButton){if(submitButton.dataset.saving==="1")return;submitButton.dataset.saving="1";submitButton.disabled=true;submitButton.dataset.originalText=submitButton.textContent;submitButton.textContent="A enviar emergência…"}
+ try {
  const propertyId=$("eProperty")?.value||null,serviceId=$("eService")?.value||null,employeeId=$("eEmployee")?.value||null,serviceType=$("eType")?.value||null,priority=$("ePriority")?.value||"urgent",description=$("eDesc")?.value.trim()||"";
  const selectedClientId=$("eClient")?.tagName==="SELECT"?($("eClient")?.value||null):null;
  const clientRequest=role()==="client";
@@ -5342,6 +5345,7 @@ async function saveEmergency(e){
   }
  }
  closeModal();toast("Emergência 24H enviada automaticamente ao Admin e ao Supervisor para atribuição do técnico.");emergency();updateOfflineIndicator();
+ } catch(err) { console.error("saveEmergency failed",err); toast("Não foi possível enviar a emergência: "+(err?.message||String(err))); } finally { if(submitButton&&submitButton.isConnected){submitButton.disabled=false;submitButton.dataset.saving="0";submitButton.textContent=submitButton.dataset.originalText||"Enviar emergência 24H de manutenção";} }
 }
 async function decideServiceAdvance(id,approved){
  const resolution=approved?"Adelanto aprobado por supervisión/admin":"Adelanto rechazado por supervisión/admin";
