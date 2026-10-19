@@ -2691,8 +2691,8 @@ function renderCleaningFlow(service,checklist,media){
  return h+"</div>";
 }
 function renderMaintenanceEmployeeFlow(x,media=[]){
- if(role()!=="maintenance_technician"||x.assigned_employee_id!==currentUser.id||!privateMaintenanceServiceType(x.service_type)||["completed","cancelled"].includes(x.status))return "";
- const evidenceCount=(media||[]).filter(m=>["photo","video"].includes(m.media_type)).length;
+ if(role()!=="maintenance_technician"||x.assigned_employee_id!==currentUser.id||isCleaningServiceType(x.service_type)||["completed","cancelled","approved","supervised","rejected"].includes(x.status))return "";
+ const evidenceCount=(media||[]).filter(m=>["photo","image","video"].includes(String(m.media_type||"").toLowerCase())).length;
  const canFinish=evidenceCount>0;
  const finishButton=canFinish
   ? '<button class="btn gold" onclick="setServiceStatusPremium(\''+x.id+'\',\'completed\')">✓ FINALIZAR MANTENIMIENTO</button>'
@@ -2831,7 +2831,7 @@ async function setServiceStatusPremium(id,status){
      if(["employee","maintenance_technician"].includes(role())){toast("La limpieza no puede finalizarse desde el perfil funcionario. Complete checklist + fotos y solicite la supervisión.");return}
      if(["admin","supervisor"].includes(role())){await approveCleaningService(id);return}
    }else if(["admin","supervisor","maintenance_technician"].includes(role())&&(["admin","supervisor"].includes(role())||sr.data.assigned_employee_id===currentUser.id)){
-     const evidence=await sb.from("service_media").select("id").eq("service_id",id).in("media_type",["photo","video"]).limit(1);
+     const evidence=await sb.from("service_media").select("id").eq("service_id",id).in("media_type",["photo","image","video"]).limit(1);
      if(evidence.error){toast("No se pudieron verificar las fotos del mantenimiento: "+evidence.error.message);return}
      if(!evidence.data?.length){toast("⚠️ Para finalizar el mantenimiento, primero debe anexar al menos una foto o vídeo del trabajo.");return}
      const done=await sb.rpc("employee_finish_maintenance_service",{p_service_id:id});
