@@ -5244,12 +5244,17 @@ async function newEmergency(){
 
  // No seleccionar un servicio automáticamente: el usuario debe elegirlo explícitamente si corresponde.
 }
-function filterEmergencyProperties(){
+async function filterEmergencyProperties(){
  const clientId=$("eClient")?.value||"",sel=$("eProperty");if(!sel)return;
- const props=window.__emergencyProps||[];
- const rows=clientId?props.filter(p=>String(p.client_id||"")===String(clientId)):[];
+ let props=window.__emergencyProps||[];
+ let rows=clientId?props.filter(p=>String(p.client_id||"")===String(clientId)):[];
+ // Re-query the selected client's properties when the local context is incomplete.
+ if(clientId&&!rows.length&&!demoMode){
+  const q=await sb.from("properties").select("id,name,code,address,city,client_id").eq("company_id",currentProfile.company_id).eq("client_id",clientId).order("name");
+  if(!q.error&&Array.isArray(q.data)){rows=q.data;window.__emergencyProps=[...props.filter(p=>String(p.client_id||"")!==String(clientId)),...rows];}
+ }
  const previous=sel.value;
- sel.innerHTML="<option value=''>"+(clientId?(rows.length?"Selecione o apartamento":"Este cliente não tem apartamentos registados"):"Selecione primeiro o cliente")+"</option>"+rows.map(p=>"<option value='"+p.id+"' data-client='"+esc(p.client_id||"")+"'>"+esc(p.name||"Apartamento")+" · "+esc(p.code||"")+" · "+esc(p.address||"Sem endereço")+(p.city?" · "+esc(p.city):"")+"</option>").join("");
+ sel.innerHTML="<option value=''>"+(clientId?(rows.length?"Selecione o apartamento":"Este cliente não tem apartamentos registados — confirme o vínculo do imóvel ao cliente"):"Selecione primeiro o cliente")+"</option>"+rows.map(p=>"<option value='"+p.id+"' data-client='"+esc(p.client_id||"")+"'>"+esc(p.name||"Apartamento")+" · "+esc(p.code||"")+" · "+esc(p.address||"Sem endereço")+(p.city?" · "+esc(p.city):"")+"</option>").join("");
  if(rows.some(p=>p.id===previous))sel.value=previous;
  const serviceSel=$("eService");
  if(serviceSel){const serviceOpts=Array.from(serviceSel.options);serviceOpts.forEach((o,i)=>{if(i===0){o.hidden=false;return}o.hidden=!!clientId&&String(o.dataset.client||"")!==String(clientId);if(o.hidden&&o.selected)serviceSel.value="";});}
