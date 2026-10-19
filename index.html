@@ -4782,7 +4782,7 @@ async function loadPropertyInspections(){
  box.innerHTML=rows.map(x=>{const p=props.find(y=>y.id===x.property_id),checks=Object.values(x.checklist||{}),inc=checks.filter(v=>v==="incidencia").length;return '<div class="panel" style="margin:8px 0;padding:14px"><div class="panel-head"><div><h3>📁 Inspeção · '+esc(p?.name||"Apartamento")+'</h3><div class="muted">'+esc(cm[x.client_id]||"Cliente")+' · '+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div></div><span class="pill">'+(x.first_free?"Gratuita":"22,26 €")+'</span></div><div class="muted">'+esc(new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"short"}).format(new Date(x.inspection_at)))+' · '+esc(x.inspector_name||"")+'</div><p>'+esc(x.notes||"Sem observações")+'</p><div class="muted">'+inc+' item(ns) com incidência · '+checks.filter(v=>v==="ok").length+' itens verificados em bom estado</div><button class="btn" data-id="'+x.id+'" onclick="openInspectionEvidence(this.dataset.id)">Ver fotos/vídeos</button>'+(["admin","supervisor"].includes(role())?'<button class="btn" data-id="'+x.id+'" onclick="editInspection(this.dataset.id)">Editar inspeção</button><button class="btn danger" data-id="'+x.id+'" onclick="deleteWholeInspection(this.dataset.id)">Eliminar inspeção inteira</button>':'')+'</div>'}).join("");
 }
 async function editInspection(id){
- if(!["admin","supervisor"].includes(role())){toast("Sem permissão para editar inspeções.");return}
+ if(!canManage()){toast("Apenas Admin ou Supervisor pode editar inspeções.");return}
  const q=await sb.from("property_inspections").select("id,inspection_at,checklist,notes,first_free,price_eur,status").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error){toast("Não foi possível abrir a inspeção: "+q.error.message);return}
  const x=q.data,checks=x.checklist||{},date=new Date(x.inspection_at);const localDate=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
@@ -4803,7 +4803,7 @@ async function saveInspectionEdit(id,e){
 async function openInspectionEvidence(id){
  const r=await sb.from("property_media").select("id,title,file_name,media_type,storage_path,created_at").eq("inspection_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:true});
  if(r.error){toast(r.error.message);return}if(!r.data?.length){toast("Esta inspeção não tem fotos ou vídeos anexados.");return}
- const canDelete=["admin","supervisor"].includes(role());
+ const canDelete=canManage();
  const grouped={};
  for(const m of r.data){
   const raw=String(m.title||"").replace(/^\[INSPEÇÃO ITEM\]\s*/i,"").replace(/^\[INSPEÇÃO GERAL\]\s*/i,"");
@@ -4822,7 +4822,7 @@ async function openInspectionEvidence(id){
  openModal("Evidências da inspeção",groups.join("")+(canDelete?'<div style="display:grid;gap:8px;margin-top:12px"><button class="btn" style="width:100%" data-id="'+id+'" onclick="deleteAllInspectionMedia(this.dataset.id)">Eliminar todas as fotos/vídeos</button><button class="btn danger" style="width:100%" data-id="'+id+'" onclick="deleteWholeInspection(this.dataset.id)">Eliminar inspeção inteira e anexos</button></div>':''));
 }
 async function deleteAllInspectionMedia(inspectionId){
- if(!["admin","supervisor"].includes(role())){toast("Só Admin ou Supervisor pode eliminar fotos/vídeos.");return}
+ if(!canManage()){toast("Apenas Admin ou Supervisor pode eliminar fotos/vídeos.");return}
  if(!confirm("Eliminar TODAS as fotos e vídeos desta inspeção, mantendo a ficha da inspeção? Esta ação não pode ser desfeita."))return;
  const q=await sb.from("property_media").select("id,storage_path").eq("inspection_id",inspectionId).eq("company_id",currentProfile.company_id);
  if(q.error){toast("Não foi possível listar as fotos: "+q.error.message);return}
@@ -4834,7 +4834,7 @@ async function deleteAllInspectionMedia(inspectionId){
  await openInspectionEvidence(inspectionId);
 }
 async function deleteInspectionMedia(mediaId,inspectionId){
- if(!["admin","supervisor"].includes(role())){toast("Sem permissão para eliminar evidências.");return}
+ if(!canManage()){toast("Apenas Admin ou Supervisor pode eliminar evidências.");return}
  if(!confirm("Eliminar esta fotografia/vídeo da inspeção? Esta ação não pode ser desfeita."))return;
  const q=await sb.from("property_media").select("id,storage_path").eq("id",mediaId).eq("company_id",currentProfile.company_id).single();
  if(q.error){toast(q.error.message);return}
@@ -4845,7 +4845,7 @@ async function deleteInspectionMedia(mediaId,inspectionId){
  await openInspectionEvidence(inspectionId);
 }
 async function deleteWholeInspection(id){
- if(!["admin","supervisor"].includes(role())){toast("Sem permissão para eliminar inspeções.");return}
+ if(!canManage()){toast("Apenas Admin ou Supervisor pode eliminar inspeções.");return}
  if(!confirm("Eliminar a inspeção inteira e todas as fotografias/vídeos associados? Esta ação não pode ser desfeita."))return;
  const q=await sb.from("property_media").select("id,storage_path").eq("inspection_id",id).eq("company_id",currentProfile.company_id);
  if(q.error){toast(q.error.message);return}
