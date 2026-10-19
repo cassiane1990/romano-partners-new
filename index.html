@@ -4784,19 +4784,48 @@ async function loadPropertyInspections(){
 async function openInspectionEvidence(id){
  const r=await sb.from("property_media").select("id,title,file_name,media_type,storage_path,created_at").eq("inspection_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:true});
  if(r.error){toast(r.error.message);return}if(!r.data?.length){toast("Esta inspeção não tem fotos ou vídeos anexados.");return}
+ const canDelete=["admin","supervisor"].includes(role());
  const grouped={};
  for(const m of r.data){
-  const raw=String(m.title||"").replace(/^\\[INSPEÇÃO ITEM\\]\\s*/i,"").replace(/^\\[INSPEÇÃO GERAL\\]\\s*/i,"");
-  const match=raw.match(/^(.+?)\\s*·\\s*([^·]+?)\\s*·\\s*Estado:\\s*(.+?)\\s*·\\s*/i);
-  const label=match?match[1]+" · "+match[2]+(match[3]?" · "+match[3]:""):(raw||"Evidência geral da inspeção");
+  const raw=String(m.title||"").replace(/^\[INSPEÇÃO ITEM\]\s*/i,"").replace(/^\[INSPEÇÃO GERAL\]\s*/i,"");
+  let label="Evidência geral da inspeção";
+  if(/^\[INSPEÇÃO ITEM\]/i.test(String(m.title||""))){
+   const parts=raw.split(" · ");
+   if(parts.length>=3){label=parts[0]+" · "+parts[1]+" · "+parts[2].replace(/^Estado:\s*/i,"Estado: ")}
+   else if(parts.length>=2)label=parts.slice(0,2).join(" · ");
+  }else if(raw)label=raw.replace(/\s*·\s*[^·]+$/,"");
   (grouped[label]||(grouped[label]=[])).push(m);
  }
  const groups=await Promise.all(Object.entries(grouped).map(async ([label,files])=>{
-  const items=await Promise.all(files.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="inspection-evidence-file"><span>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name||"Ficheiro")+'</span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
-  return '<section class="inspection-evidence-group"><h4>'+esc(label)+'</h4>'+items.join("")+'</section>';
+  const items=await Promise.all(files.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="inspection-evidence-file" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line,#eadfce)"><span style="min-width:0;overflow-wrap:anywhere">'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name||"Ficheiro")+'</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(canDelete?'<button class="btn danger" data-media-id="'+m.id+'" onclick="deleteInspectionMedia(this.dataset.mediaId,\''+id+'\')">Eliminar foto</button>':'')+'</div></div>'}));
+  return '<section class="inspection-evidence-group" style="margin:12px 0;padding:12px;border:1px solid var(--line,#eadfce);border-radius:14px"><h4 style="margin:0 0 8px">'+esc(label)+'</h4>'+items.join("")+'</section>';
  }));
- openModal("Evidências da inspeção",groups.join(""));
+ openModal("Evidências da inspeção",groups.join("")+(canDelete?'<button class="btn danger" style="width:100%;margin-top:10px" data-id="'+id+'" onclick="deleteWholeInspection(this.dataset.id)">Eliminar inspeção inteira</button>':''));
 }
+async function deleteInspectionMedia(mediaId,inspectionId){
+ if(!["admin","supervisor"].includes(role())){toast("Sem permissão para eliminar evidências.");return}
+ if(!confirm("Eliminar esta fotografia/vídeo da inspeção? Esta ação não pode ser desfeita."))return;
+ const q=await sb.from("property_media").select("id,storage_path").eq("id",mediaId).eq("company_id",currentProfile.company_id).single();
+ if(q.error){toast(q.error.message);return}
+ const d=await sb.from("property_media").delete().eq("id",mediaId).eq("company_id",currentProfile.company_id);
+ if(d.error){toast("Não foi possível eliminar a evidência: "+d.error.message);return}
+ const rm=await sb.storage.from("property-media").remove([q.data.storage_path]);
+ if(rm.error)toast("Registo eliminado, mas não foi possível remover o ficheiro do armazenamento: "+rm.error.message);else toast("Foto/vídeo eliminado.");
+ await openInspectionEvidence(inspectionId);
+}
+async function deleteWholeInspection(id){
+ if(!["admin","supervisor"].includes(role())){toast("Sem permissão para eliminar inspeções.");return}
+ if(!confirm("Eliminar a inspeção inteira e todas as fotografias/vídeos associados? Esta ação não pode ser desfeita."))return;
+ const q=await sb.from("property_media").select("id,storage_path").eq("inspection_id",id).eq("company_id",currentProfile.company_id);
+ if(q.error){toast(q.error.message);return}
+ const paths=(q.data||[]).map(x=>x.storage_path).filter(Boolean);
+ if(q.data?.length){const d=await sb.from("property_media").delete().eq("inspection_id",id).eq("company_id",currentProfile.company_id);if(d.error){toast("Não foi possível eliminar as evidências: "+d.error.message);return}}
+ const del=await sb.from("property_inspections").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(del.error){toast("Não foi possível eliminar a inspeção: "+del.error.message);return}
+ if(paths.length){const rm=await sb.storage.from("property-media").remove(paths);if(rm.error){toast("Inspeção eliminada, mas alguns ficheiros ficaram no armazenamento.");}}
+ closeModal();toast("Inspeção e evidências eliminadas.");await renderPropertyInspections();
+}
+
 async function renderEvidenceArchive(){
  const isFieldStaff=["employee","maintenance_technician"].includes(role());
  let clients=[],props=[];
