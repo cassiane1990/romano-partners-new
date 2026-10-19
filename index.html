@@ -5086,6 +5086,7 @@ async function newEmergency(){
    if(!maintenanceEmployees.length){const maintenanceEmployeeIds=new Set(services.filter(x=>String(x.service_type||"").toLowerCase().match(/manten|pint|electric|fontan|hydraulic/)).map(x=>x.assigned_employee_id).filter(Boolean));maintenanceEmployees=pp.filter(p=>maintenanceEmployeeIds.has(p.id)).map(p=>({...p,function_title:"Mantenimiento"}));}
  }
  const clientOptions=clients.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+' · '+esc(x.client_code||"")+'</option>').join("");
+ window.__emergencyProps=props;
  const propertyOptions=props.map(p=>'<option value="'+p.id+'" data-client="'+esc(p.client_id||"")+'">'+esc(p.name||"Apartamento")+' · '+esc(p.code||"")+' · '+esc(p.address||"Sin dirección")+(p.city?" · "+esc(p.city):"")+'</option>').join("");
  const maintenanceServices=services.filter(x=>String(x.service_type||"").toLowerCase().includes("manten")||String(x.service_type||"").toLowerCase().includes("pint")||String(x.service_type||"").toLowerCase().includes("electric")||String(x.service_type||"").toLowerCase().includes("fontan")||String(x.service_type||"").toLowerCase().includes("hydraulic"));
  const serviceOptions=maintenanceServices.map(x=>{const p=props.find(v=>v.id===x.property_id),cl=clients.find(v=>v.id===x.client_id)||clients.find(v=>v.id===p?.client_id);return '<option value="'+x.id+'" data-property="'+esc(x.property_id||"")+'" data-client="'+esc((x.client_id||p?.client_id)||"")+'">'+esc(cl?.name||"Cliente no identificado")+' · '+esc(p?.name||p?.code||"Apartamento no identificado")+' · '+esc(p?.address||"Sin dirección")+' · '+esc(x.code||"Servicio")+" · "+esc(x.agreed_amount==null?"Tarifa por confirmar":Number(x.agreed_amount).toLocaleString("es-ES",{style:"currency",currency:"EUR"}))+'</option>'}).join("");
@@ -5102,16 +5103,14 @@ async function newEmergency(){
  // No seleccionar un servicio automáticamente: el usuario debe elegirlo explícitamente si corresponde.
 }
 function filterEmergencyProperties(){
- const clientId=$("eClient")?.value||"";
- const sel=$("eProperty");if(!sel)return;
- const current=sel.value;
- const options=Array.from(sel.options);
- options.forEach((o,i)=>{
-   if(i===0){o.hidden=false;return}
-   const match=!clientId||String(o.dataset.client||"")===String(clientId);
-   o.hidden=!match;
-   if(!match&&o.value===current)sel.value="";
- });
+ const clientId=$("eClient")?.value||"",sel=$("eProperty");if(!sel)return;
+ const props=window.__emergencyProps||[];
+ const rows=clientId?props.filter(p=>String(p.client_id||"")===String(clientId)):[];
+ const previous=sel.value;
+ sel.innerHTML="<option value=''>"+(clientId?(rows.length?"Selecione o apartamento":"Este cliente não tem apartamentos registados"):"Selecione primeiro o cliente")+"</option>"+rows.map(p=>"<option value='"+p.id+"' data-client='"+esc(p.client_id||"")+"'>"+esc(p.name||"Apartamento")+" · "+esc(p.code||"")+" · "+esc(p.address||"Sem endereço")+(p.city?" · "+esc(p.city):"")+"</option>").join("");
+ if(rows.some(p=>p.id===previous))sel.value=previous;
+ const serviceSel=$("eService");
+ if(serviceSel){const serviceOpts=Array.from(serviceSel.options);serviceOpts.forEach((o,i)=>{if(i===0){o.hidden=false;return}o.hidden=!!clientId&&String(o.dataset.client||"")!==String(clientId);if(o.hidden&&o.selected)serviceSel.value="";});}
 }
 function emergencyTypeFromService(value){
  const t=String(value||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
