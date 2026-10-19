@@ -5238,7 +5238,7 @@ async function newEmergency(){
    ? '<input id="eClient" value="'+esc(currentProfile?.full_name||currentUser?.email||"Cliente")+'" readonly>'
    : '<select id="eClient" onchange="filterEmergencyProperties()"><option value="">Seleccione el cliente</option>'+clientOptions+'</select>';
  const typeOptions='<option value="">Seleccione el tipo de servicio</option><option value="limpieza">Limpieza urgente</option><option value="mantenimiento">Mantenimiento</option><option value="reparacion">Reparación extraordinaria</option><option value="pintura">Pintura</option><option value="electricidad">Electricidad</option><option value="fontaneria">Fontanería</option><option value="hidraulica">Hidráulica</option><option value="silicona">Silicona</option><option value="montaje">Montaje / instalación</option><option value="otros">Otros trabajos / artículos</option>';
- openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="return false;"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="two"><div class="field"><label>Tipo de servicio</label><select id="eType" required>'+typeOptions+'</select></div><div class="field"><label>Servicio de mantenimiento relacionado <small>(opcional)</small></label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div></div><div class="two">'+emergencyAssignmentNotice+'<div class="field"><label>Tarifa de urgencia 24H</label><select id="eRate"><option value="emergency" data-rate="60">Urgencia 24H · 60 €/hora</option><option value="night" data-rate="80">Noche / madrugada · 80 €/hora</option><option value="holiday" data-rate="90">Domingos / festivos · 90 €/hora</option></select></div></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><div class="field"><label>Fotos / vídeos de la emergencia</label><input id="eEmergencyMedia" type="file" multiple accept="image/*,video/*"><small class="muted">Puede adjuntar fotos o vídeos para documentar la incidencia.</small></div><button type="button" class="primary" onclick="saveEmergency({preventDefault:function(){},stopPropagation:function(){},submitter:this,target:this.form})">Enviar emergencia 24H de mantenimiento</button></form>');
+ openModal("Emergencia 24H · Mantenimiento",'<form onsubmit="return false;"><div class="two"><div class="field"><label>Cliente</label>'+clientField+'</div><div class="field"><label>Apartamento / propiedad</label><select id="eProperty" required><option value="">Seleccione el apartamento</option>'+propertyOptions+'</select></div></div><div class="two"><div class="field"><label>Tipo de servicio</label><select id="eType" required>'+typeOptions+'</select></div><div class="field"><label>Servicio de mantenimiento relacionado <small>(opcional)</small></label><select id="eService" onchange="syncEmergencyFromService(this.value)"><option value="">Sin servicio relacionado</option>'+serviceOptions+'</select></div></div><div class="two">'+emergencyAssignmentNotice+'<div class="field"><label>Tarifa de urgencia 24H</label><select id="eRate"><option value="emergency" data-rate="60">Urgencia 24H · 60 €/hora</option><option value="night" data-rate="80">Noche / madrugada · 80 €/hora</option><option value="holiday" data-rate="90">Domingos / festivos · 90 €/hora</option></select></div></div><div class="field"><label>Descripción del problema</label><textarea id="eDesc" required></textarea></div><div class="field"><label>Fotos / vídeos de la emergencia</label><input id="eEmergencyMedia" type="file" multiple accept="image/*,video/*"><small class="muted">Puede adjuntar fotos o vídeos para documentar la incidencia.</small></div><button type="button" class="primary" onclick="return saveEmergencyFromButton(this)">Enviar emergencia 24H de mantenimiento</button></form>');
  if($("eClient")?.tagName==="SELECT")filterEmergencyProperties();
 
  // No seleccionar un servicio automáticamente: el usuario debe elegirlo explícitamente si corresponde.
@@ -5289,6 +5289,18 @@ async function uploadEmergencyMedia(occurrenceId,files){
    const type=(file.type||"").startsWith("video/")?"video":"photo";
    const ins=await sb.from("occurrence_media").insert({id:crypto.randomUUID(),company_id:currentProfile.company_id,occurrence_id:occurrenceId,uploaded_by:currentUser.id,media_type:type,file_name:file.name,storage_path:path});
    if(ins.error)toast("Archivo subido pero no se pudo registrar la evidencia: "+ins.error.message);
+ }
+}
+function saveEmergencyFromButton(button){
+ try {
+  if(!button){toast("Botão de emergência não encontrado.");return}
+  const form=button.closest("form");
+  if(!form){toast("Formulário de emergência não encontrado.");return}
+  const fakeEvent={preventDefault:function(){},stopPropagation:function(){},submitter:button,target:form};
+  return saveEmergency(fakeEvent);
+ } catch(err) {
+  console.error("saveEmergencyFromButton failed",err);
+  toast("Falha ao iniciar a emergência: "+(err?.message||String(err)));
  }
 }
 async function saveEmergency(e){
