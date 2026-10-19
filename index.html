@@ -4737,7 +4737,7 @@ async function renderPropertyInspections(){
  const updateProps=()=>{const c=$("inspectionClient").value,sel=$("inspectionProperty");sel.innerHTML='<option value="">Escolha na lista</option>'+props.filter(p=>p.client_id===c).map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+' · '+esc(p.code||"")+' · '+esc([p.address,p.city,p.country].filter(Boolean).join(", "))+'</option>').join("")};
  $("inspectionClient").addEventListener("change",updateProps);$("inspectionProperty").addEventListener("change",()=>{const p=props.find(x=>x.id===$("inspectionProperty").value);$("inspectionAddress").value=p?[p.address,p.city,p.country].filter(Boolean).join(", "):""});updateProps();await loadPropertyInspections();
 }
-async function savePropertyInspection(e){
+async function savePropertyInspectionImpl(e){
  e.preventDefault();const propertyId=$("inspectionProperty").value,prop=(window.__inspectionProps||[]).find(p=>p.id===propertyId);
  if(!prop){toast("Selecione o cliente e o apartamento.");return}
  const form=$("propertyInspectionForm"),checklist={},checklistGroups={};form.querySelectorAll('select[name^="inspect_"]').forEach(el=>{try{const raw=decodeURIComponent(escape(atob(el.name.slice(8).replace(/[^A-Za-z0-9+/]/g,""))));const parts=raw.split("|"),group=parts[0],item=parts.slice(1).join("|");checklist[item]=el.value;checklistGroups[item]=group}catch(_){}});
@@ -4755,6 +4755,11 @@ async function savePropertyInspection(e){
  for(const el of form.querySelectorAll('input[type="file"][name^="inspect_media_"]')){const key=el.name.slice("inspect_media_".length);let group="",item="";try{const raw=decodeURIComponent(escape(atob(key)));const parts=raw.split("|");group=parts[0];item=parts.slice(1).join("|")}catch(_){}const status=checklist[item]||"nao_verificado";for(const file of Array.from(el.files||[]))await uploadInspectionFile(file,"[INSPEÇÃO ITEM] "+group+" · "+item+" · Estado: "+status)}
  toast("Inspeção guardada. Anexos guardados: "+saved+(failed.length?" · Falhas: "+failed.join("; "):""));await renderPropertyInspections();
 }
+async function savePropertyInspection(e){
+ try{return await savePropertyInspectionImpl(e)}
+ catch(err){console.error("Property inspection submission failed",err);toast("Não foi possível enviar a inspeção: "+(err?.message||String(err)))}
+}
+
 async function loadPropertyInspections(){
  const box=$("inspectionResults");if(!box)return;
  const clients=window.__inspectionClients||[],props=window.__inspectionProps||[],ct=($("inspectionSearchClient")?.value||"").toLowerCase().trim(),pt=($("inspectionSearchProperty")?.value||"").toLowerCase().trim(),cm=Object.fromEntries(clients.map(c=>[c.id,c.name]));
