@@ -4063,7 +4063,7 @@ $("resetBtn").onclick=async()=>{
 };
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
-sb.auth.onAuthStateChange(async(event,session)=>{if(event==="PASSWORD_RECOVERY"){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));$("recovery").classList.remove("hidden");return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED")await enterAppFromSession(session)});
+sb.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));$("recovery").classList.remove("hidden");return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED"){setTimeout(()=>{enterAppFromSession(session).catch(err=>console.error("Auth session restore failed",err))},0)}});
 (async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
 
 async function renderClientsPremium(){return renderClients()}
