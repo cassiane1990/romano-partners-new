@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-20-stock-mobile-cards">
+<head><meta name="romano-build" content="2026-10-20-inspection-admin-actions">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -149,6 +149,12 @@ button[data-action="create"],button[data-action="save"]{
 .inspection-evidence-file{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #eee5d8}
 .inspection-evidence-file span{min-width:0;overflow-wrap:anywhere;line-height:1.35}
 .inspection-evidence-file .btn{flex-shrink:0}
+
+/* Inspection administration controls: visible and usable on mobile */
+.inspection-admin-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#e5dac8)}
+.inspection-admin-actions .btn{min-height:46px;padding:12px 16px!important;font-size:14px!important;white-space:normal!important;line-height:1.35!important}
+.inspection-admin-actions .btn.danger{border-color:#c45b4d!important;color:#96382d!important;background:#fff4f1!important}
+@media(max-width:600px){.inspection-admin-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}.inspection-admin-actions .btn{width:100%!important;min-height:48px!important;text-align:center}}
 </style></style></style><style id="romano-urgent-cleaning-style">.service-urgent-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:5px 9px;border-radius:999px;background:#fff0ed;color:#a72d20;border:1px solid #efb7ad;font-size:10px;font-weight:800;letter-spacing:.06em}.services-flow{flex-wrap:wrap}.services-flow span{white-space:nowrap}</style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
@@ -4789,7 +4795,7 @@ async function loadPropertyInspections(){
  let q=sb.from("property_inspections").select("id,property_id,client_id,inspection_at,inspector_name,checklist,notes,first_free,price_eur,status,created_at").eq("company_id",currentProfile.company_id).in("property_id",ids).order("inspection_at",{ascending:false}).limit(500);
  const r=await q;if(r.error){box.innerHTML='<div class="msg">'+esc(r.error.message)+'</div>';return}
  const rows=r.data||[];if(!rows.length){box.innerHTML='<div class="empty">Ainda não há inspeções registadas.</div>';return}
- box.innerHTML=rows.map(x=>{const p=props.find(y=>y.id===x.property_id),checks=Object.values(x.checklist||{}),inc=checks.filter(v=>v==="incidencia").length;return '<div class="panel" style="margin:8px 0;padding:14px"><div class="panel-head"><div><h3>📁 Inspeção · '+esc(p?.name||"Apartamento")+'</h3><div class="muted">'+esc(cm[x.client_id]||"Cliente")+' · '+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div></div><span class="pill">'+(x.first_free?"Gratuita":"22,26 €")+'</span></div><div class="muted">'+esc(new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"short"}).format(new Date(x.inspection_at)))+' · '+esc(x.inspector_name||"")+'</div><p>'+esc(x.notes||"Sem observações")+'</p><div class="muted">'+inc+' item(ns) com incidência · '+checks.filter(v=>v==="ok").length+' itens verificados em bom estado</div><button class="btn" data-id="'+x.id+'" onclick="openInspectionEvidence(this.dataset.id)">Ver fotos/vídeos</button>'+(["admin","supervisor"].includes(role())?'<button class="btn" data-id="'+x.id+'" onclick="editInspection(this.dataset.id)">Editar inspeção</button><button class="btn danger" data-id="'+x.id+'" onclick="deleteWholeInspection(this.dataset.id)">Eliminar inspeção inteira</button>':'')+'</div>'}).join("");
+ box.innerHTML=rows.map(x=>{const p=props.find(y=>y.id===x.property_id),checks=Object.values(x.checklist||{}),inc=checks.filter(v=>v==="incidencia").length;return '<div class="panel" style="margin:8px 0;padding:14px"><div class="panel-head"><div><h3>📁 Inspeção · '+esc(p?.name||"Apartamento")+'</h3><div class="muted">'+esc(cm[x.client_id]||"Cliente")+' · '+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div></div><span class="pill">'+(x.first_free?"Gratuita":"22,26 €")+'</span></div><div class="muted">'+esc(new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"short"}).format(new Date(x.inspection_at)))+' · '+esc(x.inspector_name||"")+'</div><p>'+esc(x.notes||"Sem observações")+'</p><div class="muted">'+inc+' item(ns) com incidência · '+checks.filter(v=>v==="ok").length+' itens verificados em bom estado</div><button class="btn" data-id="'+x.id+'" onclick="openInspectionEvidence(this.dataset.id)">Ver fotos/vídeos</button>'+(["admin","supervisor"].includes(role())?'<div class="inspection-admin-actions"><button type="button" class="btn" data-id="'+x.id+'" onclick="editInspection(this.dataset.id)">✏️ Editar inspeção</button><button type="button" class="btn danger" data-id="'+x.id+'" onclick="deleteWholeInspection(this.dataset.id)">🗑️ Eliminar inspeção inteira e todas as fotos</button></div>':'')+'</div>'}).join("");
 }
 async function editInspection(id){
  if(!canManage()){toast("Apenas Admin ou Supervisor pode editar inspeções.");return}
