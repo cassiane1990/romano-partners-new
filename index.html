@@ -5295,7 +5295,7 @@ async function saveEmergency(e){
  e.preventDefault();
  const propertyId=$("eProperty")?.value||null,serviceId=$("eService")?.value||null,employeeId=$("eEmployee")?.value||null,serviceType=$("eType")?.value||null,priority=$("ePriority")?.value||"urgent",description=$("eDesc")?.value.trim()||"";
  const selectedClientId=$("eClient")?.tagName==="SELECT"?($("eClient")?.value||null):null;
- const clientRequest=currentRole==="client";
+ const clientRequest=role()==="client";
  if(!propertyId||!serviceType||!description){toast("Seleccione cliente, apartamento, tipo de servicio y describa la emergencia.");return}
  if(serviceId){
    const s=await sb.from("services").select("id,property_id,client_id,assigned_employee_id,service_type").eq("id",serviceId).maybeSingle();
