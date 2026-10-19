@@ -5340,8 +5340,6 @@ async function saveEmergency(e){
    const notices=admins.data.map(p=>({company_id:currentProfile.company_id,recipient_id:p.id,title:"🚨 Emergência 24H aguardando aceitação",body:"Nova solicitação do cliente. Abra Emergências 24H para aceitar e atribuir o técnico.",severity:"urgent",related_object_type:"occurrence",related_object_id:r.data.id}));
    const nr=await sb.from("notifications").insert(notices);if(nr.error)toast("Solicitação criada; aviso ao Admin/Supervisor falhou: "+nr.error.message);
   }
- }else{
-  await sb.from("notifications").insert({company_id:currentProfile.company_id,recipient_id:employeeId,title:"🚨 Emergencia 24H de mantenimiento",body:"Cliente y apartamento identificados. Revise y atienda la emergencia.",severity:"urgent",related_object_type:"occurrence",related_object_id:r.data.id});
  }
  closeModal();toast("Emergência 24H enviada automaticamente ao Admin e ao Supervisor para atribuição do técnico.");emergency();updateOfflineIndicator();
 }
