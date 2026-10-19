@@ -1172,7 +1172,7 @@ async function renderServicesMaster(){
    $("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';
    return;
  }
- const rows=(r.data||[]).filter(romanoIsServiceScheduledToday);
+ const rows=(r.data||[]).filter(x=>romanoIsServiceScheduledToday(x)&&!["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(String(x.status||"").toLowerCase()));
  let propertiesMap={},clientsMap={};
  if(rows.length&&!demoMode){
    const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
