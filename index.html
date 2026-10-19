@@ -1184,7 +1184,7 @@ async function renderServicesMaster(){
    const visibleClient=role()==="client"?clientName:(c?.name||fallbackClient?.name||"—");
    const visibleProperty=p?.name||p?.code||"—";
    const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
-   const actions='<button class="btn" onclick="'+(x.__relatedCleaning?"viewRelatedCleaning":"viewService")+'(\''+x.id+'\')">Ver '+(x.__relatedCleaning?"seguimiento":"detalle")+'</button>'+ (["admin","supervisor"].includes(role())?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
+   const actions='<button class="btn" onclick="'+(x.__relatedCleaning?"viewRelatedCleaning":"viewService")+'(\''+x.id+'\')">Ver '+(x.__relatedCleaning?"seguimiento":"detalle")+'</button>'+ (canManage()?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
       role()==="supervisor"&&x.status==="requested"&&!x.assigned_employee_id?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
       role()==="supervisor"&&x.status==="scheduled"&&!x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
