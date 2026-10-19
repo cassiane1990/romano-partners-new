@@ -143,6 +143,12 @@ button[data-action="create"],button[data-action="save"]{
 #content .stock-page .stock-item-actions{display:flex!important;gap:10px!important;margin-top:18px!important}
 #content .stock-page .stock-item-actions .btn{flex:1!important;min-width:0!important;min-height:50px!important;font-size:16px!important}
 @media(min-width:760px){#content .stock-page .panel-head{flex-direction:row!important;align-items:center!important;justify-content:space-between!important}#content .stock-page .panel-head>.btn{width:auto!important}#content .stock-page .stock-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+.inspection-evidence-group{border:1px solid var(--line,#e5dac8);border-radius:14px;padding:12px;margin:10px 0;background:#fffdf9}
+.inspection-evidence-group h4{font-size:15px;line-height:1.4;margin:0 0 8px;overflow-wrap:anywhere}
+.inspection-evidence-file{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #eee5d8}
+.inspection-evidence-file span{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.inspection-evidence-file .btn{flex-shrink:0}
 </style></style></style><style id="romano-urgent-cleaning-style">.service-urgent-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:5px 9px;border-radius:999px;background:#fff0ed;color:#a72d20;border:1px solid #efb7ad;font-size:10px;font-weight:800;letter-spacing:.06em}.services-flow{flex-wrap:wrap}.services-flow span{white-space:nowrap}</style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
@@ -4776,10 +4782,20 @@ async function loadPropertyInspections(){
  box.innerHTML=rows.map(x=>{const p=props.find(y=>y.id===x.property_id),checks=Object.values(x.checklist||{}),inc=checks.filter(v=>v==="incidencia").length;return '<div class="panel" style="margin:8px 0;padding:14px"><div class="panel-head"><div><h3>📁 Inspeção · '+esc(p?.name||"Apartamento")+'</h3><div class="muted">'+esc(cm[x.client_id]||"Cliente")+' · '+esc([p?.address,p?.city,p?.country].filter(Boolean).join(", "))+'</div></div><span class="pill">'+(x.first_free?"Gratuita":"22,26 €")+'</span></div><div class="muted">'+esc(new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"short"}).format(new Date(x.inspection_at)))+' · '+esc(x.inspector_name||"")+'</div><p>'+esc(x.notes||"Sem observações")+'</p><div class="muted">'+inc+' item(ns) com incidência · '+checks.filter(v=>v==="ok").length+' itens verificados em bom estado</div><button class="btn" data-id="'+x.id+'" onclick="openInspectionEvidence(this.dataset.id)">Ver fotos/vídeos</button></div>'}).join("");
 }
 async function openInspectionEvidence(id){
- const r=await sb.from("property_media").select("id,file_name,media_type,storage_path,created_at").eq("inspection_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:true});
+ const r=await sb.from("property_media").select("id,title,file_name,media_type,storage_path,created_at").eq("inspection_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:true});
  if(r.error){toast(r.error.message);return}if(!r.data?.length){toast("Esta inspeção não tem fotos ou vídeos anexados.");return}
- const html=await Promise.all(r.data.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
- openModal("Evidências da inspeção",html.join(""));
+ const grouped={};
+ for(const m of r.data){
+  const raw=String(m.title||"").replace(/^\\[INSPEÇÃO ITEM\\]\\s*/i,"").replace(/^\\[INSPEÇÃO GERAL\\]\\s*/i,"");
+  const match=raw.match(/^(.+?)\\s*·\\s*([^·]+?)\\s*·\\s*Estado:\\s*(.+?)\\s*·\\s*/i);
+  const label=match?match[1]+" · "+match[2]+(match[3]?" · "+match[3]:""):(raw||"Evidência geral da inspeção");
+  (grouped[label]||(grouped[label]=[])).push(m);
+ }
+ const groups=await Promise.all(Object.entries(grouped).map(async ([label,files])=>{
+  const items=await Promise.all(files.map(async m=>{const u=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);return '<div class="inspection-evidence-file"><span>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name||"Ficheiro")+'</span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
+  return '<section class="inspection-evidence-group"><h4>'+esc(label)+'</h4>'+items.join("")+'</section>';
+ }));
+ openModal("Evidências da inspeção",groups.join(""));
 }
 async function renderEvidenceArchive(){
  const isFieldStaff=["employee","maintenance_technician"].includes(role());
