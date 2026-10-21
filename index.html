@@ -4397,8 +4397,9 @@ async function renderReceiptsPremium(){
 async function deleteReceiptBySwipe(id){
  if(!canManage()||demoMode){toast("Só Administração pode apagar recibos reais.");return}
  if(!confirm("Apagar definitivamente este recibo/comprovativo? Esta ação não pode ser desfeita."))return;
- const q=await sb.from("payments").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ const q=await sb.from("payments").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id");
  if(q.error){toast("Não foi possível apagar o recibo: "+q.error.message);return}
+ if(!q.data?.length){toast("O recibo não foi apagado: não foi encontrado ou não tem permissão. Verifique as permissões de Administração.");return}
  toast("Recibo apagado.");await renderReceiptsPremium();
 }
 
@@ -4478,6 +4479,29 @@ async function viewInvoice(id){
    '<button class="btn" type="button" onclick="closeModal()">Cerrar</button></div>';
   openModal("Ficha de factura",body);
  }catch(e){toast("No se pudo abrir la factura: "+(e?.message||e))}
+}
+async function deleteInvoiceRecord(id){
+ if(!canManage()){toast("Só Administração pode apagar faturas.");return}
+ if(demoMode){
+  const idx=DEMO_INVOICES.findIndex(v=>String(v.id)===String(id));
+  if(idx<0){toast("Fatura não encontrada.");return}
+  if(!confirm("Apagar esta fatura de demonstração?"))return;
+  DEMO_INVOICES.splice(idx,1);delete __invoiceCache[String(id)];toast("Fatura apagada.");await renderInvoicesPremium();return;
+ }
+ if(!confirm("Apagar definitivamente esta fatura? Esta ação não pode ser desfeita. Se tiver pagamentos associados, será necessário resolver esses pagamentos primeiro."))return;
+ try{
+  const payments=await sb.from("payments").select("id").eq("invoice_id",id).eq("company_id",currentProfile.company_id).limit(1);
+  if(payments.error){toast("Não foi possível verificar os pagamentos associados: "+payments.error.message);return}
+  if(payments.data?.length){toast("Esta fatura tem recibos/pagamentos associados. Apague ou desvincule primeiro os recibos para manter a contabilidade correta.");return}
+  const linkedService=await sb.from("services").select("id").eq("invoice_id",id).eq("company_id",currentProfile.company_id).limit(1);
+  if(linkedService.error && !/column .*invoice_id.* does not exist/i.test(linkedService.error.message||"")){toast("Não foi possível verificar o serviço associado: "+linkedService.error.message);return}
+  if(linkedService.data?.length){toast("Esta fatura está associada a um serviço. Desvincule-a do serviço antes de apagar.");return}
+  const q=await sb.from("invoices").delete().eq("id",id).eq("company_id",currentProfile.company_id).select("id");
+  if(q.error){toast("Não foi possível apagar a fatura: "+q.error.message);return}
+  if(!q.data?.length){toast("A fatura não foi apagada: não foi encontrada ou não tem permissão. Verifique as permissões de Administração.");return}
+  delete __invoiceCache[String(id)];
+  toast("Fatura apagada.");await renderInvoicesPremium();
+ }catch(e){toast("Erro ao apagar a fatura: "+(e?.message||e))}
 }
 function pdfSafe(v){return String(v??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/€/g,"EUR").replace(/[^\x20-\x7E]/g,"");}
 function pdfEsc(v){return pdfSafe(v).replace(/([\\()])/g,"\\$1");}
@@ -4673,7 +4697,7 @@ async function renderInvoicesPremium(){
  const grouped={};
  rows.forEach(x=>{const key=x.client_id||"no-client";if(!grouped[key])grouped[key]=[];grouped[key].push(x)});
  const createBtn=canManage()?'<button class="btn gold" type="button" onclick="newInvoice()">+ Nueva factura</button><button class="btn" type="button" onclick="openMonthlyInvoiceSummary()">Resumen mensual</button>':'';
- const invoiceRow=x=>'<div class="line" style="align-items:flex-start;gap:12px"><div style="flex:1;min-width:0"><strong>'+esc(x.number||"—")+'</strong><br><span class="pill">'+esc(x.status||"—")+'</span><div class="muted" style="margin-top:5px">Creada: '+esc(romanoMadridLabel(x.created_at))+'</div><div class="muted">Vencimiento: '+esc(romanoMadridLabel(x.due_at))+'</div>'+(x.paid_at?'<div class="muted">Pagada: '+esc(romanoMadridLabel(x.paid_at))+'</div>':'')+'<div style="margin-top:6px">Base: '+Number(x.subtotal||0).toFixed(2)+' € · IVA: '+Number(x.tax_amount||0).toFixed(2)+' € · <strong>Total: '+Number(x.total||0).toFixed(2)+' €</strong></div></div><div class="actions"><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button> <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="sendInvoiceByEmail(this.dataset.invoiceId)">✉ E-mail</button>':'')+'</div></div>';
+ const invoiceRow=x=>'<div class="line" style="align-items:flex-start;gap:12px"><div style="flex:1;min-width:0"><strong>'+esc(x.number||"—")+'</strong><br><span class="pill">'+esc(x.status||"—")+'</span><div class="muted" style="margin-top:5px">Creada: '+esc(romanoMadridLabel(x.created_at))+'</div><div class="muted">Vencimiento: '+esc(romanoMadridLabel(x.due_at))+'</div>'+(x.paid_at?'<div class="muted">Pagada: '+esc(romanoMadridLabel(x.paid_at))+'</div>':'')+'<div style="margin-top:6px">Base: '+Number(x.subtotal||0).toFixed(2)+' € · IVA: '+Number(x.tax_amount||0).toFixed(2)+' € · <strong>Total: '+Number(x.total||0).toFixed(2)+' €</strong></div></div><div class="actions"><button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="viewInvoice(this.dataset.invoiceId)">Ver</button>'+(canManage()?' <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="editInvoice(this.dataset.invoiceId)">Editar</button> <button class="btn" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="sendInvoiceByEmail(this.dataset.invoiceId)">✉ E-mail</button> <button class="btn" style="color:#b42318" type="button" data-invoice-id="'+esc(String(x.id))+'" onclick="deleteInvoiceRecord(this.dataset.invoiceId)">🗑 Apagar</button>':'')+'</div></div>';
  const folders=Object.entries(grouped).sort((a,b)=>{
   const an=clientsById[a[0]]||"Cliente sem associação",bn=clientsById[b[0]]||"Cliente sem associação";
   return an.localeCompare(bn,"pt");
