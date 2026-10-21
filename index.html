@@ -6021,15 +6021,14 @@ async function masterUpdateDiscountSummary(){
  const clientCleaningPct=cleaningPct,clientLaundryPct=laundryPct;
  if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled){cleaningPct=0;laundryPct=0}
  const clean=masterSelectedCleaning(),items=masterItemRows();
- const cleaningBase=Math.max(0,Number(clean.price||0)*Number(clean.qty||1));
+ const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const selectedProperty=(window.__mpProps||[]).find(x=>x.id===$("mpProperty")?.value)||null;
  const laundryBase=masterExtraLinenBase(items,selectedProperty);
- const cleaningDiscount=Math.round(cleaningBase*cleaningPct)/100,laundryDiscount=Math.round(laundryBase*laundryPct)/100;
- const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
+ const cleaningDiscount=Math.round(originalTotal*cleaningPct)/100,laundryDiscount=Math.round(laundryBase*(1+Number($("mpVat")?.value||21)/100)*laundryPct)/100;
  const discountTotal=Math.round((cleaningDiscount+laundryDiscount)*100)/100;
- const subtotal=Math.max(0,Math.round((originalSub-discountTotal)*100)/100);
- const tax=originalSub>0?Math.max(0,Math.round(originalTax*(subtotal/originalSub)*100)/100):0;
- const total=Math.max(0,Math.round((originalTotal-discountTotal-originalTax+tax)*100)/100);
+ const total=Math.max(0,Math.round((originalTotal-discountTotal)*100)/100),ratio=originalTotal>0?total/originalTotal:1;
+ const subtotal=Math.max(0,Math.round(originalSub*ratio*100)/100);
+ const tax=Math.max(0,Math.round((total-subtotal)*100)/100);
  const money=v=>masterMoney(Math.round(Number(v||0)*100)/100);
  box.innerHTML="<div class='panel-head' style='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap'><div><h3 style='margin:0'>Descontos</h3><span class='pill'>"+(__romanoServiceDiscountsEnabled&&clientDiscountsEnabled?"Ativados":"Desativados")+"</span></div><button type='button' class='btn "+(__romanoServiceDiscountsEnabled?"gold":"")+" ' onclick='toggleServiceDiscounts()'>"+(__romanoServiceDiscountsEnabled?"Desativar descontos":"Ativar descontos")+"</button></div>"+
  "<div class='line-item'><span>Limpeza · preço original</span><b>"+money(cleaningBase)+"</b></div>"+
@@ -6054,7 +6053,7 @@ async function savePremiumService(){
  if(discountQuery.error){toast("No se pudieron cargar los descuentos del cliente: "+discountQuery.error.message);return}
  const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,cleaningPct=discountsActive?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
  const cleaningBase=Math.max(0,Number(clean.price||0)*Number(clean.qty||1));
- // O desconto têxtil só incide sobre packs extra além de um pack completo por cama registada no imóvel.
+ // O desconto de serviço aplica-se ao total final; os 3% têxteis aplicam-se apenas aos packs extra.
  const propertySingleBeds=Math.max(0,Number(propRow?.beds_single||0)),propertyDoubleBeds=Math.max(0,Number(propRow?.beds_double||0));
  let remainingSingleBase=propertySingleBeds,remainingDoubleBase=propertyDoubleBeds;
  const laundryBase=items.filter(x=>/laundry|linen|ropa|lavander|pack cama|sofá-cama/i.test(String(x.category||"")+" "+String(x.name||"")+" "+String(x.code||"")+" "+String(x.detail||""))).reduce((sum,x)=>{
@@ -6064,8 +6063,9 @@ async function savePremiumService(){
   // Packs de sofá-cama e outros packs têxteis adicionais são tratados como extras.
   return sum+qty*unit;
  },0);
- const cleaningDiscountAmount=Math.round(cleaningBase*cleaningPct)/100,laundryDiscountAmount=Math.round(laundryBase*laundryPct)/100,discountAmount=Math.round((cleaningDiscountAmount+laundryDiscountAmount)*100)/100;
- const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0),discountedSub=Math.max(0,Math.round((originalSub-discountAmount)*100)/100),discountedTax=originalSub>0?Math.max(0,Math.round(originalTax*(discountedSub/originalSub)*100)/100):0,discountedTotal=Math.max(0,Math.round((originalTotal-discountAmount-discountedTax+originalTax)*100)/100);
+ const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
+ const cleaningDiscountAmount=Math.round(originalTotal*cleaningPct)/100,laundryDiscountAmount=Math.round(laundryBase*(1+Number($("mpVat")?.value||21)/100)*laundryPct)/100,discountAmount=Math.round((cleaningDiscountAmount+laundryDiscountAmount)*100)/100;
+ const discountedTotal=Math.max(0,Math.round((originalTotal-discountAmount)*100)/100),discountRatio=originalTotal>0?discountedTotal/originalTotal:1,discountedSub=Math.max(0,Math.round(originalSub*discountRatio*100)/100),discountedTax=Math.max(0,Math.round((discountedTotal-discountedSub)*100)/100);
  const discountDetails={enabled:discountsActive,cleaning_percent:cleaningPct,cleaning_original:Math.round(cleaningBase*100)/100,cleaning_discount:Math.round(cleaningDiscountAmount*100)/100,laundry_percent:laundryPct,laundry_original:Math.round(laundryBase*100)/100,laundry_discount:Math.round(laundryDiscountAmount*100)/100,discount_total:discountAmount,subtotal_original:originalSub,subtotal_discounted:discountedSub,tax_original:originalTax,tax_discounted:discountedTax,total_original:originalTotal,total_discounted:discountedTotal};
  const payload={company_id:currentProfile.company_id,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,agreed_amount:discountedSub,discount_details:discountDetails,priority:$("mpPriority").value,scheduled_at:requestedSchedule.toISOString(),status:internal?"scheduled":"requested",supervisor_approved_at:internal?new Date().toISOString():null,requested_items:items.filter(x=>x.category!=="additional"),instructions:$("mpNotes").value.trim()||null,notes:null,tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:$("mpLaundry").value==="yes",additional_items:additional,created_by:currentUser.id,updated_by:currentUser.id,created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString(),pricing:{cleaning_original:clean.price,cleaning_quantity:clean.qty,urgent_cleaning:$("mpPriority").value==="urgent",cleaning_basis:clean.cat.basis,subtotal:discountedSub,tax:discountedTax,total:discountedTotal,discount_details:discountDetails,sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};
  if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:"demo-"+code.toLowerCase(),...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio limpieza ficticio creado · "+code);renderServicesMaster();return}
