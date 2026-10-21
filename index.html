@@ -2413,7 +2413,7 @@ async function geocodePropertyAddress(prefix){
   const parts=hit.address||{};
   const foundCity=parts.city||parts.town||parts.village||parts.municipality||parts.county||parts.state||"";
   const street=[parts.road,parts.house_number].filter(Boolean).join(", ");
-  if(a&&street&&!address)a.value=street;
+  if(a&&!address){const area=parts.suburb||parts.neighbourhood||parts.residential||parts.quarter||parts.road||hit.name||hit.display_name||"";a.value=street||area;}
   if(city&&foundCity)city.value=foundCity;
   if(lat)lat.value=Number(hit.lat).toFixed(7);
   if(lon)lon.value=Number(hit.lon).toFixed(7);
