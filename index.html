@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-21-auto-update-v12">
+<head><meta name="romano-build" content="2026-10-21-auto-update-v13">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -5989,18 +5989,18 @@ async function masterUpdateDiscountSummary(){
  const box=$("mpDiscountSummary");if(!box)return;
  const request=++__mpDiscountPreviewRequest;
  const clientId=$("mpClient")?.value||null;
- let cleaningPct=0,laundryPct=0;
+ let cleaningPct=0,laundryPct=0,clientDiscountsEnabled=true;
  if(clientId){
-  if(demoMode){const c=demoFindClient(clientId)||{};cleaningPct=Number(c.cleaning_discount_percent||0);laundryPct=Number(c.laundry_discount_percent||0)}
+  if(demoMode){const c=demoFindClient(clientId)||{};clientDiscountsEnabled=c.discounts_enabled!==false;cleaningPct=Number(c.cleaning_discount_percent||0);laundryPct=Number(c.laundry_discount_percent||0)}
   else{
-   const q=await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent").eq("id",clientId).eq("company_id",currentProfile.company_id).maybeSingle();
+   const q=await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).maybeSingle();
    if(q.error){if(request===__mpDiscountPreviewRequest)box.innerHTML="<div class='muted'>Não foi possível carregar os descontos deste cliente.</div>";return}
-   cleaningPct=Number(q.data?.cleaning_discount_percent||0);laundryPct=Number(q.data?.laundry_discount_percent||0);
+   clientDiscountsEnabled=q.data?.discounts_enabled!==false;cleaningPct=Number(q.data?.cleaning_discount_percent||0);laundryPct=Number(q.data?.laundry_discount_percent||0);
   }
  }
  if(request!==__mpDiscountPreviewRequest)return;
  const clientCleaningPct=cleaningPct,clientLaundryPct=laundryPct;
- if(!__romanoServiceDiscountsEnabled){cleaningPct=0;laundryPct=0}
+ if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled){cleaningPct=0;laundryPct=0}
  const clean=masterSelectedCleaning(),items=masterItemRows();
  const cleaningBase=Math.max(0,Number(clean.price||0)*Number(clean.qty||1));
  const laundryBase=items.filter(x=>/laundry|linen|ropa|lavander/i.test(String(x.category||"")+" "+String(x.name||"")+" "+String(x.detail||""))).reduce((sum,x)=>sum+Math.max(0,Number(x.unit_price||0)*Number(x.quantity||0)),0);
@@ -6011,7 +6011,7 @@ async function masterUpdateDiscountSummary(){
  const tax=originalSub>0?Math.max(0,Math.round(originalTax*(subtotal/originalSub)*100)/100):0;
  const total=Math.max(0,Math.round((originalTotal-discountTotal-originalTax+tax)*100)/100);
  const money=v=>masterMoney(Math.round(Number(v||0)*100)/100);
- box.innerHTML="<div class='panel-head' style='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap'><div><h3 style='margin:0'>Descontos</h3><span class='pill'>"+(__romanoServiceDiscountsEnabled?"Ativados":"Desativados")+"</span></div><button type='button' class='btn "+(__romanoServiceDiscountsEnabled?"gold":"")+" ' onclick='toggleServiceDiscounts()'>"+(__romanoServiceDiscountsEnabled?"Desativar descontos":"Ativar descontos")+"</button></div>"+
+ box.innerHTML="<div class='panel-head' style='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap'><div><h3 style='margin:0'>Descontos</h3><span class='pill'>"+(__romanoServiceDiscountsEnabled&&clientDiscountsEnabled?"Ativados":"Desativados")+"</span></div><button type='button' class='btn "+(__romanoServiceDiscountsEnabled?"gold":"")+" ' onclick='toggleServiceDiscounts()'>"+(__romanoServiceDiscountsEnabled?"Desativar descontos":"Ativar descontos")+"</button></div>"+
  "<div class='line-item'><span>Limpeza · preço original</span><b>"+money(cleaningBase)+"</b></div>"+
  "<div class='line-item'><span>Desconto limpeza ("+cleaningPct.toLocaleString('es-ES')+"%)</span><b>− "+money(cleaningDiscount)+"</b></div>"+
  "<div class='line-item'><span>Pack roupa/lavandaria · preço original</span><b>"+money(laundryBase)+"</b></div>"+
