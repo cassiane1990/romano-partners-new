@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-20-inspection-admin-actions">
+<head><meta name="romano-build" content="2026-10-21-auto-update-v1">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -4004,17 +4004,17 @@ async function checkRomanoProductionUpdate(){
  if(__romanoUpdateCheckBusy||document.visibilityState==="hidden")return;
  __romanoUpdateCheckBusy=true;
  try{
-  const r=await fetch("/index.html?__romano_update_check="+Date.now(),{method:"HEAD",cache:"no-store",credentials:"same-origin"});
+  const r=await fetch("/index.html?__romano_update_check="+Date.now(),{method:"GET",cache:"no-store",credentials:"same-origin"});
   if(!r.ok)return;
-  const etag=r.headers.get("etag");
-  const modified=r.headers.get("last-modified");
-  const revision=etag||modified;
+  const html=await r.text();
+  const match=html.match(/<meta\\s+name=["']romano-build["']\\s+content=["']([^"']+)["']/i);
+  const revision=match?match[1]:(r.headers.get("etag")||r.headers.get("last-modified"));
   if(!revision)return;
   if(__romanoPageETag===null){__romanoPageETag=revision;return}
   if(revision!==__romanoPageETag){
    window.__romanoUpdatePending=true;
    if(romanoHasUnsafeWorkInProgress()){
-    if(!__romanoUpdateToastShown){toast("Nova versão disponível. Será aplicada automaticamente quando terminar esta operação.");__romanoUpdateToastShown=true}
+    if(!__romanoUpdateToastShown){toast("Nova versão disponível. Será aplicada automaticamente assim que terminar a operação atual.");__romanoUpdateToastShown=true}
    }else{
     romanoApplyPendingUpdate();
    }
