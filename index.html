@@ -6021,7 +6021,7 @@ async function masterUpdateDiscountSummary(){
  const clientCleaningPct=cleaningPct,clientLaundryPct=laundryPct;
  if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled){cleaningPct=0;laundryPct=0}
  const clean=masterSelectedCleaning(),items=masterItemRows();
- const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
+ const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0),serviceBase=Math.max(0,originalTotal);
  const selectedProperty=(window.__mpProps||[]).find(x=>x.id===$("mpProperty")?.value)||null;
  const laundryBase=masterExtraLinenBase(items,selectedProperty);
  const cleaningDiscount=Math.round(originalTotal*cleaningPct)/100,laundryDiscount=Math.round(laundryBase*(1+Number($("mpVat")?.value||21)/100)*laundryPct)/100;
@@ -6031,8 +6031,8 @@ async function masterUpdateDiscountSummary(){
  const tax=Math.max(0,Math.round((total-subtotal)*100)/100);
  const money=v=>masterMoney(Math.round(Number(v||0)*100)/100);
  box.innerHTML="<div class='panel-head' style='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap'><div><h3 style='margin:0'>Descontos</h3><span class='pill'>"+(__romanoServiceDiscountsEnabled&&clientDiscountsEnabled?"Ativados":"Desativados")+"</span></div><button type='button' class='btn "+(__romanoServiceDiscountsEnabled?"gold":"")+" ' onclick='toggleServiceDiscounts()'>"+(__romanoServiceDiscountsEnabled?"Desativar descontos":"Ativar descontos")+"</button></div>"+
- "<div class='line-item'><span>Limpeza · preço original</span><b>"+money(cleaningBase)+"</b></div>"+
- "<div class='line-item'><span>Desconto limpeza ("+cleaningPct.toLocaleString('es-ES')+"%)</span><b>− "+money(cleaningDiscount)+"</b></div>"+
+ "<div class='line-item'><span>Serviço completo · total original com IVA</span><b>"+money(serviceBase)+"</b></div>"+
+ "<div class='line-item'><span>Desconto do serviço ("+cleaningPct.toLocaleString('es-ES')+"%)</span><b>− "+money(cleaningDiscount)+"</b></div>"+
  "<div class='line-item'><span>Pack roupa/lavandaria · preço original</span><b>"+money(laundryBase)+"</b></div>"+
  "<div class='line-item'><span>Desconto pack roupa ("+laundryPct.toLocaleString('es-ES')+"%)</span><b>− "+money(laundryDiscount)+"</b></div>"+
  "<div class='line-item'><span>Total de descontos</span><b>− "+money(discountTotal)+"</b></div>"+
@@ -6052,7 +6052,7 @@ async function savePremiumService(){
  const discountQuery=demoMode?{data:demoFindClient(clientId)||{},error:null}:await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).single();
  if(discountQuery.error){toast("No se pudieron cargar los descuentos del cliente: "+discountQuery.error.message);return}
  const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,cleaningPct=discountsActive?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
- const cleaningBase=Math.max(0,Number(clean.price||0)*Number(clean.qty||1));
+ const cleaningBase=Math.max(0,Number($("mpTotal")?.dataset?.v||0));
  // O desconto de serviço aplica-se ao total final; os 3% têxteis aplicam-se apenas aos packs extra.
  const propertySingleBeds=Math.max(0,Number(propRow?.beds_single||0)),propertyDoubleBeds=Math.max(0,Number(propRow?.beds_double||0));
  let remainingSingleBase=propertySingleBeds,remainingDoubleBase=propertyDoubleBeds;
