@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-21-notifications-fix-v5">
+<head><meta name="romano-build" content="2026-10-21-notifications-open-fix-v6">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -3889,12 +3889,8 @@ async function openNotification(id,title,body){
  }
  const opened=await markNotificationRead(id,false);
  if(!opened)return;
- if(/incidencia|incidência|emergencia|emergência/.test(t)){
-   if(["admin","supervisor"].includes(role())){
-     await openPage("services");
-     return;
-   }
- }
+ // Las alertas de incidencias y emergencias también se abren aquí:
+ // quedan marcadas como leídas y disponibles para eliminar con gesto lateral.
  await renderNotifications();
 }
 function enableNotificationSwipe(){
