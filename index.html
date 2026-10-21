@@ -5969,7 +5969,7 @@ function masterFilterProperties(){
 }
 
 let __mpDiscountPreviewRequest=0;
-async async function masterUpdateDiscountSummary(){
+async function masterUpdateDiscountSummary(){
  const box=$("mpDiscountSummary");if(!box)return;
  const request=++__mpDiscountPreviewRequest;
  const clientId=$("mpClient")?.value||null;
