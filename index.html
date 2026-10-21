@@ -2392,23 +2392,34 @@ async function saveClientEdit(e,id){
  closeModal(); toast("Cliente actualizado"); renderClients();
 }
 async function geocodePropertyAddress(prefix){
- const a=$(prefix+"Address"),city=$(prefix+"City"),postal=$(prefix+"Postal"),country=$(prefix+"Country"),lat=$(prefix+"Lat"),lon=$(prefix+"Lon"),status=$(prefix+"GpsStatus");
- const address=String(a?.value||"").trim(),postalCode=String(postal?.value||"").trim();
- if(!postalCode){if(status)status.textContent="Introduzca el código postal del inmueble para localizar el GPS.";if(postal)postal.focus();return false;}
- if(!address&&!postalCode){if(status)status.textContent="Introduce una dirección o un código postal.";return false;}
- if(status)status.textContent="Buscando ubicación por dirección y código postal…";
+ const get=(...ids)=>{for(const id of ids){const el=$(id);if(el)return el}return null};
+ const a=get(prefix+"Address",prefix+"address"),city=get(prefix+"City",prefix+"city"),postal=get(prefix+"Postal",prefix+"postal"),country=get(prefix+"Country",prefix+"country"),lat=get(prefix+"Lat",prefix+"lat"),lon=get(prefix+"Lon",prefix+"lon"),status=get(prefix+"GpsStatus",prefix+"GpsStatus");
+ const address=String(a?.value||"").trim(),postalCode=String(postal?.value||"").trim(),cityName=String(city?.value||"").trim(),countryName=String(country?.value||"España").trim();
+ if(!postalCode){if(status)status.textContent="Introduza o código postal para procurar a localização do imóvel.";if(postal)postal.focus();return false}
+ if(status)status.textContent="A procurar a localização pelo código postal…";
  try{
-  const cityName=String(city?.value||"").trim(),countryName=String(country?.value||"").trim();
-  const q=[postalCode,cityName,countryName,address].filter(Boolean).join(", ");
-  const res=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="+encodeURIComponent(q),{headers:{"Accept":"application/json","Accept-Language":"es"}});
+  const params=new URLSearchParams({format:"jsonv2",addressdetails:"1",limit:"5",postalcode:postalCode,country:countryName});
+  if(cityName)params.set("city",cityName);
+  const res=await fetch("https://nominatim.openstreetmap.org/search?"+params.toString(),{headers:{"Accept":"application/json","Accept-Language":"es"}});
   if(!res.ok)throw new Error("geocode");
-  const rows=await res.json(),hit=rows?.[0];
-  if(!hit?.lat||!hit?.lon){if(status)status.textContent="No se encontró el código postal. Compruebe el código postal, la ciudad y el país.";return false}
+  let rows=await res.json();
+  if(!rows?.length){
+   const q=[postalCode,cityName,countryName].filter(Boolean).join(", ");
+   const fallback=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q="+encodeURIComponent(q),{headers:{"Accept":"application/json","Accept-Language":"es"}});
+   if(fallback.ok)rows=await fallback.json();
+  }
+  const hit=(rows||[]).find(x=>x.lat&&x.lon);
+  if(!hit){if(status)status.textContent="Não encontrámos esse código postal. Confirme o código postal, a cidade e o país.";return false}
+  const parts=hit.address||{};
+  const foundCity=parts.city||parts.town||parts.village||parts.municipality||parts.county||parts.state||"";
+  const street=[parts.road,parts.house_number].filter(Boolean).join(", ");
+  if(a&&street&&!address)a.value=street;
+  if(city&&foundCity)city.value=foundCity;
   if(lat)lat.value=Number(hit.lat).toFixed(7);
   if(lon)lon.value=Number(hit.lon).toFixed(7);
-  if(status)status.textContent="Ubicación encontrada.";
+  if(status)status.textContent=(street?"Rua/localização encontrada. ":"Zona do código postal encontrada. ")+"O código postal pode abranger várias ruas; confirme o endereço exato antes de guardar.";
   return true;
- }catch(e){if(status)status.textContent="No se pudo localizar automáticamente.";return false}
+ }catch(e){if(status)status.textContent="Não foi possível procurar agora. Verifique a ligação e tente novamente.";return false}
 }
 async function capturePropertyGPS(prefix){
  const latEl=$(prefix+"Lat"),lonEl=$(prefix+"Lon"),statusEl=$(prefix+"GpsStatus");
@@ -2497,7 +2508,7 @@ function clientPropertyInlineHtml(p,client,mode){
 async function saveClientPropertyInline(e,id,clientId,mode){
  e.preventDefault();
  const k="cpi_"+id+"_";
- const data={name:$(k+"name").value.trim(),property_type:$(k+"type").value,beds_single:Math.max(0,Number($(k+"bedsSingle").value||0)),beds_double:Math.max(0,Number($(k+"bedsDouble").value||0)),address:$(k+"address").value.trim(),city:$(k+"city").value.trim(),country:$(k+"country").value.trim(),latitude:$(k+"Lat")?.value?Number($(k+"Lat").value):null,longitude:$(k+"Lon")?.value?Number($(k+"Lon").value):null,client_id:$(k+"client").value,status:$(k+"status").value};
+ const data={name:$(k+"name").value.trim(),property_type:$(k+"type").value,beds_single:Math.max(0,Number($(k+"bedsSingle").value||0)),beds_double:Math.max(0,Number($(k+"bedsDouble").value||0)),address:$(k+"address").value.trim(),postal_code:$(k+"Postal").value.trim(),city:$(k+"city").value.trim(),country:$(k+"country").value.trim(),latitude:$(k+"Lat")?.value?Number($(k+"Lat").value):null,longitude:$(k+"Lon")?.value?Number($(k+"Lon").value):null,client_id:$(k+"client").value,status:$(k+"status").value};
  const photo=$(k+"photo")?.files?.[0]||null;
  if(!data.client_id){toast("Seleccione el cliente asociado.");return}
  if(mode==="demo"){
