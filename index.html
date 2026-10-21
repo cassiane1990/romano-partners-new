@@ -4866,7 +4866,7 @@ async function shareInspectionWhatsApp(id){
   const isVideo=m.media_type==="video"||["mp4","mov","webm","m4v"].includes(ext);
   const visual=isVideo
    ?'<div class="media-file"><p>🎥 '+htmlEsc(label)+'</p><a href="'+htmlEsc(relative)+'">Abrir vídeo: '+htmlEsc(m.file_name||"vídeo")+'</a><p class="muted">O vídeo original está incluído na pasta Fotografias_e_videos do ZIP.</p></div>'
-   :'<figure><img loading="lazy" alt="'+htmlEsc(label)+'" src="data:'+mime+';base64,'+toBase64(data)+'"><figcaption><strong>'+htmlEsc(label)+'</strong><br><span>'+htmlEsc(m.file_name||"Fotografia")+'</span></figcaption></figure>';
+   :'<figure><img alt="'+htmlEsc(label)+'" src="data:'+mime+';base64,'+toBase64(data)+'"><figcaption><strong>'+htmlEsc(label)+'</strong><br><span>'+htmlEsc(m.file_name||"Fotografia")+'</span></figcaption></figure>';
   visualItems.push({group,label,visual});
  }
  const grouped={};for(const item of visualItems)(grouped[item.group]||(grouped[item.group]=[])).push(item);
