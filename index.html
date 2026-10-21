@@ -5892,7 +5892,26 @@ function masterUpdateCleaningMode(){const type=$("mpCleaningType")?.value||"airb
 function masterCleaningOptionChanged(){const cat=SERVICE_CLEANING_CATALOG[$("mpCleaningType")?.value||"airbnb"]||SERVICE_CLEANING_CATALOG.airbnb,opt=cat.options.find(x=>x.code===($("mpCleaning")?.value)),p=$("mpCleaningPrice");if(p){p.value=opt?.price==null?"":String(opt.price);p.readOnly=!opt?.range;p.placeholder=opt?.range?"Introduzca el valor aplicado":"Tarifa de tabla"}const pn=$("mpCleaningPriceNote");if(pn)pn.textContent=opt?.range?"Rango de tabla: "+masterMoney(opt.price)+"–"+masterMoney(opt.maxPrice)+" por "+(opt.unit||"unidad")+" · indique el valor aplicado.":opt?.price==null?"Tarifa a confirmar antes de facturar.":"Valor original · SIN IVA";masterRecalc()}
 function masterUpdateMaintenance(){const type=$("mpMaintenance")?.value||"none",rate=$("mpMaintenanceRate")?.value||"normal",wrap=$("mpMaintenanceHoursWrap"),other=$("mpMaintenanceOtherWrap");const fixed=rate==="travel_center"||rate==="travel_out";if(wrap)wrap.style.display=(type==="none"||fixed||type==="other")?"none":"block";if(other)other.style.display=type==="other"?"block":"none";masterRecalc()}
 
-function masterLoadPropertyBeds(){const id=$("mpProperty")?.value,p=(demoMode?DEMO_PROPERTIES:((window.__mpProps||[]))).find(x=>x.id===id);if(!p)return;const s=document.querySelector("[data-qty='LINEN_SINGLE']"),d=document.querySelector("[data-qty='LINEN_KING']");if(s)s.value=String(Math.max(0,Number(p.beds_single||0)));if(d)d.value=String(Math.max(0,Number(p.beds_double||0)));masterRecalc();masterLoadPropertyInstructions()}
+function masterLoadPropertyBeds(){
+ const id=$("mpProperty")?.value,p=(demoMode?DEMO_PROPERTIES:((window.__mpProps||[]))).find(x=>x.id===id);if(!p)return;
+ const single=document.querySelector("[data-qty='LINEN_SINGLE']"),double=document.querySelector("[data-qty='LINEN_KING']");
+ const selected=masterSelectedCleaning(),code=String(selected.opt?.code||"").toUpperCase();
+ const typologyMatch=code.match(/^T(\\d+)/),bedroomCount=typologyMatch?Math.max(1,Number(typologyMatch[1])):null;
+ const propertySingle=Math.max(0,Number(p.beds_single||0)),propertyDouble=Math.max(0,Number(p.beds_double||0));
+ // Os packs incluídos seguem a tipologia do serviço; camas excedentes no cadastro não viram extras automaticamente.
+ let singleCount=propertySingle,doubleCount=propertyDouble;
+ if(bedroomCount!==null&&singleCount+doubleCount>bedroomCount){
+   let remaining=bedroomCount;
+   doubleCount=Math.min(propertyDouble,remaining);remaining-=doubleCount;
+   singleCount=Math.min(propertySingle,remaining);
+ }else if(bedroomCount!==null&&singleCount+doubleCount<bedroomCount){
+   // Só completa até ao número de quartos quando a composição registada é inferior.
+   const missing=bedroomCount-singleCount-doubleCount;
+   doubleCount+=missing;
+ }
+ if(single)single.value=String(singleCount);if(double)double.value=String(doubleCount);
+ masterRecalc();masterLoadPropertyInstructions()
+}
 async function renderPropertyInstructions(boxId,propertyId){const box=$(boxId);if(!box)return;if(!propertyId){box.innerHTML="<div class='muted'>Selecione um imóvel para ver as instruções.</div>";return}let p=(demoMode?DEMO_PROPERTIES:(window.__mpProps||[])).find(x=>x.id===propertyId)||null;if(!demoMode){const q=await sb.from("properties").select("id,name,code,address,postal_code,city,country,key_location,key_deposit_address,key_deposit_code,exterior_door_code,entry_instructions,latitude,longitude,beds_single,beds_double").eq("id",propertyId).maybeSingle();if(q.error){box.innerHTML="<div class='muted'>Não foi possível carregar as instruções do imóvel.</div>";return}p=q.data||p}if(!p){box.innerHTML="<div class='muted'>Imóvel não encontrado.</div>";return}const rows=[["Localização das chaves",p.key_location],["Morada do depósito das chaves",p.key_deposit_address],["Código do depósito",p.key_deposit_code],["Código da porta exterior",p.exterior_door_code],["Instruções para entrega/retirada das chaves",p.entry_instructions],["Morada",p.address],["Código postal",p.postal_code],["Cidade",p.city],["País",p.country],["Camas individuais",p.beds_single],["Camas duplas/King",p.beds_double]];box.innerHTML="<div class='panel-head'><h3 style='margin:0'>Instruções do imóvel · "+esc(p.name||"Imóvel")+"</h3><span class='pill'>"+esc(p.code||"")+"</span></div>"+rows.filter(r=>r[1]!==null&&r[1]!==undefined&&String(r[1]).trim()!=="").map(r=>"<div class='line-item' style='align-items:flex-start'><span>"+esc(r[0])+"</span><b style='text-align:right;white-space:pre-wrap'>"+esc(String(r[1]))+"</b></div>").join("")+"<div class='muted' style='margin-top:8px'>"+(rows.some(r=>r[1]!==null&&r[1]!==undefined&&String(r[1]).trim()!=="")?"Dados carregados da ficha do imóvel.":"Ainda não há instruções preenchidas nesta ficha.")+"</div>"}
 function masterLoadPropertyInstructions(){return renderPropertyInstructions("mpPropertyInstructions",$("mpProperty")?.value)}
 function maintenanceServiceShowPropertyInstructions(){return renderPropertyInstructions("msPropertyInstructions",$("msProperty")?.value)}
