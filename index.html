@@ -1956,6 +1956,47 @@ const ROMANO_PACK_STATUSES={submitted:"Enviado",under_review:"En análisis",conf
 function romanoPackMoney(n){return new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(Number(n)||0)}
 function romanoPackStatus(s){return ROMANO_PACK_STATUSES[s]||s||"—"}
 function romanoPackTotal(items){return (Number(items?.individual||0)*ROMANO_PACK_PRICES.individual)+(Number(items?.double||0)*ROMANO_PACK_PRICES.double)+(Number(items?.single_beds||0)*ROMANO_PACK_PRICES.single_beds)+(Number(items?.amenities||0)*ROMANO_PACK_PRICES.amenities)}
+let __romanoPackDiscount={clientId:"",percent:0,enabled:false,clientEnabled:false};
+function romanoPackDiscountToggle(){
+ const d=__romanoPackDiscount;
+ if(!d.clientId||d.percent<=0||!d.clientEnabled){toast("Este cliente não tem desconto de roupa configurado.");return}
+ d.enabled=!d.enabled;
+ const btn=$("rpcPackDiscountToggle"),status=$("rpcPackDiscountStatus");
+ if(btn){btn.textContent=d.enabled?"Desativar desconto":"Ativar desconto";btn.classList.toggle("gold",d.enabled)}
+ if(status)status.textContent=d.enabled?"Desconto de roupa ativado: "+d.percent+"%":"Desconto disponível: "+d.percent+"% · desativado";
+ romanoPackUpdateTotal();
+}
+async function romanoPackLoadDiscount(){
+ const sel=$("rpcPackClient"),clientId=role()==="client"?null:(sel?.value||null);
+ let row=null;
+ if(role()==="client"){
+  const q=await sb.from("clients").select("id,name,laundry_discount_percent,discounts_enabled").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(q.error){toast("Não foi possível carregar o desconto do cliente.");return}
+  row=q.data;
+ }else if(clientId){
+  const q=await sb.from("clients").select("id,name,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(q.error){toast("Não foi possível carregar o desconto do cliente.");return}
+  row=q.data;
+ }
+ const percent=Math.max(0,Math.min(100,Number(row?.laundry_discount_percent||0)));
+ __romanoPackDiscount={clientId:row?.id||"",percent,enabled:percent>0&&row?.discounts_enabled!==false,clientEnabled:percent>0&&row?.discounts_enabled!==false};
+ const panel=$("rpcPackDiscountPanel");
+ if(panel){
+  panel.style.display=row?"block":"none";
+  const status=$("rpcPackDiscountStatus"),btn=$("rpcPackDiscountToggle");
+  if(status)status.textContent=percent>0&&row?.discounts_enabled!==false?( __romanoPackDiscount.enabled?"Desconto de roupa ativado: "+percent+"%":"Desconto disponível: "+percent+"% · desativado"):"Este cliente não tem desconto de roupa ativo.";
+  if(btn){btn.disabled=!(percent>0&&row?.discounts_enabled!==false);btn.textContent=__romanoPackDiscount.enabled?"Desativar desconto":"Ativar desconto";btn.classList.toggle("gold",__romanoPackDiscount.enabled)}
+ }
+ romanoPackUpdateTotal();
+}
+function romanoPackUpdateTotal(){
+ const items={individual:$("rpcPackIndividual")?.value,double:$("rpcPackDouble")?.value,single_beds:$("rpcPackSingleBeds")?.value,amenities:$("rpcPackAmenities")?.value};
+ const original=romanoPackTotal(items),d=__romanoPackDiscount;
+ const discount=d.enabled?Math.round(original*d.percent)/100:0;
+ const el=$("rpcPackTotal");if(el)el.textContent=romanoPackMoney(Math.max(0,Math.round((original-discount)*100)/100));
+ const detail=$("rpcPackDiscountAmount");if(detail)detail.textContent=d.enabled?"Desconto aplicado: − "+romanoPackMoney(discount):"Desconto: "+romanoPackMoney(0);
+}
+
 async function renderPacksAmenities(){
  const admin=["admin","supervisor"].includes(role()),client=role()==="client";
  let properties=[],orders=[],profiles=[],customers=[],error=null;
@@ -1982,7 +2023,7 @@ async function renderPacksAmenities(){
  if(client||admin){
   html+='<div class="panel"><div class="panel-head"><div><h3>Solicitar productos</h3><div class="muted">Seleccione apartamento, cantidades y fecha deseada.</div></div></div>';
   if(!properties.length)html+='<div class="msg">No hay propiedades asociadas. Compruebe la asociación del cliente con el apartamento.</div>';
-  else html+='<form id="romanoPackOrderForm" onsubmit="submitRomanoPackOrder(event)">'+(admin?'<div class="field"><label for="rpcPackClientSearch">Buscar cliente por nombre</label><input id="rpcPackClientSearch" type="search" placeholder="Escriba el nombre del cliente"><label for="rpcPackClient">Cliente</label><select id="rpcPackClient" required><option value="">Seleccione cliente</option>'+customers.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name||c.email||c.client_code||"Cliente")+'</option>').join("")+'</select></div>':'')+'<div class="field"><label for="rpcPackPropertySearch">Buscar apartamento por nombre o código</label><input id="rpcPackPropertySearch" type="search" placeholder="Escriba el nombre o código"><label for="rpcPackProperty">Apartamento</label><select id="rpcPackProperty" required><option value="">'+(admin?'Seleccione primero el cliente':'Seleccione apartamento')+'</option>'+properties.filter(p=>!admin||customers.some(c=>c.id===p.client_id)).map(p=>'<option data-client-id="'+esc(p.client_id||"")+'" value="'+esc(p.id)+'" '+(admin?'disabled':'')+'>'+esc(p.name)+' · '+esc(p.code||"")+'</option>').join("")+'</select></div><div class="two"><div class="field"><label for="rpcPackIndividual">Pack individual · '+romanoPackMoney(18.84)+'</label><input id="rpcPackIndividual" type="number" min="0" max="500" step="1" value="0"></div><div class="field"><label for="rpcPackDouble">Pack casal / Double / King · '+romanoPackMoney(20.41)+'</label><input id="rpcPackDouble" type="number" min="0" max="500" step="1" value="0"></div><div class="field"><label for="rpcPackSingleBeds">Pack de camas individuales · '+romanoPackMoney(13.25)+'</label><input id="rpcPackSingleBeds" type="number" min="0" max="500" step="1" value="0"></div><div class="field"><label for="rpcPackAmenities">Amenities · '+romanoPackMoney(1.50)+' / unidad</label><input id="rpcPackAmenities" type="number" min="0" max="1000" step="1" value="0"></div></div><div class="field"><label for="rpcPackDate">Fecha deseada de entrega</label><input id="rpcPackDate" type="date" min="'+new Date().toISOString().slice(0,10)+'" required></div><div class="field"><label for="rpcPackNotes">Observaciones (opcional)</label><textarea id="rpcPackNotes" maxlength="1000" placeholder="Indique detalles útiles para preparar el pedido."></textarea></div><div class="panel" style="margin-top:14px;background:#f7f1e7"><div class="panel-head"><h3>Total estimado</h3><strong id="rpcPackTotal">'+romanoPackMoney(0)+'</strong></div><div class="muted">Importe orientativo con IVA incluido. El pedido y el precio quedan pendientes de validación por Romano.</div></div><button class="btn gold" type="submit" style="margin-top:14px">Solicitar pedido</button></form>';
+  else html+='<form id="romanoPackOrderForm" onsubmit="submitRomanoPackOrder(event)">'+(admin?'<div class="field"><label for="rpcPackClientSearch">Buscar cliente por nombre</label><input id="rpcPackClientSearch" type="search" placeholder="Escriba el nombre del cliente"><label for="rpcPackClient">Cliente</label><select id="rpcPackClient" required><option value="">Seleccione cliente</option>'+customers.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name||c.email||c.client_code||"Cliente")+'</option>').join("")+'</select></div>':'')+'<div class="field"><label for="rpcPackPropertySearch">Buscar apartamento por nombre o código</label><input id="rpcPackPropertySearch" type="search" placeholder="Escriba el nombre o código"><label for="rpcPackProperty">Apartamento</label><select id="rpcPackProperty" required><option value="">'+(admin?'Seleccione primero el cliente':'Seleccione apartamento')+'</option>'+properties.filter(p=>!admin||customers.some(c=>c.id===p.client_id)).map(p=>'<option data-client-id="'+esc(p.client_id||"")+'" value="'+esc(p.id)+'" '+(admin?'disabled':'')+'>'+esc(p.name)+' · '+esc(p.code||"")+'</option>').join("")+'</select></div><div class="two"><div class="field"><label for="rpcPackIndividual">Pack individual · '+romanoPackMoney(18.84)+'</label><input id="rpcPackIndividual" type="number" min="0" max="500" step="1" value="0"></div><div class="field"><label for="rpcPackDouble">Pack casal / Double / King · '+romanoPackMoney(20.41)+'</label><input id="rpcPackDouble" type="number" min="0" max="500" step="1" value="0"></div><div class="field"><label for="rpcPackSingleBeds">Pack de camas individuales · '+romanoPackMoney(13.25)+'</label><input id="rpcPackSingleBeds" type="number" min="0" max="500" step="1" value="0"></div><div class="field"><label for="rpcPackAmenities">Amenities · '+romanoPackMoney(1.50)+' / unidad</label><input id="rpcPackAmenities" type="number" min="0" max="1000" step="1" value="0"></div></div><div class="panel" id="rpcPackDiscountPanel" style="display:none;margin-top:12px;background:#fff7e8"><div class="panel-head"><div><h3>Descuento de ropa del cliente</h3><div id="rpcPackDiscountStatus" class="muted">Seleccione un cliente para consultar el descuento.</div><div id="rpcPackDiscountAmount" class="muted">Descuento: 0,00 €</div></div><button type="button" class="btn" id="rpcPackDiscountToggle" onclick="romanoPackDiscountToggle()">Activar descuento</button></div></div><div class="field"><label for="rpcPackDate">Fecha deseada de entrega</label><input id="rpcPackDate" type="date" min="'+new Date().toISOString().slice(0,10)+'" required></div><div class="field"><label for="rpcPackNotes">Observaciones (opcional)</label><textarea id="rpcPackNotes" maxlength="1000" placeholder="Indique detalles útiles para preparar el pedido."></textarea></div><div class="panel" style="margin-top:14px;background:#f7f1e7"><div class="panel-head"><h3>Total estimado</h3><strong id="rpcPackTotal">'+romanoPackMoney(0)+'</strong></div><div class="muted">Importe orientativo con IVA incluido. El pedido y el precio quedan pendientes de validación por Romano.</div></div><button class="btn gold" type="submit" style="margin-top:14px">Solicitar pedido</button></form>';
   html+='</div>';
  }
  html+='<div class="panel"><div class="panel-head"><div><h3>'+(client?"Mis pedidos":"Pedidos de packs recibidos")+'</h3><div class="muted">'+(admin?"Revise precios, disponibilidad, asignación y entrega.":client?"Consulte el estado de cada solicitud.":"Tareas de preparación y entrega asignadas a su perfil.")+'</div></div><button class="btn" onclick="openPage(\'packs_amenities\')">Actualizar</button></div>';
@@ -2024,15 +2065,16 @@ async function renderPacksAmenities(){
   filterClients();filterProperties();
  }
  if((client||admin)&&properties.length){
-  const updateTotal=()=>{const items={individual:$("rpcPackIndividual")?.value,double:$("rpcPackDouble")?.value,single_beds:$("rpcPackSingleBeds")?.value,amenities:$("rpcPackAmenities")?.value};const el=$("rpcPackTotal");if(el)el.textContent=romanoPackMoney(romanoPackTotal(items));};
-  ["rpcPackIndividual","rpcPackDouble","rpcPackSingleBeds","rpcPackAmenities"].forEach(id=>$(id)?.addEventListener("input",updateTotal));
+  ["rpcPackIndividual","rpcPackDouble","rpcPackSingleBeds","rpcPackAmenities"].forEach(id=>$(id)?.addEventListener("input",romanoPackUpdateTotal));
+  if(admin)$("rpcPackClient")?.addEventListener("change",romanoPackLoadDiscount);
+  if(client)romanoPackLoadDiscount();
  }
 }
 async function submitRomanoPackOrder(e){
  e.preventDefault();if(!["client","admin","supervisor"].includes(role()))return;
  const items={individual:Number($("rpcPackIndividual")?.value||0),double:Number($("rpcPackDouble")?.value||0),single_beds:Number($("rpcPackSingleBeds")?.value||0),amenities:Number($("rpcPackAmenities")?.value||0)};
  if(!Object.values(items).some(n=>n>0)){toast("Seleccione al menos un producto o pack.");return}
- const propertyId=$("rpcPackProperty")?.value,date=$("rpcPackDate")?.value,notes=$("rpcPackNotes")?.value?.trim()||"";
+ const propertyId=$("rpcPackProperty")?.value,date=$("rpcPackDate")?.value,userNotes=$("rpcPackNotes")?.value?.trim()||"",d=__romanoPackDiscount,discountValue=d.enabled?Math.round(romanoPackTotal(items)*d.percent)/100:0,notes=[userNotes,d.enabled?"Desconto roupa aplicado na estimativa: "+d.percent+"% (− "+romanoPackMoney(discountValue)+").":d.clientEnabled?"Desconto roupa disponível ("+d.percent+"%), mas desativado.":""].filter(Boolean).join("\n");
  if(!propertyId||!date){toast("Seleccione el apartamento y la fecha deseada.");return}
  if(role()!=="client"){const clientId=$("rpcPackClient")?.value;const prop=await sb.from("properties").select("client_id").eq("id",propertyId).maybeSingle();if(!clientId||prop.error||!prop.data||prop.data.client_id!==clientId){toast("Seleccione primero el cliente y después su apartamento.");return}}
  const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent="Enviando…"}
