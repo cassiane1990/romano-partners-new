@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-21-auto-update-v4">
+<head><meta name="romano-build" content="2026-10-21-notifications-fix-v5">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -3808,16 +3808,18 @@ async function markNotificationRead(id,refresh=true){
 async function deleteReadNotifications(){
  const ok=window.confirm("¿Eliminar todas las notificaciones ya leídas? Las no leídas no se eliminarán.");
  if(!ok)return;
- const r=await sb.from("notifications").delete().eq("recipient_id",currentUser.id).not("read_at","is",null);
- if(r.error){toast(r.error.message||"No se pudieron eliminar las notificaciones leídas.");return}
- toast("Notificaciones leídas eliminadas.");
+ const r=await sb.from("notifications").delete().eq("recipient_id",currentUser.id).not("read_at","is",null).select("id");
+ if(r.error){toast("No se pudieron eliminar las notificaciones leídas: "+(r.error.message||"permiso denegado"));return}
+ if(!r.data?.length){toast("No se eliminó ninguna notificación leída. Comprueba los permisos de la cuenta.");return}
+ toast("Notificaciones leídas eliminadas ("+r.data.length+").");
  await renderNotifications();
 }
 async function deleteSingleNotification(id){
  if(!id)return;
  if(!window.confirm("¿Eliminar esta notificación? Esta acción no se puede deshacer."))return;
- const r=await sb.from("notifications").delete().eq("id",id).eq("recipient_id",currentUser.id);
- if(r.error){toast(r.error.message||"No se pudo eliminar la notificación.");return}
+ const r=await sb.from("notifications").delete().eq("id",id).eq("recipient_id",currentUser.id).select("id");
+ if(r.error){toast("No se pudo eliminar la notificación: "+(r.error.message||"permiso denegado"));return}
+ if(!r.data?.length){toast("La notificación sigue guardada: no se encontró para este usuario o faltan permisos para eliminarla.");return}
  toast("Notificación eliminada.");
  await renderNotifications();
 }
@@ -3898,7 +3900,7 @@ async function openNotification(id,title,body){
 function enableNotificationSwipe(){
  document.querySelectorAll("[data-notification-swipe]").forEach(el=>{
   let sx=0,sy=0,moving=false;
-  el.addEventListener("touchstart",e=>{if(el.dataset.read!=="1")return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;moving=true},{passive:true});
+  el.addEventListener("touchstart",e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;moving=true},{passive:true});
   el.addEventListener("touchmove",e=>{if(!moving)return;const dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(Math.abs(dy)>Math.abs(dx)){moving=false;return}if(dx<0){el.style.transform="translateX("+Math.max(dx,-110)+"px)";el.style.opacity=String(Math.max(.45,1+dx/220))}},{passive:true});
   el.addEventListener("touchend",async()=>{if(!moving)return;moving=false;const m=el.style.transform.match(/-?[0-9.]+/);const x=m?parseFloat(m[0]):0;if(x<=-70&&el.dataset.id){await deleteSingleNotification(el.dataset.id)}else{el.style.transform="";el.style.opacity=""}});
  });
@@ -3917,7 +3919,7 @@ async function renderNotifications(){
    const label=isMessage?"💬 ABRIR CHAT":isEmployeeAssignment?"✓ ACEPTAR SERVICIO":isPendingService?"✓ ACEPTAR Y DESIGNAR":/nova incidência no arquivo/.test(t)?"📁 ABRIR INCIDÊNCIA":/novo serviço|novo pedido de serviço/.test(t)?"✓ ABRIR PEDIDO":/incid[eê]ncia|emergencia/.test(t)?"✓ ACEPTAR COMO RECIBIDO":/adelanto|check-in/.test(t)?"✓ ABRIR PEDIDO":"";
    const urgent=String(x.severity||"").toLowerCase()==="critical"||/urgencia 24h|🚨/i.test(String(x.title||""));
    const serviceKind=/mantenimiento/i.test(String(x.title||""))?"🔧 MANTENIMIENTO":/limpieza/i.test(String(x.title||""))?"🧹 LIMPIEZA":"";
-   return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"0")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(urgent?'border:2px solid #b00020;background:#fff4f3;box-shadow:0 6px 18px #b0002030;':'')+(x.read_at?"opacity:.68":(!urgent?"border-color:#c59643;box-shadow:0 4px 14px #b7893f18":""))+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:'+(urgent?'#b00020;color:#fff':'#fbe5e3;color:#a52b25')+'">'+(urgent?'🚨 URGENTE':'NUEVA')+'</span>':'')+'</div><div style="margin-top:5px;font-weight:800">'+serviceKind+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" '+(urgent?'style="background:#b00020;border-color:#b00020" ':'')+'onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button><button class="btn" onclick="event.stopPropagation();deleteSingleNotification(\''+esc(x.id)+'\')">🗑️ Eliminar</button></div>':'<div class="actions" style="margin-top:12px"><button class="btn" onclick="event.stopPropagation();deleteSingleNotification(\''+esc(x.id)+'\')">🗑️ Eliminar</button></div>')+'</div>';
+   return '<div class="panel" data-notification-swipe="1" data-id="'+esc(x.id)+'" data-read="'+(x.read_at?"1":"0")+'" style="margin-top:10px;cursor:pointer;touch-action:pan-y;transition:transform .18s,opacity .18s;'+(urgent?'border:2px solid #b00020;background:#fff4f3;box-shadow:0 6px 18px #b0002030;':'')+(x.read_at?"opacity:.68":(!urgent?"border-color:#c59643;box-shadow:0 4px 14px #b7893f18":""))+'" onclick="openNotification(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong>'+esc(x.title||"Nueva alerta")+'</strong>'+(!x.read_at?'<span class="pill" style="background:'+(urgent?'#b00020;color:#fff':'#fbe5e3;color:#a52b25')+'">'+(urgent?'🚨 URGENTE':'NUEVA')+'</span>':'')+'</div><div style="margin-top:5px;font-weight:800">'+serviceKind+'</div><div class="muted">'+esc(x.body||"")+'</div><small>'+esc(x.severity||"info")+' · '+esc(romanoMadridLabel(x.created_at))+(x.read_at?" · Leída":" · Sin leer")+'</small>'+(action&&!x.read_at?'<div class="actions" style="margin-top:12px"><button class="btn gold" '+(urgent?'style="background:#b00020;border-color:#b00020" ':'')+'onclick="event.stopPropagation();notificationAction(\''+esc(x.id)+'\',\''+esc(x.title||"")+'\',\''+esc(x.body||"")+'\')">'+label+'</button></div>':'')+'</div>';
  }).join(""):'<div class="empty">No hay alertas.</div>')+'</div>';enableNotificationSwipe();
 }
 
