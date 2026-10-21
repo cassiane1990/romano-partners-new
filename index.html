@@ -2398,11 +2398,12 @@ async function geocodePropertyAddress(prefix){
  if(!address&&!postalCode){if(status)status.textContent="Introduce una dirección o un código postal.";return false;}
  if(status)status.textContent="Buscando ubicación por dirección y código postal…";
  try{
-  const q=[address,postalCode,String(city?.value||"").trim(),String(country?.value||"").trim()].filter(Boolean).join(", ");
+  const cityName=String(city?.value||"").trim(),countryName=String(country?.value||"").trim();
+  const q=[postalCode,cityName,countryName,address].filter(Boolean).join(", ");
   const res=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="+encodeURIComponent(q),{headers:{"Accept":"application/json","Accept-Language":"es"}});
   if(!res.ok)throw new Error("geocode");
   const rows=await res.json(),hit=rows?.[0];
-  if(!hit?.lat||!hit?.lon){if(status)status.textContent="No se encontró la ubicación.";return false}
+  if(!hit?.lat||!hit?.lon){if(status)status.textContent="No se encontró el código postal. Compruebe el código postal, la ciudad y el país.";return false}
   if(lat)lat.value=Number(hit.lat).toFixed(7);
   if(lon)lon.value=Number(hit.lon).toFixed(7);
   if(status)status.textContent="Ubicación encontrada.";
@@ -2488,7 +2489,7 @@ function clientPropertyInlineHtml(p,client,mode){
  '<div class="notice">La composición de camas queda guardada en la propiedad y se cargará automáticamente al crear el próximo servicio.</div>'+
  '<div class="field"><label>Dirección</label><input id="'+k+'address" value="'+esc(p.address||"")+'"></div>'+
  '<div class="two"><div class="field"><label>Código postal *</label><input id="'+k+'Postal" inputmode="numeric" autocomplete="postal-code" value="'+esc(p.postal_code||"")+'" placeholder="Ej. 28001" required></div><div class="field"><label>Ciudad</label><input id="'+k+'city" value="'+esc(p.city||"")+'"></div></div><div class="field"><label>País</label><input id="'+k+'country" value="'+esc(p.country||"España")+'"></div>'+
- '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Ubicación GPS</h3><button type="button" class="btn" onclick="geocodePropertyAddress(\''+k+'\')">📍 Localizar dirección</button></div><div class="two"><div class="field"><label>Latitud</label><input id="'+k+'Lat" type="number" step="any" value="'+(p.latitude??"")+'" readonly></div><div class="field"><label>Longitud</label><input id="'+k+'Lon" type="number" step="any" value="'+(p.longitude??"")+'" readonly></div></div><div id="'+k+'GpsStatus" class="muted">'+(p.latitude!=null&&p.longitude!=null?"Ubicación guardada.":"Se obtiene automáticamente al completar la dirección.")+'</div>'+(p.latitude!=null&&p.longitude!=null?propertyGpsLink(p.latitude,p.longitude,"Abrir en Google Maps"):"")+'</div>'+
+ '<div class="field"><label>Código postal *</label><input id="'+k+'Postal" inputmode="numeric" autocomplete="postal-code" value="'+esc(p.postal_code||"")+'" placeholder="Ej. 28001" required><small class="muted">El GPS se calcula por código postal; no necesita estar físicamente en el inmueble.</small></div>'+'<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Ubicación GPS</h3><button type="button" class="btn" onclick="geocodePropertyAddress(\''+k+'\')">📍 Localizar dirección</button></div><div class="two"><div class="field"><label>Latitud</label><input id="'+k+'Lat" type="number" step="any" value="'+(p.latitude??"")+'" readonly></div><div class="field"><label>Longitud</label><input id="'+k+'Lon" type="number" step="any" value="'+(p.longitude??"")+'" readonly></div></div><div id="'+k+'GpsStatus" class="muted">'+(p.latitude!=null&&p.longitude!=null?"Ubicación guardada.":"Se obtiene automáticamente al completar la dirección.")+'</div>'+(p.latitude!=null&&p.longitude!=null?propertyGpsLink(p.latitude,p.longitude,"Abrir en Google Maps"):"")+'</div>'+
  '<div class="field"><label>Estado</label><select id="'+k+'status"><option '+(p.status==="Activo"?"selected":"")+'>Activo</option><option '+(p.status==="En servicio"?"selected":"")+'>En servicio</option><option '+(p.status==="Mantenimiento"?"selected":"")+'>Mantenimiento</option><option '+(p.status==="Inactivo"?"selected":"")+'>Inactivo</option></select></div>'+
  '<button class="primary">Guardar cambios</button></form></div></details>';
 }
