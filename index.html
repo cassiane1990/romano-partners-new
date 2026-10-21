@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-21-auto-update-v3">
+<head><meta name="romano-build" content="2026-10-21-auto-update-v4">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -3994,7 +3994,7 @@ async function registerRomanoServiceWorker(){
  }catch(e){console.warn("ROMANO Service Worker:",e);return null}
 }
 let __romanoSWUpdateTimer=null;
-let __romanoPageETag=null;
+let __romanoPageETag=document.querySelector('meta[name="romano-build"]')?.getAttribute("content")||null;
 let __romanoUpdateCheckBusy=false;
 let __romanoUpdateToastShown=false;
 function romanoHasUnsafeWorkInProgress(){
