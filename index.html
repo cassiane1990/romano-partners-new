@@ -5828,13 +5828,18 @@ function masterAdditionalRow(id){
 function addServiceAdditionalRow(){__mpAdditionalSeq++;$("mpAdditionalList").insertAdjacentHTML("beforeend",masterAdditionalRow(__mpAdditionalSeq));masterRecalc()}
 function qtyOptions(selected=0,max=10){let h="";for(let i=0;i<=max;i++)h+="<option value='"+i+"' "+(Number(selected)===i?"selected":"")+">"+i+"</option>";return h}
 function masterSelectedQty(code){const el=document.querySelector("[data-qty='"+code+"']");return Math.max(0,Number(el?.value||0))}
-function masterExtraLinenBase(items,property){
- const singleBeds=Math.max(0,Number(property?.beds_single||0)),doubleBeds=Math.max(0,Number(property?.beds_double||0));
- let singleIncluded=singleBeds,doubleIncluded=doubleBeds;
+function masterExtraLinenBase(items,typologyCode){
+ const code=String(typologyCode||"").toUpperCase();
+ const bedroomMatch=code.match(/^T(\\d+)/);
+ let includedPacks=bedroomMatch?Math.max(1,Number(bedroomMatch[1])):0;
  return (items||[]).filter(x=>String(x.category||"").toLowerCase()==="ropa"||/laundry|linen|ropa|lavander|pack cama|sofá-cama/i.test(String(x.name||"")+" "+String(x.code||"")+" "+String(x.detail||""))).reduce((sum,x)=>{
-  const qty=Math.max(0,Number(x.quantity||0)),unit=Math.max(0,Number(x.unit_price||0)),code=String(x.code||"").toUpperCase(),name=String(x.name||"").toLowerCase();
-  if(code==="SINGLE"||/individual|solteir/.test(name)){const included=Math.min(qty,singleIncluded);singleIncluded-=included;return sum+Math.max(0,qty-included)*unit}
-  if(code==="KING"||/doble|dupla|king|casal/.test(name)){const included=Math.min(qty,doubleIncluded);doubleIncluded-=included;return sum+Math.max(0,qty-included)*unit}
+  const qty=Math.max(0,Number(x.quantity||0)),unit=Math.max(0,Number(x.unit_price||0)),code=String(x.code||"").toUpperCase();
+  // Packs de camas contam para a quantidade incluída pela tipologia; sofá-cama é sempre extra.
+  if(code==="SINGLE"||code==="KING"){
+   const included=Math.min(qty,includedPacks);
+   includedPacks-=included;
+   return sum+Math.max(0,qty-included)*unit;
+  }
   return sum+qty*unit;
  },0);
 }
@@ -6022,8 +6027,7 @@ async function masterUpdateDiscountSummary(){
  if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled){cleaningPct=0;laundryPct=0}
  const clean=masterSelectedCleaning(),items=masterItemRows();
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0),serviceBase=Math.max(0,originalTotal);
- const selectedProperty=(window.__mpProps||[]).find(x=>x.id===$("mpProperty")?.value)||null;
- const laundryBase=masterExtraLinenBase(items,selectedProperty);
+ const laundryBase=masterExtraLinenBase(items,clean.opt?.code);
  const cleaningDiscount=Math.round(originalTotal*cleaningPct)/100,laundryDiscount=Math.round(laundryBase*(1+Number($("mpVat")?.value||21)/100)*laundryPct)/100;
  const discountTotal=Math.round((cleaningDiscount+laundryDiscount)*100)/100;
  const total=Math.max(0,Math.round((originalTotal-discountTotal)*100)/100),ratio=originalTotal>0?total/originalTotal:1;
@@ -6054,15 +6058,7 @@ async function savePremiumService(){
  const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,cleaningPct=discountsActive?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
  const cleaningBase=Math.max(0,Number($("mpTotal")?.dataset?.v||0));
  // O desconto de serviço aplica-se ao total final; os 3% têxteis aplicam-se apenas aos packs extra.
- const propertySingleBeds=Math.max(0,Number(propRow?.beds_single||0)),propertyDoubleBeds=Math.max(0,Number(propRow?.beds_double||0));
- let remainingSingleBase=propertySingleBeds,remainingDoubleBase=propertyDoubleBeds;
- const laundryBase=items.filter(x=>/laundry|linen|ropa|lavander|pack cama|sofá-cama/i.test(String(x.category||"")+" "+String(x.name||"")+" "+String(x.code||"")+" "+String(x.detail||""))).reduce((sum,x)=>{
-  const unit=Math.max(0,Number(x.unit_price||0)),qty=Math.max(0,Number(x.quantity||0)),code=String(x.code||"").toUpperCase(),name=String(x.name||"").toLowerCase();
-  if(code==="SINGLE"||/individual|solteir/.test(name)){const included=Math.min(qty,remainingSingleBase);remainingSingleBase-=included;return sum+Math.max(0,qty-included)*unit}
-  if(code==="KING"||/doble|dupla|king|casal/.test(name)){const included=Math.min(qty,remainingDoubleBase);remainingDoubleBase-=included;return sum+Math.max(0,qty-included)*unit}
-  // Packs de sofá-cama e outros packs têxteis adicionais são tratados como extras.
-  return sum+qty*unit;
- },0);
+ const laundryBase=masterExtraLinenBase(items,clean.opt?.code);
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const cleaningDiscountAmount=Math.round(originalTotal*cleaningPct)/100,laundryDiscountAmount=Math.round(laundryBase*(1+Number($("mpVat")?.value||21)/100)*laundryPct)/100,discountAmount=Math.round((cleaningDiscountAmount+laundryDiscountAmount)*100)/100;
  const discountedTotal=Math.max(0,Math.round((originalTotal-discountAmount)*100)/100),discountRatio=originalTotal>0?discountedTotal/originalTotal:1,discountedSub=Math.max(0,Math.round(originalSub*discountRatio*100)/100),discountedTax=Math.max(0,Math.round((discountedTotal-discountedSub)*100)/100);
