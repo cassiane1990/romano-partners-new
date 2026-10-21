@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-21-auto-update-v7">
+<head><meta name="romano-build" content="2026-10-21-discount-summary-v8">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -5969,7 +5969,7 @@ function masterFilterProperties(){
 }
 
 let __mpDiscountPreviewRequest=0;
-async function masterUpdateDiscountSummary(){
+async async function masterUpdateDiscountSummary(){
  const box=$("mpDiscountSummary");if(!box)return;
  const request=++__mpDiscountPreviewRequest;
  const clientId=$("mpClient")?.value||null;
