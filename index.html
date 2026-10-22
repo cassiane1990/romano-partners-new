@@ -2851,7 +2851,7 @@ async function renderServiceArchiveEvidence(rows){
  }))).join("");
 }
 function renderServicePropertyAccessHtml(p){const rows=[["Localização das chaves",p.key_location],["Morada do depósito das chaves",p.key_deposit_address],["Código do depósito",p.key_deposit_code],["Código da porta exterior",p.exterior_door_code],["Instruções para entrega/retirada das chaves",p.entry_instructions],["Morada",p.address],["Código postal",p.postal_code],["Cidade",p.city],["País",p.country],["Camas individuais",p.beds_single],["Camas duplas/King",p.beds_double]].filter(r=>r[1]!==null&&r[1]!==undefined&&String(r[1]).trim()!=="");return "<details class='panel' style='margin:12px 0;border:1px solid #d9bd8b;background:#fff9ef'><summary style='cursor:pointer;font-weight:800;padding:12px'>🔑 Instruções de acesso e dados do imóvel</summary><div style='padding:0 12px 12px'>"+(rows.length?rows.map(r=>"<div class='line-item' style='align-items:flex-start'><span>"+esc(r[0])+"</span><b style='text-align:right;white-space:pre-wrap'>"+esc(String(r[1]))+"</b></div>").join(""):"<div class='muted'>Não existem instruções de acesso preenchidas na ficha deste imóvel.</div>")+"</div></details>"}
-async async function openEditService(id){
+async function openEditService(id){
  if(!["admin","supervisor","client"].includes(role())){toast("Seu perfil não pode editar este serviço.");return}
  const q=await sb.from("services").select("*").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(q.error||!q.data){toast("Não foi possível carregar o serviço para edição: "+(q.error?.message||"serviço não encontrado"));return}
