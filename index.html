@@ -2926,29 +2926,62 @@ async function viewService(id){
 function openEditService(id){
  if(!["admin","supervisor","client"].includes(role())){toast("Sem permissão para editar este serviço.");return}
  (async()=>{
-  const q=await sb.from("services").select("id,code,client_id,status,priority,scheduled_at,instructions,company_id").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
+  const q=await sb.from("services").select("id,code,client_id,property_id,service_type,typology,pricing_code,agreed_amount,status,priority,scheduled_at,instructions,requested_items,additional_items,notes,company_id,tax_country").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
   if(q.error||!q.data){toast("Não foi possível carregar o serviço para edição.");return}
   const x=q.data;
-  if(!["requested","scheduled"].includes(x.status)){toast("Só é possível editar serviços programados ou aguardando confirmação.");return}
+  if(!["requested","scheduled"].includes(x.status)){toast("Só é possível editar serviços aguardando confirmação ou programados.");return}
   if(role()==="client"){const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();if(own.error||!own.data||own.data.id!==x.client_id){toast("Só pode editar os seus próprios serviços.");return}}
   const d=new Date(x.scheduled_at),local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  openModal("Editar serviço · "+esc(x.code),'<div class="notice">Pode corrigir a data, prioridade e observações. A tipologia e o preço permanecem inalterados.</div><div class="field"><label>Data e hora</label><input id="editServiceDate" type="datetime-local" value="'+esc(local)+'" required></div><div class="field"><label>Prioridade</label><select id="editServicePriority"><option value="normal" '+(x.priority==="normal"?"selected":"")+'>Normal</option><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="urgent" '+(x.priority==="urgent"?"selected":"")+'>Urgente</option></select></div><div class="field"><label>Observações / instruções</label><textarea id="editServiceInstructions" rows="4">'+esc(x.instructions||"")+'</textarea></div><div class="actions"><button class="btn gold" type="button" onclick="saveEditedService(\''+x.id+'\')">Guardar alterações</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div>');
+  let notes={};try{notes=JSON.parse(x.notes||"{}")}catch(e){}
+  const isMaintenance=privateMaintenanceServiceType(x.service_type);
+  const props=role()==="client"?((await sb.from("properties").select("id,name,code").eq("client_id",x.client_id).eq("company_id",currentProfile.company_id).order("name")).data||[]):((await sb.from("properties").select("id,name,code").eq("company_id",currentProfile.company_id).order("name")).data||[]);
+  const propertyOptions=props.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===x.property_id?'selected':'')+'>'+esc((p.code?p.code+" · ":"")+p.name)+'</option>').join("");
+  const requested=Array.isArray(x.requested_items)?x.requested_items:[];
+  const additional=Array.isArray(x.additional_items)?x.additional_items:[];
+  const allItems=[...requested,...additional];
+  const itemRows=allItems.map((it,i)=>'<div class="two edit-service-item" data-item-index="'+i+'"><div class="field"><label>Item '+(i+1)+' · nome</label><input class="edit-item-name" value="'+esc(it.name||it.code||"")+'"></div><div class="field"><label>Quantidade × preço unitário</label><div class="two"><input class="edit-item-qty" type="number" min="0" step="1" value="'+Math.max(0,Number(it.quantity||1))+'"><input class="edit-item-price" type="number" min="0" step="0.01" value="'+Math.max(0,Number(it.unit_price||0))+'"></div></div></div>').join("");
+  openModal("Editar todos os dados · "+esc(x.code),
+   '<div class="notice">Edite os dados do serviço, itens e valores. O histórico será preservado. Só é permitido editar antes de o serviço começar.</div>'+
+   '<div class="field"><label>Imóvel / apartamento</label><select id="editServiceProperty">'+propertyOptions+'</select></div>'+
+   '<div class="two"><div class="field"><label>Tipo de serviço</label><input id="editServiceType" value="'+esc(x.service_type||"")+'" readonly></div><div class="field"><label>Tipologia / código</label><input id="editServiceTypology" value="'+esc(x.typology||"")+'"></div></div>'+
+   '<div class="two"><div class="field"><label>Data e hora</label><input id="editServiceDate" type="datetime-local" value="'+esc(local)+'" required></div><div class="field"><label>Prioridade</label><select id="editServicePriority"><option value="normal" '+(x.priority==="normal"?"selected":"")+'>Normal</option><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="urgent" '+(x.priority==="urgent"?"selected":"")+'>Urgente</option></select></div></div>'+
+   '<div class="field"><label>Valor acordado (se aplicável)</label><input id="editServiceAmount" type="number" min="0" step="0.01" value="'+(x.agreed_amount==null?"":Number(x.agreed_amount))+'"><small class="muted">Para serviços calculados por itens, os totais serão recalculados a partir dos itens abaixo.</small></div>'+
+   '<div class="panel"><div class="panel-head"><h3>Itens do serviço</h3></div><div id="editServiceItems">'+(itemRows||'<div class="empty">Este serviço não tem itens registados.</div>')+'</div><button type="button" class="btn" onclick="addEditServiceItem()">＋ Adicionar item</button></div>'+
+   '<div class="field"><label>Observações / instruções</label><textarea id="editServiceInstructions" rows="4">'+esc(x.instructions||"")+'</textarea></div>'+
+   '<div class="field"><label>Notas internas do serviço</label><textarea id="editServiceNotes" rows="3">'+esc(notes.notes||notes.description||"")+'</textarea></div>'+
+   '<div class="actions"><button class="btn gold" type="button" onclick="saveEditedService(\''+x.id+'\')">Guardar todas as alterações</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div>');
  })().catch(e=>toast("Erro ao abrir edição: "+(e?.message||e)));
+}
+function addEditServiceItem(){
+ const box=$("editServiceItems");if(!box)return;
+ const i=box.querySelectorAll(".edit-service-item").length;
+ const row=document.createElement("div");row.className="two edit-service-item";row.dataset.itemIndex=String(i);
+ row.innerHTML='<div class="field"><label>Item '+(i+1)+' · nome</label><input class="edit-item-name" value=""></div><div class="field"><label>Quantidade × preço unitário</label><div class="two"><input class="edit-item-qty" type="number" min="0" step="1" value="1"><input class="edit-item-price" type="number" min="0" step="0.01" value="0"></div></div>';
+ box.appendChild(row);
 }
 async function saveEditedService(id){
  if(!["admin","supervisor","client"].includes(role())){toast("Sem permissão para editar este serviço.");return}
  const date=new Date($("editServiceDate")?.value||"");
  if(Number.isNaN(date.getTime())){toast("Introduza uma data e hora válidas.");return}
  if(date.getTime()<Date.now()-60000){toast("A data do serviço não pode estar no passado.");return}
- const current=await sb.from("services").select("id,client_id,status").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
+ const current=await sb.from("services").select("id,client_id,property_id,status,requested_items,additional_items,notes,service_type").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(current.error||!current.data){toast("Não foi possível validar o serviço.");return}
  if(!["requested","scheduled"].includes(current.data.status)){toast("O serviço já começou ou foi finalizado e não pode ser editado por este formulário.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();if(own.error||!own.data||own.data.id!==current.data.client_id){toast("Só pode editar os seus próprios serviços.");return}}
- const priority=$("editServicePriority")?.value||"normal",instructions=$("editServiceInstructions")?.value.trim()||null;
- const u=await sb.from("services").update({scheduled_at:date.toISOString(),priority,instructions,updated_by:currentUser.id,updated_at:new Date().toISOString()}).eq("id",id).eq("company_id",currentProfile.company_id).in("status",["requested","scheduled"]);
+ const propertyId=$("editServiceProperty")?.value||current.data.property_id;
+ const prop=await sb.from("properties").select("id,client_id").eq("id",propertyId).eq("company_id",currentProfile.company_id).maybeSingle();
+ if(prop.error||!prop.data||prop.data.client_id!==current.data.client_id){toast("O imóvel selecionado não pertence ao cliente deste serviço.");return}
+ const items=[];
+ document.querySelectorAll("#editServiceItems .edit-service-item").forEach(row=>{const name=row.querySelector(".edit-item-name")?.value.trim();if(!name)return;items.push({category:"additional",code:"EDITED",name,quantity:Math.max(0,Number(row.querySelector(".edit-item-qty")?.value||0)),unit_price:Math.max(0,Number(row.querySelector(".edit-item-price")?.value||0)),tax:false})});
+ const amountField=$("editServiceAmount")?.value;
+ const amount=amountField===""||amountField==null?null:Math.max(0,Number(amountField));
+ const priority=$("editServicePriority")?.value||"normal",instructions=$("editServiceInstructions")?.value.trim()||null,typology=$("editServiceTypology")?.value.trim()||null;
+ let notes={};try{notes=JSON.parse(current.data.notes||"{}")}catch(e){}
+ notes.notes=$("editServiceNotes")?.value.trim()||null;
+ const u=await sb.from("services").update({property_id:propertyId,typology,scheduled_at:date.toISOString(),priority,instructions,agreed_amount:amount,requested_items:items,additional_items:[],notes:JSON.stringify(notes),updated_by:currentUser.id,updated_at:new Date().toISOString()}).eq("id",id).eq("company_id",currentProfile.company_id).in("status",["requested","scheduled"]);
  if(u.error){toast("Não foi possível guardar: "+u.error.message);return}
- await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:id,actor_id:currentUser.id,event_type:"service_edited",metadata:{scheduled_at:date.toISOString(),priority,edited_by_role:role()}});
- closeModal();toast("Alterações do serviço guardadas.");renderServicesMaster();
+ await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:id,actor_id:currentUser.id,event_type:"service_edited",metadata:{scheduled_at:date.toISOString(),priority,property_id:propertyId,typology,edited_by_role:role(),items_count:items.length}});
+ closeModal();toast("Alterações guardadas.");renderServicesMaster();
 }
 
 async function saveMaintenanceObservation(id){
