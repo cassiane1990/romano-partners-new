@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta name="romano-build" content="2026-10-13-pedidos-extra">
+<meta name="romano-build" content="2026-10-29-laundry-catalog-production-v2">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ROMANO PARTNERS · Property Care</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -229,45 +229,59 @@ const EXTRA_PIECES=[
 ];
 const EXTRA_STATUS={requested:"Solicitado",approved:"Aprobado",preparing:"Preparando",delivered:"Entregado",cancelled:"Cancelado"};
 function extraOrderMoney(v){return Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"})}
+let __extraLaundryCatalog=[];
+async function loadExtraLaundryCatalog(){
+ const q=await sb.from("romano_laundry_catalog").select("id,company_id,product_key,name,category,unit,price,is_active,sort_order").order("sort_order").order("name");
+ if(q.error)throw q.error;__extraLaundryCatalog=q.data||[];return __extraLaundryCatalog;
+}
+async function saveExtraLaundryProduct(key){
+ if(!["admin","supervisor"].includes(role()))return;
+ const fresh=key==="__new__",s=fresh?"new":key;
+ const name=$("laundryName_"+s)?.value?.trim(),category=$("laundryCategory_"+s)?.value||"articulo",unit=$("laundryUnit_"+s)?.value?.trim()||"unidad",price=Number($("laundryPrice_"+s)?.value),active=fresh?true:$("laundryActive_"+s)?.checked!==false;
+ if(!name||!Number.isFinite(price)||price<0){toast("Indique un nombre y un precio válido.");return}
+ const product_key=fresh?"articulo_"+crypto.randomUUID().replace(/-/g,"").slice(0,16):key;
+ const row={company_id:currentProfile.company_id,product_key,name,category,unit,price:Math.round(price*100)/100,is_active:active,sort_order:fresh?500:Number(__extraLaundryCatalog.find(p=>p.product_key===key)?.sort_order||100),updated_at:new Date().toISOString()};
+ const btn=$("laundrySave_"+s);if(btn){btn.disabled=true;btn.textContent="Guardando…"}
+ try{const r=await sb.from("romano_laundry_catalog").upsert(row,{onConflict:"company_id,product_key"});if(r.error)throw r.error;toast("Catálogo actualizado.");await renderExtraOrders()}
+ catch(e){toast("No se pudo guardar: "+(e?.message||String(e)))}
+ finally{if(btn){btn.disabled=false;btn.textContent="Guardar"}}
+}
 async function renderExtraOrders(){
  const isStaff=["admin","supervisor","employee","maintenance_technician"].includes(role());
- const canCreate=["admin","supervisor","client"].includes(role());
- let props=[], orders=[], staff=[];
+ const canCreate=["admin","supervisor","client"].includes(role()),isAdmin=["admin","supervisor"].includes(role());
+ let props=[],orders=[],staff=[],loadError=null;
+ try{await loadExtraLaundryCatalog()}catch(e){loadError=e?.message||String(e)}
  if(demoMode){
   orders=window.__extraOrderDemo||(window.__extraOrderDemo=[]);
   props=(role()==="client"?DEMO_PROPERTIES.filter(p=>p.client_id===DEMO_PROPERTIES[0]?.client_id):DEMO_PROPERTIES).map(p=>({id:p.id,code:p.code,name:p.name,client_id:p.client_id}));
  }else{
-  const pr=await sb.from("properties").select("id,code,name,client_id").order("name");
-  if(pr.error)throw pr.error; props=pr.data||[];
-  let q=sb.from("extra_orders").select("id,company_id,property_id,property_code_snapshot,property_name_snapshot,client_id,requested_by,assigned_to,delivery_date,delivery_window,items,amenities_quantity,amenities_unit_price,total,pricing_pending,status,notes,status_history,created_at,updated_at").order("created_at",{ascending:false}).limit(200);
-  const rr=await q; if(rr.error)throw rr.error; orders=rr.data||[];
-  if(["admin","supervisor"].includes(role())){
-   const sr=await sb.from("profiles").select("id,full_name,email,role").eq("active",true).eq("role","maintenance_technician").order("full_name");
-   staff=sr.data||[];
-  }
+  const pr=await sb.from("properties").select("id,code,name,client_id").order("name");if(pr.error)throw pr.error;props=pr.data||[];
+  const rr=await sb.from("extra_orders").select("id,company_id,property_id,property_code_snapshot,property_name_snapshot,client_id,requested_by,assigned_to,delivery_date,delivery_window,items,amenities_quantity,amenities_unit_price,total,pricing_pending,status,notes,status_history,created_at,updated_at").order("created_at",{ascending:false}).limit(200);if(rr.error)throw rr.error;orders=rr.data||[];
+  if(isAdmin){const sr=await sb.from("profiles").select("id,full_name,email,role").eq("active",true).eq("role","maintenance_technician").order("full_name");staff=sr.data||[]}
+ }
+ const active=__extraLaundryCatalog.filter(p=>p.is_active);
+ const categoryLabels={pack:"Packs completos",toalla:"Toallas",sábana:"Sábanas",sabana:"Sábanas",funda:"Fundas",alfombra:"Alfombras de baño",amenity:"Amenities",articulo:"Otros artículos"};
+ const groups={};active.forEach(p=>{(groups[p.category||"articulo"]||(groups[p.category||"articulo"]=[])).push(p)});
+ let h='<div class="panel"><div class="panel-head"><div><h3>Ropa de cama y baño</h3><div class="muted">Packs completos y artículos individuales · los precios se gestionan en el catálogo.</div></div><button class="btn" onclick="reloadCurrentPage()">Actualizar</button></div>';
+ if(loadError)h+='<div class="status urgent">No se pudo cargar el catálogo: '+esc(loadError)+'</div>';
+ if(isAdmin){
+  h+='<div class="panel" style="margin:12px 0"><h3>Catálogo y tabla de precios</h3><div class="muted">Edite los precios aquí. Los cambios se reflejan automáticamente en los nuevos pedidos.</div><div class="three">';
+  __extraLaundryCatalog.forEach(p=>{const k=esc(p.product_key);h+='<div class="panel" style="margin:8px 0;background:var(--surface,#fffdf9)"><div class="field"><label>Nombre</label><input id="laundryName_'+k+'" maxlength="120" value="'+esc(p.name)+'"></div><div class="field"><label>Categoría</label><select id="laundryCategory_'+k+'">'+[['pack','Pack completo'],['toalla','Toallas'],['sábana','Sábanas'],['funda','Fundas'],['alfombra','Alfombras'],['amenity','Amenities'],['articulo','Otros artículos']].map(([v,l])=>'<option value="'+v+'" '+(p.category===v?'selected':'')+'>'+l+'</option>').join('')+'</select></div><div class="field"><label>Unidad</label><input id="laundryUnit_'+k+'" value="'+esc(p.unit||"unidad")+'"></div><div class="field"><label>Precio (€)</label><input id="laundryPrice_'+k+'" type="number" min="0" step="0.01" value="'+Number(p.price||0).toFixed(2)+'"></div><label><input id="laundryActive_'+k+'" type="checkbox" '+(p.is_active?'checked':'')+'> Disponible</label><button class="btn gold" id="laundrySave_'+k+'" type="button" onclick="saveExtraLaundryProduct(\''+k+'\')">Guardar</button></div>'});
+  h+='</div><details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">＋ Añadir artículo nuevo</summary><div class="three"><div class="field"><label>Nombre</label><input id="laundryName_new" placeholder="Ej. Toalla de piscina"></div><div class="field"><label>Categoría</label><select id="laundryCategory_new"><option value="toalla">Toallas</option><option value="sábana">Sábanas</option><option value="funda">Fundas</option><option value="alfombra">Alfombras</option><option value="pack">Pack completo</option><option value="amenity">Amenities</option><option value="articulo">Otros artículos</option></select></div><div class="field"><label>Unidad</label><input id="laundryUnit_new" value="unidad"></div><div class="field"><label>Precio (€)</label><input id="laundryPrice_new" type="number" min="0" step="0.01" value="0"></div></div><button class="btn gold" id="laundrySave_new" type="button" onclick="saveExtraLaundryProduct(\'__new__\')">Añadir artículo</button></details></div>';
  }
  const ownClient=role()==="client"&&!demoMode?await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle():null;
- let h='<div class="panel"><div class="panel-head"><div><h3>Pedidos extra</h3><div class="muted">Solicitudes independientes de ropa y amenities · entrega por apartamento · historial propio</div></div><button class="btn" onclick="reloadCurrentPage()">Actualizar</button></div>';
  if(canCreate){
-  h+='<form class="panel" style="background:var(--surface,#fffdf9);margin:12px 0" onsubmit="saveExtraOrder(event)"><div class="panel-head"><h3>Nuevo pedido</h3><span class="pill">Pedido independiente</span></div><div class="two"><div class="field"><label>Apartamento</label><select id="extraProperty" required><option value="">Seleccionar apartamento</option>'+props.map(p=>'<option value="'+esc(p.id)+'">'+esc((p.code?p.code+" · ":"")+p.name)+'</option>').join("")+'</select></div><div class="field"><label>Fecha de entrega</label><input id="extraDeliveryDate" type="date" min="'+new Date().toISOString().slice(0,10)+'" required value="'+new Date().toISOString().slice(0,10)+'"></div></div><div class="two"><div class="field"><label>Franja horaria (opcional)</label><input id="extraDeliveryWindow" placeholder="Ej. 10:00–13:00"></div><div class="field"><label>Amenities (€1,50 / unidad)</label><input id="extraAmenities" type="number" min="0" step="1" value="0"></div></div><div class="panel" style="margin:10px 0"><h4>Packs de ropa</h4><div class="three">'+EXTRA_PACKS.map((p,i)=>'<div class="field"><label>'+esc(p.label)+' · '+extraOrderMoney(p.price)+'</label><input id="extraPack'+i+'" type="number" min="0" step="1" value="0"></div>').join("")+'</div><div class="muted">Tarifas actuales del catálogo; confirma los importes antes de emitir cualquier factura.</div></div><div class="panel" style="margin:10px 0"><h4>Piezas sueltas</h4><div class="three">'+EXTRA_PIECES.map((p,i)=>'<div class="field"><label>'+esc(p.label)+'</label><input id="extraPiece'+i+'" type="number" min="0" step="1" value="0"></div>').join("")+'</div><div class="muted">Las piezas sueltas quedan pendientes de valoración hasta que administración confirme su precio.</div></div><div class="field"><label>Notas de entrega</label><textarea id="extraNotes" rows="2" placeholder="Instrucciones para el apartamento"></textarea></div><button class="btn gold" type="submit">＋ Crear pedido extra</button></form>';
+  h+='<form class="panel" style="background:var(--surface,#fffdf9);margin:12px 0" onsubmit="saveExtraOrder(event)"><div class="panel-head"><h3>Nuevo pedido</h3><span class="pill">Pedido independiente</span></div><div class="two"><div class="field"><label>Apartamento</label><select id="extraProperty" required><option value="">Seleccionar apartamento</option>'+props.filter(p=>role()!=="client"||p.client_id===ownClient?.data?.id).map(p=>'<option value="'+esc(p.id)+'">'+esc((p.code?p.code+" · ":"")+p.name)+'</option>').join("")+'</select></div><div class="field"><label>Fecha de entrega</label><input id="extraDeliveryDate" type="date" min="'+new Date().toISOString().slice(0,10)+'" required value="'+new Date().toISOString().slice(0,10)+'"></div></div><div class="two"><div class="field"><label>Franja horaria (opcional)</label><input id="extraDeliveryWindow" placeholder="Ej. 10:00–13:00"></div><div class="field"><label>Amenities</label><input id="extraAmenities" type="number" min="0" step="1" value="0"></div></div>';
+  Object.entries(groups).forEach(([cat,ps])=>{h+='<div class="panel" style="margin:10px 0"><h4>'+esc(categoryLabels[cat]||cat)+'</h4><div class="three">'+ps.map(p=>'<div class="field"><label>'+esc(p.name)+' · '+extraOrderMoney(p.price)+' / '+esc(p.unit||"unidad")+'</label><input id="extraCatalog_'+esc(p.product_key)+'" data-laundry-key="'+esc(p.product_key)+'" type="number" min="0" max="1000" step="1" value="0" '+(Number(p.price)<=0?'disabled':'')+'></div>').join("")+'</div></div>'});
+  h+='<div class="field"><label>Notas de entrega</label><textarea id="extraNotes" rows="2" placeholder="Instrucciones para el apartamento"></textarea></div><button class="btn gold" type="submit">＋ Crear pedido extra</button></form>';
  }
  h+='<div class="panel-head"><h3>Historial de pedidos</h3><span class="pill">'+orders.length+' pedidos</span></div>';
  if(!orders.length)h+='<div class="empty">Todavía no hay pedidos extra.</div>';
  else h+='<div class="table-wrap"><table class="table"><thead><tr><th>Pedido / entrega</th><th>Apartamento</th><th>Detalle</th><th>Total</th><th>Estado</th><th>Asignación / acciones</th></tr></thead><tbody>'+orders.map(o=>{
-  const p=props.find(x=>x.id===o.property_id);
-  const items=Array.isArray(o.items)?o.items:[];
-  const detail=items.map((it,idx)=>esc(it.label||it.code)+' × '+esc(it.qty)+' '+(it.unit_price==null||Number(it.unit_price)===0&&it.type==="piece"?'(pendiente de precio)':extraOrderMoney(Number(it.unit_price||0)*Number(it.qty||0)))).join('<br>');
-  const status=EXTRA_STATUS[o.status]||o.status;
-  let actions='';
-  if(["admin","supervisor"].includes(role())&&!demoMode){
-   actions+='<div class="field"><label>Asignar a mantenimiento</label><select onchange="assignExtraOrder(\''+o.id+'\',this.value)"><option value="">Sin asignar</option>'+staff.map(u=>'<option value="'+u.id+'" '+(o.assigned_to===u.id?'selected':'')+'>'+esc(u.full_name||u.email)+'</option>').join("")+'</select></div>';
-   actions+='<div class="field"><label>Estado</label><select onchange="changeExtraOrderStatus(\''+o.id+'\',this.value)">'+Object.keys(EXTRA_STATUS).map(k=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+EXTRA_STATUS[k]+'</option>').join("")+'</select></div>';
-  }else if(["employee","maintenance_technician"].includes(role())&&o.assigned_to===currentUser?.id&&!demoMode){
-   actions+='<div class="field"><label>Estado</label><select onchange="changeExtraOrderStatus(\''+o.id+'\',this.value)">'+["approved","preparing","delivered"].map(k=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+EXTRA_STATUS[k]+'</option>').join("")+'</select></div>';
-  }else actions+='<span class="muted">'+(o.assigned_to?"Asignado":"Pendiente de asignación")+'</span>';
-  if(o.pricing_pending&&["admin","supervisor"].includes(role())){
-   actions+='<div class="muted">Valorar piezas sueltas</div>'+items.map((it,idx)=>it.type==="piece"?'<div class="field"><label>'+esc(it.label)+' · '+it.qty+' ud.</label><input type="number" min="0" step="0.01" placeholder="€/unidad" value="'+(it.unit_price||"")+'" onchange="setExtraPiecePrice(\''+o.id+'\','+idx+',this.value)"></div>':'').join("");
-  }
+  const p=props.find(x=>x.id===o.property_id),items=Array.isArray(o.items)?o.items:[],detail=items.map(it=>esc(it.label||it.code)+' × '+esc(it.qty)+' '+(it.unit_price==null?'(pendiente de precio)':extraOrderMoney(Number(it.unit_price||0)*Number(it.qty||0)))).join('<br>'),status=EXTRA_STATUS[o.status]||o.status;let actions='';
+  if(isAdmin&&!demoMode){actions+='<div class="field"><label>Asignar a mantenimiento</label><select onchange="assignExtraOrder(\''+o.id+'\',this.value)"><option value="">Sin asignar</option>'+staff.map(u=>'<option value="'+u.id+'" '+(o.assigned_to===u.id?'selected':'')+'>'+esc(u.full_name||u.email)+'</option>').join("")+'</select></div><div class="field"><label>Estado</label><select onchange="changeExtraOrderStatus(\''+o.id+'\',this.value)">'+Object.keys(EXTRA_STATUS).map(k=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+EXTRA_STATUS[k]+'</option>').join("")+'</select></div>'}
+  else if(["employee","maintenance_technician"].includes(role())&&o.assigned_to===currentUser?.id&&!demoMode)actions+='<div class="field"><label>Estado</label><select onchange="changeExtraOrderStatus(\''+o.id+'\',this.value)">'+["approved","preparing","delivered"].map(k=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+EXTRA_STATUS[k]+'</option>').join("")+'</select></div>';
+  else actions+='<span class="muted">'+(o.assigned_to?"Asignado":"Pendiente de asignación")+'</span>';
   const hist=Array.isArray(o.status_history)?o.status_history:[];
   return '<tr><td><b>#'+esc(o.id.slice(0,8).toUpperCase())+'</b><br>'+esc(o.delivery_date)+'<br><small>'+esc(o.delivery_window||"")+'</small></td><td><b>'+esc(p?.code||o.property_code_snapshot||"")+'</b><br>'+esc(p?.name||o.property_name_snapshot||"Apartamento")+'</td><td>'+(detail||"—")+(Number(o.amenities_quantity)>0?'<br>Amenities × '+o.amenities_quantity+' · '+extraOrderMoney(Number(o.amenities_quantity)*Number(o.amenities_unit_price||1.5)):"")+(o.notes?'<br><small>'+esc(o.notes)+'</small>':"")+(hist.length?'<details><summary>Historial ('+hist.length+')</summary>'+hist.slice().reverse().map(ev=>'<div class="muted">'+esc(ev.at?new Date(ev.at).toLocaleString("es-ES"):"")+' · '+esc(ev.text||ev.status||"Actualización")+'</div>').join("")+'</details>':"")+'</td><td><b>'+extraOrderMoney(o.total)+'</b>'+(o.pricing_pending?'<br><small class="status urgent">Pendiente de valoración</small>':"")+'</td><td><span class="status '+(o.status==="delivered"?"approved":o.status==="cancelled"?"urgent":"pending")+'">'+esc(status)+'</span></td><td>'+actions+'</td></tr>';
  }).join("")+'</tbody></table></div>';
@@ -276,32 +290,18 @@ async function renderExtraOrders(){
 }
 async function saveExtraOrder(e){
  e.preventDefault();
- const propertyId=$("extraProperty").value, propText=$("extraProperty").selectedOptions[0]?.textContent||"";
- const items=[];
- EXTRA_PACKS.forEach((p,i)=>{const qty=Number($("extraPack"+i)?.value||0);if(qty>0)items.push({type:"pack",code:p.code,label:p.label,qty,unit_price:p.price})});
- EXTRA_PIECES.forEach((p,i)=>{const qty=Number($("extraPiece"+i)?.value||0);if(qty>0)items.push({type:"piece",code:p.code,label:p.label,qty,unit_price:null})});
+ const propertyId=$("extraProperty").value,items=[];
+ __extraLaundryCatalog.filter(p=>p.is_active).forEach(p=>{const qty=Number($("extraCatalog_"+p.product_key)?.value||0);if(qty>0)items.push({type:p.category==="pack"?"pack":"piece",code:p.product_key,label:p.name,qty,unit_price:Number(p.price||0),unit:p.unit||"unidad"})});
  const amenities=Number($("extraAmenities").value||0);
  if(!items.length&&!amenities){toast("Añade al menos un pack, una pieza o un amenity.");return}
- const pending=items.some(x=>x.type==="piece"&&x.unit_price==null);
- const total=items.reduce((sum,x)=>sum+(Number(x.unit_price||0)*x.qty),0)+amenities*1.5;
- const hist=[{at:new Date().toISOString(),status:"requested",text:"Pedido creado"}];
- if(demoMode){
-  window.__extraOrderDemo=window.__extraOrderDemo||[];
-  window.__extraOrderDemo.unshift({id:"demo-"+Date.now(),property_id:propertyId,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value,status_history:hist,assigned_to:null,created_at:new Date().toISOString()});
-  toast("Pedido guardado en la demostración.");return renderExtraOrders();
- }
+ const pending=false,total=items.reduce((sum,x)=>sum+(Number(x.unit_price||0)*x.qty),0)+amenities*1.5,hist=[{at:new Date().toISOString(),status:"requested",text:"Pedido creado"}];
+ if(demoMode){window.__extraOrderDemo=window.__extraOrderDemo||[];window.__extraOrderDemo.unshift({id:"demo-"+Date.now(),property_id:propertyId,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value,status_history:hist,assigned_to:null,created_at:new Date().toISOString()});toast("Pedido guardado en la demostración.");return renderExtraOrders()}
  const propertyRow=await sb.from("properties").select("id,client_id,code,name").eq("id",propertyId).maybeSingle();
  if(propertyRow.error||!propertyRow.data){toast(propertyRow.error?.message||"No se encontró el apartamento seleccionado.");return}
  let clientId=propertyRow.data.client_id;
- if(role()==="client"){
-  const c=await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle();
-  if(c.error||!c.data){toast(c.error?.message||"No se encontró el cliente asociado a este acceso.");return}
-  clientId=c.data.id;
- }
+ if(role()==="client"){const q=await sb.from("clients").select("id").eq("profile_id",currentUser.id).maybeSingle();if(q.error||!q.data){toast(q.error?.message||"No se encontró el cliente asociado a este acceso.");return}clientId=q.data.id}
  const payload={property_id:propertyId,property_code_snapshot:propertyRow.data.code,property_name_snapshot:propertyRow.data.name,client_id:clientId,requested_by:currentUser.id,delivery_date:$("extraDeliveryDate").value,delivery_window:$("extraDeliveryWindow").value||null,items,amenities_quantity:amenities,amenities_unit_price:1.5,total,pricing_pending:pending,status:"requested",notes:$("extraNotes").value||null,status_history:hist};
- const r=await sb.from("extra_orders").insert(payload);
- if(r.error){toast(r.error.message);return}
- toast("Pedido extra creado correctamente.");await renderExtraOrders();
+ const r=await sb.from("extra_orders").insert(payload);if(r.error){toast(r.error.message);return}toast("Pedido extra creado correctamente.");await renderExtraOrders();
 }
 async function changeExtraOrderStatus(id,status){
  if(demoMode){const o=(window.__extraOrderDemo||[]).find(x=>x.id===id);if(o){o.status=status;o.status_history=[...(o.status_history||[]),{at:new Date().toISOString(),status,text:"Estado: "+(EXTRA_STATUS[status]||status)}]}return renderExtraOrders()}
