@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-21-auto-update-v22">
+<head><meta name="romano-build" content="2026-10-29-protect-active-work-v23">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -4119,7 +4119,12 @@ async function registerRomanoServiceWorker(){
   if(!window.__romanoSWControllerWatch){
    window.__romanoSWControllerWatch=true;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
-    if(!window.__romanoAppReady||__authBusy||__romanoSWReloading)return;
+    if(!window.__romanoAppReady||__romanoSWReloading)return;
+    window.__romanoUpdatePending=true;
+    if(romanoHasUnsafeWorkInProgress()){
+     if(!__romanoUpdateToastShown){toast("Actualización disponible. Se aplicará cuando termine la operación actual.");__romanoUpdateToastShown=true}
+     return;
+    }
     __romanoSWReloading=true;
     window.location.reload();
    });
@@ -4181,6 +4186,7 @@ async function checkRomanoProductionUpdate(){
  }catch(e){}finally{__romanoUpdateCheckBusy=false}
 }
 setInterval(checkRomanoProductionUpdate,30000);
+setInterval(()=>{if(window.__romanoUpdatePending&&!romanoHasUnsafeWorkInProgress())romanoApplyPendingUpdate()},2000);
 document.addEventListener("visibilitychange",()=>{
  if(document.visibilityState==="visible"){
   if(romanoApplyPendingUpdate())return;
