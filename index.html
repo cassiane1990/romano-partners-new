@@ -3667,6 +3667,8 @@ function financeFilterProperties(){
 function financePropertyChanged(){
  const id=$("feProperty")?.value,p=(window.__financeProperties||[]).find(v=>v.id===id);
  if(p&&$("feClient")&&p.client_id)$("feClient").value=p.client_id;
+ if(p&&$("feTypology")&&!$("feTypology").value){const m=String(p.property_type||"").toUpperCase().match(/T[1-5]/);if(m)$("feTypology").value=m[0];}
+ if($("feCategory")?.value==="Limpeza"&&$("feTypology")?.value){const t=$("feTypology").value,opts=Array.from($("feCleaningType")?.options||[]),match=opts.find(v=>v.value.startsWith(t+"-"))||opts.find(v=>v.value===t);if(match){$("feCleaningType").value=match.value;financeCleaningChanged();}}
  financeTypologyChanged();
 }
 function financeCategoryChanged(){
