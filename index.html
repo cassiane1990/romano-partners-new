@@ -3587,7 +3587,7 @@ async function renderFinance(){
  const [sv,sc,fe,iv,pay]=await Promise.all([
   sb.from("services").select("id,typology,service_type,status,agreed_amount,finished_at,scheduled_at").eq("company_id",currentProfile.company_id).gte("finished_at",from).lt("finished_at",to).not("finished_at","is",null).not("status","in",'("cancelled","rejected","returned")'),
   sb.from("service_costs").select("id,service_id,category,description,amount,incurred_at").eq("company_id",currentProfile.company_id).gte("incurred_at",from).lt("incurred_at",to),
-  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",month+"-"+String(new Date(yy,mm,0).getDate()).padStart(2,"0")+"~").order("entry_date",{ascending:false}),
+  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
   sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
   sb.from("payments").select("amount,paid_at").eq("company_id",currentProfile.company_id).gte("paid_at",from).lt("paid_at",to)
  ]);
