@@ -3611,7 +3611,7 @@ async function renderFinance(){
  const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense")].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
  const typRows=typologies.map(t=>'<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].cost)+'</td><td><b>'+fmt(typ[t].revenue-typ[t].cost)+'</b></td></tr>').join("");
  const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
- const entryRows=entries.map(x=>'<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td>'+esc(x.description||"—")+'</td><td>'+esc(x.typology||"—")+'</td><td>'+Number(x.quantity||0)+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="deleteFinanceEntry('+JSON.stringify(x.id)+')">Apagar</button></td></tr>').join("");
+ const entryRows=entries.map(x=>'<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td>'+esc(x.description||"—")+'</td><td>'+esc(x.typology||"—")+(x.property_id?'<div class="muted">Apartamento associado</div>':"")+'</td><td>'+Number(x.quantity||0)+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="editFinanceEntry('+JSON.stringify(x.id)+')">Editar</button> <button class="btn" type="button" onclick="deleteFinanceEntry('+JSON.stringify(x.id)+')">Apagar</button></td></tr>').join("");
  $("content").innerHTML=
  '<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Mês: '+esc(month)+' · Os serviços concluídos vêm da operação; os lançamentos manuais ficam guardados no PostgreSQL.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button><button class="btn" type="button" onclick="newFinanceEntry()">＋ Novo lançamento</button></div></div>'+
  '<div class="grid"><div class="stat"><small>Faturação de limpezas/serviços</small><strong>'+fmt(serviceRevenue)+'</strong></div><div class="stat"><small>Vendas extras</small><strong>'+fmt(extraIncome)+'</strong></div><div class="stat"><small>Despesas totais</small><strong>'+fmt(totalExpense)+'</strong></div><div class="stat"><small>Resultado operacional estimado</small><strong>'+fmt(operating)+'</strong></div></div>'+
@@ -3623,28 +3623,42 @@ async function renderFinance(){
 }
 function newFinanceEntry(){
  if(role()!=="admin"){toast("Apenas o Administrador pode registar movimentos financeiros.");return}
- openModal("Novo lançamento financeiro",
- '<form onsubmit="saveFinanceEntry(event)"><div class="two"><div class="field"><label>Tipo</label><select id="feType"><option value="expense">Despesa</option><option value="income">Receita / venda extra</option></select></div><div class="field"><label>Data</label><input id="feDate" type="date" value="'+new Date().toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})+'" required></div></div>'+
- '<div class="two"><div class="field"><label>Categoria</label><select id="feCategory"><option>Salários</option><option>Lavandaria</option><option>Montagem de apartamentos</option><option>Amenities</option><option>Kits de cozinha</option><option>Transporte e deslocações</option><option>Materiais de limpeza</option><option>Renda e despesas fixas</option><option>Água, luz e comunicações</option><option>Manutenção</option><option>Venda de roupa / packs</option><option>Venda de amenities / kits</option><option>Outras receitas</option><option>Outras despesas</option></select></div><div class="field"><label>Tipologia (opcional)</label><select id="feTypology"><option value="">Sem tipologia</option><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div>'+
- '<div class="field"><label>Descrição</label><input id="feDescription" maxlength="180" placeholder="Ex.: salário de outubro, venda de pack casal..."></div>'+
- '<div class="two"><div class="field"><label>Quantidade</label><input id="feQuantity" type="number" min="0" step="0.01" value="1" required></div><div class="field"><label>Valor unitário (€)</label><input id="feUnitAmount" type="number" min="0" step="0.01" value="0" required></div></div>'+
- '<div class="muted" style="margin:8px 0">Total calculado automaticamente: quantidade × valor unitário.</div><div class="actions"><button class="btn gold" type="submit">Guardar lançamento</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>');
+ openFinanceEntryForm(null);
 }
-async function saveFinanceEntry(e){
- e.preventDefault();
- if(role()!=="admin"){toast("Apenas o Administrador pode registar movimentos financeiros.");return}
+async function editFinanceEntry(id){
+ if(role()!=="admin"||!id)return;
+ const r=await sb.from("finance_entries").select("*").eq("id",id).eq("company_id",currentProfile.company_id).single();
+ if(r.error||!r.data){toast("Não foi possível abrir o lançamento: "+(r.error?.message||"não encontrado"));return}
+ openFinanceEntryForm(r.data);
+}
+async function openFinanceEntryForm(x){
+ const [cr,pr]=await Promise.all([sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name"),sb.from("properties").select("id,name,code,client_id").eq("company_id",currentProfile.company_id).order("name")]);
+ if(cr.error||pr.error){toast("Não foi possível carregar clientes e apartamentos.");return}
+ window.__financeProperties=pr.data||[];
+ const clients=(cr.data||[]).map(v=>'<option value="'+v.id+'" '+(x?.client_id===v.id?"selected":"")+' >'+esc(v.name)+'</option>').join("");
+ const props=(pr.data||[]).map(v=>'<option value="'+v.id+'" '+(x?.property_id===v.id?"selected":"")+' >'+esc(v.name||v.code)+' · '+esc(v.code||"")+'</option>').join("");
+ const cats=["Salários","Lavandaria","Montagem de apartamentos","Amenities","Kits de cozinha","Transporte e deslocações","Materiais de limpeza","Renda e despesas fixas","Água, luz e comunicações","Manutenção","Venda de roupa / packs","Venda de amenities / kits","Outras receitas","Outras despesas"];
+ openModal(x?"Editar lançamento financeiro":"Novo lançamento financeiro",
+ '<form onsubmit="saveFinanceEntry(event,'+(x?JSON.stringify(x.id):"null")+')"><div class="two"><div class="field"><label>Tipo</label><select id="feType"><option value="expense" '+(x?.entry_type==="expense"?"selected":"")+' >Despesa</option><option value="income" '+(x?.entry_type==="income"?"selected":"")+' >Receita / venda extra</option></select></div><div class="field"><label>Data</label><input id="feDate" type="date" value="'+esc(x?.entry_date||new Date().toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"}))+'" required></div></div>'+
+ '<div class="two"><div class="field"><label>Cliente</label><select id="feClient"><option value="">Sem cliente</option>'+clients+'</select></div><div class="field"><label>Apartamento</label><select id="feProperty"><option value="">Sem apartamento</option>'+props+'</select></div></div>'+
+ '<div class="two"><div class="field"><label>Categoria</label><select id="feCategory">'+cats.map(v=>'<option '+(x?.category===v?"selected":"")+' >'+v+'</option>').join("")+'</select></div><div class="field"><label>Tipologia</label><select id="feTypology"><option value="">Sem tipologia</option>'+["T1","T2","T3","T4","T5"].map(v=>'<option '+(x?.typology===v?"selected":"")+' >'+v+'</option>').join("")+'</select></div></div>'+
+ '<div class="field"><label>Descrição / trabalho realizado</label><textarea id="feDescription" maxlength="500">'+esc(x?.description||"")+'</textarea></div>'+
+ '<div class="two"><div class="field"><label>Quantidade / horas</label><input id="feQuantity" type="number" min="0.01" step="0.01" value="'+Number(x?.quantity||1)+'" required></div><div class="field"><label>Valor unitário ou valor por hora (€)</label><input id="feUnitAmount" type="number" min="0" step="0.01" value="'+Number(x?.unit_amount||0)+'" required></div></div>'+
+ '<div class="muted" style="margin:8px 0">Total calculado automaticamente: quantidade × valor unitário. Para manutenção, indique as horas e o valor por hora.</div><div class="actions"><button class="btn gold" type="submit">Guardar</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>');
+}
+async function saveFinanceEntry(e,id=null){
+ e.preventDefault();if(role()!=="admin"){toast("Apenas o Administrador pode guardar movimentos financeiros.");return}
  const quantity=Number($("feQuantity").value),unit=Number($("feUnitAmount").value);
- if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unit)||unit<0){toast("Confirme a quantidade e o valor unitário.");return}
- const payload={company_id:currentProfile.company_id,entry_type:$("feType").value,category:$("feCategory").value,description:$("feDescription").value.trim()||null,typology:$("feTypology").value||null,quantity,unit_amount:unit,entry_date:$("feDate").value,created_by:currentUser.id};
- const r=await sb.from("finance_entries").insert(payload).select("id").single();
- if(r.error){toast("Não foi possível guardar: "+r.error.message);return}
- closeModal();toast("Lançamento financeiro guardado.");await renderFinance();
+ if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unit)||unit<0){toast("Confirme a quantidade/horas e o valor unitário.");return}
+ const propertyId=$("feProperty").value||null;const property=(window.__financeProperties||[]).find(v=>v.id===propertyId);
+ const payload={entry_type:$("feType").value,category:$("feCategory").value,description:$("feDescription").value.trim()||null,typology:$("feTypology").value||null,quantity,unit_amount:unit,entry_date:$("feDate").value,client_id:$("feClient").value||property?.client_id||null,property_id:propertyId,hours:$("feCategory").value==="Manutenção"?quantity:null,unit_label:$("feCategory").value==="Manutenção"?"hora":null};
+ const query=id?sb.from("finance_entries").update(payload).eq("id",id).eq("company_id",currentProfile.company_id):sb.from("finance_entries").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id});
+ const r=await query.select("id").single();if(r.error){toast("Não foi possível guardar: "+r.error.message);return}
+ closeModal();toast(id?"Lançamento atualizado.":"Lançamento financeiro guardado.");await renderFinance();
 }
 async function deleteFinanceEntry(id){
- if(role()!=="admin"||!id)return;
- if(!confirm("Apagar este lançamento financeiro?"))return;
- const r=await sb.from("finance_entries").delete().eq("id",id).eq("company_id",currentProfile.company_id);
- if(r.error){toast("Não foi possível apagar: "+r.error.message);return}
+ if(role()!=="admin"||!id)return;if(!confirm("Tem a certeza de que pretende apagar este lançamento? Esta ação não pode ser desfeita."))return;
+ const r=await sb.from("finance_entries").delete().eq("id",id).eq("company_id",currentProfile.company_id);if(r.error){toast("Não foi possível apagar: "+r.error.message);return}
  toast("Lançamento apagado.");await renderFinance();
 }
 
