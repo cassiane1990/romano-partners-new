@@ -3565,7 +3565,87 @@ async function renderDocuments(){
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Documentos seguros</h3><div class="muted">Documentación vinculada a clientes · Storage privado + RLS</div></div></div><p class="muted">Cada archivo queda asociado a un cliente concreto y el acceso se valida en el backend.</p>'+(cards.length?'<table class="table"><thead><tr><th>Cliente</th><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+cards.map(x=>'<tr><td>'+esc(x.clients?.name||"—")+'</td><td>'+esc(x.title)+'</td><td>'+esc(documentTypeLabel(x.document_type))+'</td><td>'+esc(x.file_name)+' · '+formatFileSize(x.size_bytes)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td><td>'+(x._url?'<a class="btn" href="'+esc(x._url)+'" target="_blank" rel="noopener">Ver / Descargar</a>':"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos cargados.</div>')+'</div>';
 }
 
-async function renderFinance(){const r=demoMode?{data:DEMO_INVOICES,error:null}:{data:null,error:null};const p=demoMode?{data:DEMO_PAYMENTS,error:null}:{data:null,error:null};if(!demoMode){const q=await sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100);const pp=await sb.from("payments").select("amount,method,paid_at").order("paid_at",{ascending:false}).limit(20);r.data=q.data;r.error=q.error;p.data=pp.data;p.error=pp.error}$("content").innerHTML='<div class="grid"><div class="stat"><small>Facturas</small><strong>'+((r.data||[]).length)+'</strong></div><div class="stat"><small>Total facturado</small><strong>'+((r.data||[]).reduce((a,x)=>a+Number(x.total||0),0)).toFixed(2)+' €</strong></div><div class="stat"><small>Pagos registrados</small><strong>'+((p.data||[]).length)+'</strong></div><div class="stat"><small>Pagado</small><strong>'+((p.data||[]).reduce((a,x)=>a+Number(x.amount||0),0)).toFixed(2)+' €</strong></div></div><div class="panel"><div class="panel-head"><h3>Facturación</h3><span class="pill">Servicio → factura → pago → costes → margen</span></div>'+(r.data?.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Base</th><th>IVA</th><th>Total</th><th>Vencimiento</th></tr></thead><tbody>'+r.data.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.status)+'</td><td>'+Number(x.subtotal||0).toFixed(2)+' €</td><td>'+Number(x.tax_amount||0).toFixed(2)+' €</td><td><strong>'+Number(x.total||0).toFixed(2)+' €</strong></td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas. Los valores reales de ROMANO PROPERTY CARE se introducirán cuando sean incorporados al sistema.</div>')+'</div>'}
+async function renderFinance(){
+ const admin=role()==="admin";
+ const monthDefault=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit"}).format(new Date());
+ const month=(document.getElementById("financeMonth")?.value||monthDefault);
+ const [yy,mm]=month.split("-").map(Number);
+ const from=new Date(yy,mm-1,1).toISOString();
+ const to=new Date(yy,mm,1).toISOString();
+ const fmt=v=>Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"});
+ if(!admin){
+  const [iv,pay]=await Promise.all([
+   sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100),
+   sb.from("payments").select("amount,method,paid_at").order("paid_at",{ascending:false}).limit(100)
+  ]);
+  if(iv.error||pay.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc((iv.error||pay.error).message)+'</div></div>';return}
+  const invoices=iv.data||[],payments=pay.data||[];
+  $("content").innerHTML='<div class="grid"><div class="stat"><small>Facturas</small><strong>'+invoices.length+'</strong></div><div class="stat"><small>Total facturado</small><strong>'+fmt(invoices.reduce((a,x)=>a+Number(x.total||0),0))+'</strong></div><div class="stat"><small>Pagos registrados</small><strong>'+payments.length+'</strong></div><div class="stat"><small>Pagado</small><strong>'+fmt(payments.reduce((a,x)=>a+Number(x.amount||0),0))+'</strong></div></div><div class="panel"><h3>Facturación</h3>'+(invoices.length?'<table class="table"><thead><tr><th>Nº</th><th>Estado</th><th>Total</th><th>Vencimiento</th></tr></thead><tbody>'+invoices.map(x=>'<tr><td>'+esc(x.number)+'</td><td>'+esc(x.status)+'</td><td>'+fmt(x.total)+'</td><td>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay facturas registradas.</div>')+'</div>';
+  return;
+ }
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Registo mensal de receitas, vendas, custos e despesas.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button></div></div><div class="empty">A carregar os valores do mês...</div></div>';
+ const [sv,sc,fe,iv,pay]=await Promise.all([
+  sb.from("services").select("id,typology,service_type,status,agreed_amount,finished_at,scheduled_at").eq("company_id",currentProfile.company_id).gte("finished_at",from).lt("finished_at",to).not("finished_at","is",null).not("status","in",'("cancelled","rejected","returned")'),
+  sb.from("service_costs").select("id,service_id,category,description,amount,incurred_at").eq("company_id",currentProfile.company_id).gte("incurred_at",from).lt("incurred_at",to),
+  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",month+"-"+String(new Date(yy,mm,0).getDate()).padStart(2,"0")+"~").order("entry_date",{ascending:false}),
+  sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
+  sb.from("payments").select("amount,paid_at").eq("company_id",currentProfile.company_id).gte("paid_at",from).lt("paid_at",to)
+ ]);
+ const errors=[sv.error,sc.error,fe.error,iv.error,pay.error].filter(Boolean);
+ if(errors.length){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(errors[0].message)+'</div><div class="muted">Verifique as permissões financeiras e a migração do módulo.</div></div>';return}
+ const services=sv.data||[],costs=sc.data||[],entries=fe.data||[],invoices=iv.data||[],payments=pay.data||[];
+ const ids=services.map(x=>x.id);
+ let finBy={};
+ if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
+ const serviceCosts={};
+ costs.forEach(x=>{if(x.service_id)serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0)});
+ const typologies=["T1","T2","T3","T4","T5"];
+ const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,cost:0});
+ let serviceRevenue=0;
+ services.forEach(x=>{const t=String(x.typology||"").toUpperCase();if(!typ[t])return;typ[t].count++;const rev=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0);typ[t].revenue+=rev;typ[t].cost+=serviceCosts[x.id]||0;serviceRevenue+=rev});
+ const extraIncome=entries.filter(x=>x.entry_type==="income").reduce((a,x)=>a+Number(x.amount||0),0);
+ const manualExpense=entries.filter(x=>x.entry_type==="expense").reduce((a,x)=>a+Number(x.amount||0),0);
+ const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0);
+ const totalRevenue=serviceRevenue+extraIncome,totalExpense=directExpense+manualExpense,operating=totalRevenue-totalExpense;
+ const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense")].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
+ const typRows=typologies.map(t=>'<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].cost)+'</td><td><b>'+fmt(typ[t].revenue-typ[t].cost)+'</b></td></tr>').join("");
+ const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
+ const entryRows=entries.map(x=>'<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td>'+esc(x.description||"—")+'</td><td>'+esc(x.typology||"—")+'</td><td>'+Number(x.quantity||0)+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="deleteFinanceEntry('+JSON.stringify(x.id)+')">Apagar</button></td></tr>').join("");
+ $("content").innerHTML=
+ '<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Mês: '+esc(month)+' · Os serviços concluídos vêm da operação; os lançamentos manuais ficam guardados no PostgreSQL.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button><button class="btn" type="button" onclick="newFinanceEntry()">＋ Novo lançamento</button></div></div>'+
+ '<div class="grid"><div class="stat"><small>Faturação de limpezas/serviços</small><strong>'+fmt(serviceRevenue)+'</strong></div><div class="stat"><small>Vendas extras</small><strong>'+fmt(extraIncome)+'</strong></div><div class="stat"><small>Despesas totais</small><strong>'+fmt(totalExpense)+'</strong></div><div class="stat"><small>Resultado operacional estimado</small><strong>'+fmt(operating)+'</strong></div></div>'+
+ '<div class="grid"><div class="stat"><small>Limpezas concluídas</small><strong>'+services.length+'</strong></div><div class="stat"><small>Receita total</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>Faturas emitidas (informativo)</small><strong>'+fmt(invoices.reduce((a,x)=>a+Number(x.total||0),0))+'</strong></div><div class="stat"><small>Pagamentos recebidos (informativo)</small><strong>'+fmt(payments.reduce((a,x)=>a+Number(x.amount||0),0))+'</strong></div></div></div>'+
+ '<div class="panel"><div class="panel-head"><h3>Produção e margem por tipologia</h3><span class="muted">Margem de contribuição = receita dos serviços − custos diretamente associados</span></div><table class="table"><thead><tr><th>Tipologia</th><th>Quantidade</th><th>Receita</th><th>Custos diretos</th><th>Margem</th></tr></thead><tbody>'+typRows+'</tbody></table></div>'+
+ '<div class="panel"><div class="panel-head"><h3>Despesas por categoria</h3><span class="muted">Inclui custos ligados a serviços e lançamentos gerais.</span></div>'+(expenseRows?'<table class="table"><thead><tr><th>Categoria</th><th>Total</th></tr></thead><tbody>'+expenseRows+'</tbody></table>':'<div class="empty">Ainda não existem despesas registadas neste mês.</div>')+'</div>'+
+ '<div class="panel"><div class="panel-head"><h3>Lançamentos manuais</h3><span class="muted">Vendas extras, salários, lavandaria, montagem, amenities, kits, transporte e despesas fixas.</span></div>'+(entryRows?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Tipologia</th><th>Qtd.</th><th>Valor</th><th></th></tr></thead><tbody>'+entryRows+'</tbody></table></div>':'<div class="empty">Nenhum lançamento manual. Use “Novo lançamento” para registar vendas extras ou despesas.</div>')+'</div>'+
+ '<div class="panel"><div class="muted"><b>Nota:</b> as faturas e os pagamentos são apresentados separadamente para não somar duas vezes a mesma receita. Despesas sem tipologia entram no resultado mensal, mas não são distribuídas artificialmente pelas margens T1–T5.</div></div>';
+}
+function newFinanceEntry(){
+ if(role()!=="admin"){toast("Apenas o Administrador pode registar movimentos financeiros.");return}
+ openModal("Novo lançamento financeiro",
+ '<form onsubmit="saveFinanceEntry(event)"><div class="two"><div class="field"><label>Tipo</label><select id="feType"><option value="expense">Despesa</option><option value="income">Receita / venda extra</option></select></div><div class="field"><label>Data</label><input id="feDate" type="date" value="'+new Date().toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})+'" required></div></div>'+
+ '<div class="two"><div class="field"><label>Categoria</label><select id="feCategory"><option>Salários</option><option>Lavandaria</option><option>Montagem de apartamentos</option><option>Amenities</option><option>Kits de cozinha</option><option>Transporte e deslocações</option><option>Materiais de limpeza</option><option>Renda e despesas fixas</option><option>Água, luz e comunicações</option><option>Manutenção</option><option>Venda de roupa / packs</option><option>Venda de amenities / kits</option><option>Outras receitas</option><option>Outras despesas</option></select></div><div class="field"><label>Tipologia (opcional)</label><select id="feTypology"><option value="">Sem tipologia</option><option>T1</option><option>T2</option><option>T3</option><option>T4</option><option>T5</option></select></div></div>'+
+ '<div class="field"><label>Descrição</label><input id="feDescription" maxlength="180" placeholder="Ex.: salário de outubro, venda de pack casal..."></div>'+
+ '<div class="two"><div class="field"><label>Quantidade</label><input id="feQuantity" type="number" min="0" step="0.01" value="1" required></div><div class="field"><label>Valor unitário (€)</label><input id="feUnitAmount" type="number" min="0" step="0.01" value="0" required></div></div>'+
+ '<div class="muted" style="margin:8px 0">Total calculado automaticamente: quantidade × valor unitário.</div><div class="actions"><button class="btn gold" type="submit">Guardar lançamento</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>');
+}
+async function saveFinanceEntry(e){
+ e.preventDefault();
+ if(role()!=="admin"){toast("Apenas o Administrador pode registar movimentos financeiros.");return}
+ const quantity=Number($("feQuantity").value),unit=Number($("feUnitAmount").value);
+ if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unit)||unit<0){toast("Confirme a quantidade e o valor unitário.");return}
+ const payload={company_id:currentProfile.company_id,entry_type:$("feType").value,category:$("feCategory").value,description:$("feDescription").value.trim()||null,typology:$("feTypology").value||null,quantity,unit_amount:unit,entry_date:$("feDate").value,created_by:currentUser.id};
+ const r=await sb.from("finance_entries").insert(payload).select("id").single();
+ if(r.error){toast("Não foi possível guardar: "+r.error.message);return}
+ closeModal();toast("Lançamento financeiro guardado.");await renderFinance();
+}
+async function deleteFinanceEntry(id){
+ if(role()!=="admin"||!id)return;
+ if(!confirm("Apagar este lançamento financeiro?"))return;
+ const r=await sb.from("finance_entries").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("Não foi possível apagar: "+r.error.message);return}
+ toast("Lançamento apagado.");await renderFinance();
+}
 
 
 function romanoCatalogCategoryLabel(category){
