@@ -3632,17 +3632,18 @@ async function editFinanceEntry(id){
  openFinanceEntryForm(r.data);
 }
 async function openFinanceEntryForm(x){
- const [cr,pr,mc]=await Promise.all([
+ const [cr,pr,mc,cc]=await Promise.all([
   sb.from("clients").select("id,name").eq("company_id",currentProfile.company_id).order("name"),
   sb.from("properties").select("id,name,code,client_id,property_type").eq("company_id",currentProfile.company_id).order("name"),
-  sb.from("service_catalog").select("id,name,price,unit,active").eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name")
+  sb.from("service_catalog").select("id,name,price,unit,active").eq("company_id",currentProfile.company_id).eq("category","maintenance").eq("active",true).order("name"),
+  sb.from("service_catalog").select("id,code,name,price,unit,active").eq("company_id",currentProfile.company_id).eq("category","cleaning").eq("active",true).order("name")
  ]);
  if(cr.error||pr.error){toast("Não foi possível carregar clientes e apartamentos.");return}
  window.__financeProperties=pr.data||[];
  const clients=(cr.data||[]).map(v=>'<option value="'+v.id+'" '+(x?.client_id===v.id?"selected":"")+' >'+esc(v.name)+'</option>').join("");
  const props=(pr.data||[]).map(v=>'<option value="'+v.id+'" '+(x?.property_id===v.id?"selected":"")+' >'+esc(v.name||v.code)+' · '+esc(v.code||"")+(v.property_type?" · "+esc(v.property_type):"")+'</option>').join("");
  const maint=(mc.data||[]).map(v=>'<option value="'+v.id+'" data-rate="'+Number(v.price||0)+'">'+esc(v.name)+' · '+Number(v.price||0).toFixed(2)+' € / '+esc(v.unit||"hora")+'</option>').join("");
- const clean=(MASTER_PRICES.cleaning||[]).map(v=>'<option value="'+v.code+'" data-price="'+(v.price==null?"":v.price)+'">'+esc(v.name)+' · '+(v.price==null?"Consultar":Number(v.price).toFixed(2)+" €")+'</option>').join("");
+ const clean=(cc.data||[]).map(v=>'<option value="'+v.code+'" data-price="'+(v.price==null?"":v.price)+'">'+esc(v.name)+' · '+(v.price==null?"Consultar":Number(v.price).toFixed(2)+" €")+'</option>').join("");
  const cats=["Limpeza","Manutenção","Salários","Lavandaria","Montagem de apartamentos","Amenities","Kits de cozinha","Transporte e deslocações","Materiais de limpeza","Renda e despesas fixas","Água, luz e comunicações","Venda de roupa / packs","Venda de amenities / kits","Outras receitas","Outras despesas"];
  const selectedCat=x?.category||"Limpeza";
  openModal(x?"Editar lançamento financeiro":"Novo lançamento financeiro",
@@ -3679,8 +3680,8 @@ function financeCategoryChanged(){
 function financeTypologyChanged(){
  if($("feCategory")?.value!=="Limpeza")return;
  const t=$("feTypology")?.value;if(!t)return;
- const opts=MASTER_PRICES.cleaning||[],match=opts.find(v=>v.code===t)||opts.find(v=>v.code.startsWith(t+"-"));
- if(match&&$("feUnitAmount"))$("feUnitAmount").value=match.price==null?0:match.price;
+ const opts=Array.from($("feCleaningType")?.options||[]),match=opts.find(v=>v.value===t)||opts.find(v=>v.value.startsWith(t+"-"));
+ if(match&&$("feUnitAmount"))$("feUnitAmount").value=match.dataset.price||0;
  financeRecalc();
 }
 function financeCleaningChanged(){
