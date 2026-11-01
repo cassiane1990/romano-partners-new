@@ -3591,7 +3591,7 @@ async function renderFinance(){
   sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
   sb.from("payments").select("amount,paid_at").eq("company_id",currentProfile.company_id).gte("paid_at",from).lt("paid_at",to),
   sb.from("properties").select("id,name,code,beds_single,beds_double").eq("company_id",currentProfile.company_id),
-  sb.from("company_cost_catalog").select("id,cost_key,name,unit,unit_cost,is_active").eq("company_id",currentProfile.company_id).eq("is_active",true).order("name")
+  sb.from("company_cost_catalog").select("id,cost_key,name,unit,unit_cost,is_active").eq("company_id",currentProfile.company_id).order("name")
  ]);
  const errors=[sv.error,sc.error,fe.error,iv.error,pay.error,pr.error,cc.error].filter(Boolean);
  if(errors.length){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(errors[0].message)+'</div><div class="muted">Verifique as permissões financeiras e a migração do módulo.</div></div>';return}
@@ -3599,7 +3599,7 @@ async function renderFinance(){
  const ids=services.map(x=>x.id);
  let finBy={};
  if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
- const costByKey={};costCatalog.forEach(c=>costByKey[c.cost_key]=Number(c.unit_cost||0));
+ const costByKey={};costCatalog.filter(c=>c.is_active).forEach(c=>costByKey[c.cost_key]=Number(c.unit_cost||0));
  const costValue=(key,fallback)=>costByKey[key]??fallback;
  const serviceCosts={},serviceCostCategories={};
  costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
@@ -3642,7 +3642,7 @@ async function renderFinance(){
   const revenue=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0)+linkedIncome,allDirect=direct+linkedExpense,profit=revenue-allDirect-fixedPerService;
   return '<tr><td>'+esc(p.name||p.code||"Apartamento")+'</td><td>'+typ+'</td><td>'+beds+'</td><td>'+fmt(revenue)+'</td><td>'+fmt(allDirect)+'</td><td>'+fmt(fixedPerService)+'</td><td><b>'+fmt(profit)+'</b></td></tr>';
  }).join("");
- const costCatalogRows=costCatalog.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.unit)+'</td><td><input type="number" min="0" step="0.01" id="cost_'+c.id+'" value="'+Number(c.unit_cost||0).toFixed(2)+'" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost(\''+c.id+'\')">Guardar</button></td></tr>').join("");
+ const costCatalogRows=costCatalog.map(c=>'<tr><td>'+esc(c.name)+(c.is_active?'':' <span class="pill">Inativo</span>')+'</td><td>'+esc(c.unit)+'</td><td><input type="number" min="0" step="0.01" id="cost_'+c.id+'" value="'+Number(c.unit_cost||0).toFixed(2)+'" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost(\\''+c.id+'\\')">Guardar</button> <button class="btn" type="button" onclick="toggleCompanyCost(\\''+c.id+'\\', '+(!c.is_active)+')">'+(c.is_active?'Desativar':'Reativar')+'</button> <button class="btn" type="button" onclick="deleteCompanyCost(\\''+c.id+'\\')">Excluir</button></td></tr>').join("");
  const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense"),...(recordedPayroll>0?[]:[{category:"Salários",amount:payroll}]),...(transportRecorded>0?[]:[{category:"Transportes",amount:transport}]),...(autoLaundryCost?[{category:"Lavandaria (custo por cama)",amount:autoLaundryCost}]:[]),...(autoAmenitiesCost?[{category:"Amenities",amount:autoAmenitiesCost}]:[]),...(autoKitchenCost?[{category:"Kit cozinha",amount:autoKitchenCost}]:[])].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
  const typRows=typologies.map(t=>'<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].cost)+'</td><td><b>'+fmt(typ[t].revenue-typ[t].cost)+'</b></td></tr>').join("");
  const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
@@ -3666,6 +3666,21 @@ async function saveCompanyCost(id){
  if(r.error){toast("Não foi possível atualizar: "+r.error.message);return}
  toast("Custo atualizado. Os próximos cálculos já usarão este valor.");renderFinance();
 }
+async function toggleCompanyCost(id,active){
+ if(role()!=="admin"||!id)return;
+ if(!confirm(active?"Reativar este custo? Voltará a entrar nos cálculos.":"Desativar este custo? Deixará de entrar nos cálculos futuros."))return;
+ const r=await sb.from("company_cost_catalog").update({is_active:active,updated_at:new Date().toISOString(),updated_by:currentUser.id}).eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("Não foi possível alterar o custo: "+r.error.message);return}
+ toast(active?"Custo reativado.":"Custo desativado.");await renderFinance();
+}
+async function deleteCompanyCost(id){
+ if(role()!=="admin"||!id)return;
+ if(!confirm("Excluir definitivamente este custo do catálogo? Esta ação não pode ser desfeita."))return;
+ const r=await sb.from("company_cost_catalog").delete().eq("id",id).eq("company_id",currentProfile.company_id);
+ if(r.error){toast("Não foi possível excluir: "+r.error.message);return}
+ toast("Custo excluído do catálogo.");await renderFinance();
+}
+
 function newFinanceEntry(){
  if(role()!=="admin"){toast("Apenas o Administrador pode registar movimentos financeiros.");return}
  openFinanceEntryForm(null);
