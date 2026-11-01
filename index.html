@@ -3587,7 +3587,7 @@ async function renderFinance(){
  const [sv,sc,fe,iv,pay,pr,cc]=await Promise.all([
   sb.from("services").select("id,client_id,property_id,typology,service_type,status,agreed_amount,finished_at,scheduled_at").eq("company_id",currentProfile.company_id).in("status",["completed","approved","supervised"]).gte("finished_at",from).lt("finished_at",to),
   sb.from("service_costs").select("id,service_id,category,description,amount,incurred_at").eq("company_id",currentProfile.company_id).gte("incurred_at",from).lt("incurred_at",to),
-  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
+  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at,property_id").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
   sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
   sb.from("payments").select("amount,paid_at").eq("company_id",currentProfile.company_id).gte("paid_at",from).lt("paid_at",to),
   sb.from("properties").select("id,name,code,beds_single,beds_double").eq("company_id",currentProfile.company_id),
@@ -3628,14 +3628,17 @@ async function renderFinance(){
  const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",195);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0)+autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
  const totalRevenue=serviceRevenue+extraIncome,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
- const monthlyCleaningCount=completedServices.filter(x=>/limpez|clean|housekeep/i.test(String(x.service_type||""))||!!x.typology).length;
- const fixedPerService=monthlyCleaningCount?(payroll+transport)/monthlyCleaningCount:0;
+ const sharedOther=manualExpense-transportRecorded;
+ const monthlyCleaningCount=completedServices.filter(x=>!!String(x.typology||"").match(/T[1-5]/i)).length;
+ const fixedPerService=monthlyCleaningCount?(payroll+transport+sharedOther)/monthlyCleaningCount:0;
+ const entriesByProperty={};entries.forEach(e=>{if(e.property_id)(entriesByProperty[e.property_id]??=[]).push(e)});
  const propertyDetailRows=completedServices.map(x=>{
   const p=propertyBy[x.property_id]||{},typ=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]||"—";
   const beds=Number(p.beds_single||0)+Number(p.beds_double||0),cats=serviceCostCategories[x.id]||[];
   const direct=Number(serviceCosts[x.id]||0)+(cats.some(c=>/lavand|laundry|roupa|linen/.test(c))?0:beds*costValue("laundry_bed",8.74))+(cats.some(c=>/amenit/.test(c))?0:costValue("amenities",0.86))+(cats.some(c=>/kit.*cozinha|cozinha.*kit|welcome kit/.test(c))?0:costValue("kitchen_kit",0.45));
-  const revenue=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0),profit=revenue-direct-fixedPerService;
-  return '<tr><td>'+esc(p.name||p.code||"Apartamento")+'</td><td>'+typ+'</td><td>'+beds+'</td><td>'+fmt(revenue)+'</td><td>'+fmt(direct)+'</td><td>'+fmt(fixedPerService)+'</td><td><b>'+fmt(profit)+'</b></td></tr>';
+  const linked=entriesByProperty[x.property_id]||[],linkedIncome=linked.filter(e=>e.entry_type==="income").reduce((a,e)=>a+Number(e.amount||0),0),linkedExpense=linked.filter(e=>e.entry_type==="expense").reduce((a,e)=>a+Number(e.amount||0),0);
+  const revenue=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0)+linkedIncome,allDirect=direct+linkedExpense,profit=revenue-allDirect-fixedPerService;
+  return '<tr><td>'+esc(p.name||p.code||"Apartamento")+'</td><td>'+typ+'</td><td>'+beds+'</td><td>'+fmt(revenue)+'</td><td>'+fmt(allDirect)+'</td><td>'+fmt(fixedPerService)+'</td><td><b>'+fmt(profit)+'</b></td></tr>';
  }).join("");
  const costCatalogRows=costCatalog.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.unit)+'</td><td><input type="number" min="0" step="0.01" id="cost_'+c.id+'" value="'+Number(c.unit_cost||0).toFixed(2)+'" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost(\''+c.id+'\')">Guardar</button></td></tr>').join("");
  const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense"),...(recordedPayroll>0?[]:[{category:"Salários",amount:payroll}]),...(transportRecorded>0?[]:[{category:"Transportes",amount:transport}]),...(autoLaundryCost?[{category:"Lavandaria (custo por cama)",amount:autoLaundryCost}]:[]),...(autoAmenitiesCost?[{category:"Amenities",amount:autoAmenitiesCost}]:[]),...(autoKitchenCost?[{category:"Kit cozinha",amount:autoKitchenCost}]:[])].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
