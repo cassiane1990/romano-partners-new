@@ -3603,6 +3603,7 @@ async function renderFinance(){
  const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,cost:0});
  let serviceRevenue=0;
  services.forEach(x=>{const t=String(x.typology||"").toUpperCase();if(!typ[t])return;typ[t].count++;const rev=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0);typ[t].revenue+=rev;typ[t].cost+=serviceCosts[x.id]||0;serviceRevenue+=rev});
+ entries.forEach(x=>{const t=String(x.typology||"").toUpperCase();if(!typ[t])return;if(x.entry_type==="income")typ[t].revenue+=Number(x.amount||0);else typ[t].cost+=Number(x.amount||0)});
  const extraIncome=entries.filter(x=>x.entry_type==="income").reduce((a,x)=>a+Number(x.amount||0),0);
  const manualExpense=entries.filter(x=>x.entry_type==="expense").reduce((a,x)=>a+Number(x.amount||0),0);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0);
