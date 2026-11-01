@@ -3628,7 +3628,8 @@ async function renderFinance(){
  const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",195);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0)+autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
  const totalRevenue=serviceRevenue+extraIncome,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
- const sharedOther=manualExpense-transportRecorded;
+ const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
+ const sharedOther=Math.max(0,manualExpense-transportRecorded-linkedPropertyExpense);
  const monthlyCleaningCount=completedServices.filter(x=>!!String(x.typology||"").match(/T[1-5]/i)).length;
  const fixedPerService=monthlyCleaningCount?(payroll+transport+sharedOther)/monthlyCleaningCount:0;
  const entriesByProperty={};entries.forEach(e=>{if(e.property_id)(entriesByProperty[e.property_id]??=[]).push(e)});
