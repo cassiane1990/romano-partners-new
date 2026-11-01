@@ -3668,7 +3668,7 @@ async function openFinanceEntryForm(x){
  '<div class="two"><div class="field"><label>Cliente</label><select id="feClient" onchange="financeFilterProperties()"><option value="">Selecionar cliente</option>'+clients+'</select></div><div class="field"><label>Apartamento</label><select id="feProperty" onchange="financePropertyChanged()"><option value="">Selecionar apartamento</option>'+props+'</select></div></div>'+
  '<div class="two"><div class="field"><label>Serviço / categoria</label><select id="feCategory" onchange="financeCategoryChanged()">'+cats.map(v=>'<option '+(selectedCat===v?"selected":"")+' >'+v+'</option>').join("")+'</select></div><div class="field"><label>Tipologia</label><select id="feTypology" onchange="financeTypologyChanged()"><option value="">Selecionar tipologia</option>'+["T1","T2","T3","T4","T5"].map(v=>'<option '+(x?.typology===v?"selected":"")+' >'+v+'</option>').join("")+'</select></div></div>'+
  '<div id="feCleaningBox" class="panel" style="display:none;margin:8px 0"><div class="field"><label>Tipo de limpeza</label><select id="feCleaningType" onchange="financeCleaningChanged()"><option value="">Selecionar limpeza / tipologia</option>'+clean+'</select></div><div class="muted">O valor é sugerido pelo catálogo de limpeza e pode ser ajustado manualmente abaixo.</div></div>'+
- '<div id="feMaintenanceBox" class="panel" style="display:none;margin:8px 0"><div class="field"><label>Trabalho de manutenção (catálogo)</label><select id="feMaintenanceType" onchange="financeMaintenanceChanged()"><option value="">Selecionar trabalho</option>'+maint+'</select></div><div class="two"><div class="field"><label>Tempo no local (horas)</label><input id="feHours" type="number" min="0.01" step="0.25" value="'+Number(x?.hours||x?.quantity||1)+'" oninput="financeRecalc()"></div><div class="field"><label>Valor por hora (€)</label><input id="feHourlyRate" type="number" min="0" step="0.01" value="'+Number(x?.unit_amount||0)+'" readonly></div></div><div class="field"><label>Descrição do trabalho efetuado</label><textarea id="feWorkDescription" maxlength="500" placeholder="Ex.: reparação, pintura, troca de torneira...">'+esc(x?.description||"")+'</textarea></div></div>'+
+ '<div id="feMaintenanceBox" class="panel" style="display:none;margin:8px 0"><div class="field"><label>Trabalho de manutenção (catálogo)</label><select id="feMaintenanceType" onchange="financeMaintenanceChanged()"><option value="">Selecionar trabalho</option>'+maint+'</select></div><div class="two"><div class="field"><label>Tempo no local (horas)</label><input id="feHours" type="number" inputmode="decimal" min="0.01" step="any" value="'+Number(x?.hours||x?.quantity||1)+'" oninput="financeRecalc()"></div><div class="field"><label>Valor por hora (€)</label><input id="feHourlyRate" type="number" min="0" step="0.01" value="'+Number(x?.unit_amount||0)+'" readonly></div></div><div class="field"><label>Descrição do trabalho efetuado</label><textarea id="feWorkDescription" maxlength="500" placeholder="Ex.: reparação, pintura, troca de torneira...">'+esc(x?.description||"")+'</textarea></div></div>'+
  '<div class="field"><label>Descrição / observações</label><textarea id="feDescription" maxlength="500" placeholder="Detalhes adicionais">'+esc(x?.description||"")+'</textarea></div>'+
  '<div id="feGeneralValues" class="two"><div class="field"><label>Quantidade</label><input id="feQuantity" type="number" min="0.01" step="0.01" value="'+Number(x?.quantity||1)+'" oninput="financeRecalc()" required></div><div class="field"><label>Valor unitário (€)</label><input id="feUnitAmount" type="number" min="0" step="0.01" value="'+Number(x?.unit_amount||0)+'" oninput="financeRecalc()" required></div></div>'+
  '<div class="muted" style="margin:8px 0">Total calculado: <b id="feTotal">0,00 €</b></div><div class="actions"><button class="btn gold" type="submit">Guardar</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>');
@@ -3694,6 +3694,10 @@ function financeCategoryChanged(){
  if($("feMaintenanceBox"))$("feMaintenanceBox").style.display=maintenance?"block":"none";
  if($("feGeneralValues"))$("feGeneralValues").style.display=maintenance?"none":"grid";
  if($("feDescription"))$("feDescription").parentElement.style.display=maintenance?"none":"block";
+ if($("feQuantity"))$("feQuantity").required=!maintenance;
+ if($("feUnitAmount"))$("feUnitAmount").required=!maintenance;
+ if($("feHours"))$("feHours").required=maintenance;
+ if($("feMaintenanceType"))$("feMaintenanceType").required=maintenance;
  financeRecalc();
 }
 function financeTypologyChanged(){
@@ -3717,14 +3721,18 @@ function financeMaintenanceChanged(){
 }
 function financeRecalc(){
  const maintenance=$("feCategory")?.value==="Manutenção";
- const qty=Number(maintenance?$("feHours")?.value:$("feQuantity")?.value)||0;
- const rate=Number(maintenance?$("feHourlyRate")?.value:$("feUnitAmount")?.value)||0;
+ const parseFinanceNumber=v=>Number(String(v??"").trim().replace(",","."));
+ const qty=parseFinanceNumber(maintenance?$("feHours")?.value:$("feQuantity")?.value)||0;
+ const rate=parseFinanceNumber(maintenance?$("feHourlyRate")?.value:$("feUnitAmount")?.value)||0;
  const total=qty*rate,out=$("feTotal");if(out)out.textContent=total.toLocaleString("pt-PT",{style:"currency",currency:"EUR"});
 }
 async function saveFinanceEntry(e,id=null){
  e.preventDefault();if(role()!=="admin"){toast("Apenas o Administrador pode guardar movimentos financeiros.");return}
- const maintenance=$("feCategory").value==="Manutenção",quantity=Number(maintenance?$("feHours").value:$("feQuantity").value),unit=Number(maintenance?$("feHourlyRate").value:$("feUnitAmount").value);
- if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unit)||unit<0){toast("Confirme a quantidade/horas e o valor unitário.");return}
+ const maintenance=$("feCategory").value==="Manutenção";
+ const parseFinanceNumber=v=>Number(String(v??"").trim().replace(",","."));
+ const quantity=parseFinanceNumber(maintenance?$("feHours").value:$("feQuantity").value),unit=parseFinanceNumber(maintenance?$("feHourlyRate").value:$("feUnitAmount").value);
+ if(maintenance&&!$("feMaintenanceType")?.value){toast("Selecione o trabalho no catálogo de manutenção.");$("feMaintenanceType")?.focus();return}
+ if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unit)||unit<=0){toast("Introduza apenas as horas e confirme a tarifa automática do catálogo.");return}
  const propertyId=$("feProperty").value||null,property=(window.__financeProperties||[]).find(v=>v.id===propertyId);
  const maintenanceName=maintenance?($("feMaintenanceType").selectedOptions?.[0]?.textContent||"").split(" · ")[0]:""; const description=maintenance?([maintenanceName,$("feWorkDescription").value.trim()].filter(Boolean).join(" — ")):$("feDescription").value.trim();
  const payload={entry_type:$("feType").value,category:$("feCategory").value,description:description||null,typology:$("feTypology").value||null,quantity,unit_amount:unit,amount:Math.round(quantity*unit*100)/100,entry_date:$("feDate").value,client_id:$("feClient").value||property?.client_id||null,property_id:propertyId,hours:maintenance?quantity:null,hourly_rate:maintenance?unit:null,unit_mode:maintenance?"hour":null,unit_label:maintenance?"hora":($("feCategory").value==="Limpeza"?"limpeza":null)};
