@@ -26,7 +26,7 @@ jobs:
       - name: Verify PWA cache refresh
         shell: bash
         run: |
-          grep -q 'const CACHE="romano-pwa-v44";' sw.js
+          grep -q 'const CACHE="romano-pwa-v46";' sw.js
           grep -q 'SKIP_WAITING' sw.js
           grep -q 'clients.claim' sw.js
 
