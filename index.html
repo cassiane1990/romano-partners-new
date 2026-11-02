@@ -1149,24 +1149,7 @@ function romanoIsServiceScheduledToday(service){
  const today=romanoMadridParts();
  return parts.year===today.year&&parts.month===today.month&&parts.day===today.day;
 }
-function startServicesAutoRefresh(){
- if(window.__romanoServicesAutoRefresh)return;
- window.__romanoServicesAutoRefresh=setInterval(async()=>{
-  if(window.__romanoCurrentPage!=="services"||document.visibilityState!=="visible")return;
-  if(window.__romanoServicesRefreshBusy)return;
-  if(document.querySelector(".modal:not(.hidden),.modal-overlay:not(.hidden)"))return;
-  const active=document.activeElement;
-  if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
-  window.__romanoServicesRefreshBusy=true;
-  try{await renderServicesMaster()}catch(e){console.warn("Actualización automática de servicios:",e)}
-  finally{window.__romanoServicesRefreshBusy=false}
- },15000);
-}
-function stopServicesAutoRefresh(){
- if(window.__romanoServicesAutoRefresh){clearInterval(window.__romanoServicesAutoRefresh);window.__romanoServicesAutoRefresh=null}
-}
 async function renderServicesMaster(){
- startServicesAutoRefresh();
  const r=demoMode?{data:DEMO_SERVICES,error:null}:{data:null,error:null};
  if(!demoMode){
    let q=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,supervisor_approved_at,property_id,client_id").order("scheduled_at",{ascending:true}).limit(500);
@@ -4555,7 +4538,7 @@ function showApp(){closeMobileMenu();
  try{initRomanoPullToRefresh()}catch(e){}
  openPage("dashboard")}
 function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
-async function openPage(key){if(currentProfile&&!romanoProfileCan(key)){toast("Este perfil no tiene acceso a esta área.");return}if(key!=="services")stopServicesAutoRefresh();window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
+async function openPage(key){if(currentProfile&&!romanoProfileCan(key)){toast("Este perfil no tiene acceso a esta área.");return}window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 let __authBusy=false,__authReadyId=null;
 async function enterAppFromSession(session){
  if(!session?.user){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}
