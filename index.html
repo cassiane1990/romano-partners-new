@@ -1172,7 +1172,7 @@ async function renderServicesMaster(){
    $("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';
    return;
  }
- const rows=(r.data||[]).filter(x=>!["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(String(x.status||"").toLowerCase()));
+ const rows=(r.data||[]).filter(x=>{const st=String(x.status||"").toLowerCase();if(st==="supervision_pending")return romanoIsServiceScheduledToday(x);return !["completed","approved","supervised","cancelled","rejected","returned"].includes(st)});
  let propertiesMap={},clientsMap={};
  if(rows.length&&!demoMode){
    const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
@@ -1323,7 +1323,7 @@ async function finishTechnicianService(button){
 
 function journeyActionsForService(s){
  const r=role(),own=["employee","maintenance_technician"].includes(r)&&s.assigned_employee_id===currentUser.id;
- if(["completed","approved","supervised","cancelled","rejected","returned","supervision_pending"].includes(s.status))return "";
+ if(["completed","approved","supervised","cancelled","rejected","returned"].includes(s.status))return "";
  const maint=privateMaintenanceServiceType(s.service_type);
  const sid=JSON.stringify(s.id);
  const btn=(label,status,gold=false)=>'<button type="button" class="btn '+(gold?"gold":"")+'" onclick="setServiceStatusPremium(\''+s.id+'\',\''+status+'\')">'+label+'</button>';
@@ -1404,8 +1404,8 @@ async function renderServiceJourneyBoard(){
  const active=services.filter(s=>["on_the_way","in_progress","paused","supervision_pending"].includes(s.status)).length;
  const cards=services.map(s=>{
   const p=pm[s.property_id]||{},cl=cm[s.client_id]||{},emp=em[s.assigned_employee_id]||{},own=["employee","maintenance_technician"].includes(role())&&s.assigned_employee_id===currentUser.id;
-  const action=journeyActionsForService(s),terminal=["supervision_pending","supervised","completed","approved","cancelled","rejected","returned"].includes(s.status);
-  const stageText=terminal?"Estado bloqueado":
+  const action=journeyActionsForService(s),terminal=["supervised","completed","approved","cancelled","rejected","returned"].includes(s.status);
+  const stageText=s.status==="supervision_pending"?"Esperando revisión del Supervisor/Administrador":terminal?"Estado bloqueado":
    s.status==="requested"?"Esperando programación":
    s.status==="scheduled"?(["employee","maintenance_technician"].includes(role())&&s.assigned_employee_id===currentUser.id?"Próximo paso: aceptar":s.assigned_employee_id?"Esperando aceptación del funcionario":"Próximo paso: designar funcionario"):
    s.status==="on_the_way"?(["employee","maintenance_technician"].includes(role())&&s.assigned_employee_id===currentUser.id?"Próximo paso: iniciar":"En camino"):
