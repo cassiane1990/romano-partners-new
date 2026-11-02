@@ -41,8 +41,10 @@ function showGuide(){
  if(inAppBrowser){const note=document.createElement("p");note.innerHTML="<b>Está num navegador interno de e-mail ou de outra aplicação.</b> A instalação pode não funcionar aqui. Abra o endereço no Safari (iPhone) ou Chrome (Android) e repita os passos.";instructions.prepend(note);}
 }
 async function triggerInstall(){
- if(!deferredPrompt){showGuide();return;}
- const prompt=deferredPrompt;deferredPrompt=null;
+ const prompt=deferredPrompt||(typeof __romanoInstallPrompt!=="undefined"?__romanoInstallPrompt:null);
+ if(!prompt){showGuide();return;}
+ deferredPrompt=null;
+ try{if(typeof __romanoInstallPrompt!=="undefined")__romanoInstallPrompt=null;}catch(_){}
  try{await prompt.prompt();await prompt.userChoice;}catch(_){}
  modal.hidden=true;refreshButton();
 }
