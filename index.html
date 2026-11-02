@@ -3674,7 +3674,13 @@ async function renderFinance(){
  const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
  const typologies=["T1","T2","T3","T4","T5"];
  const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,gross:0,tax:0,cost:0});
- const completedServices=services.filter(x=>["completed","approved","supervised"].includes(String(x.status||"").toLowerCase())&&x.finished_at);
+ const isCleaningService=x=>{const v=String(x.service_type||"").toLowerCase();return !!String(x.typology||"").toUpperCase().match(/T[1-5]/)&&!/manuten|maintenance|repar|electric|fontan|plumb|pintur|paint|montagem|assembly/.test(v)};
+ const completedServices=services.filter(x=>["completed","approved","supervised"].includes(String(x.status||"").toLowerCase())&&x.finished_at&&isCleaningService(x));
+ const dayKey=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})};
+ const serviceCleaningKeys=new Set(completedServices.filter(x=>x.property_id).map(x=>dayKey(x.finished_at)+"|"+x.property_id+"|"+String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]));
+ const isManualCleaning=e=>e.entry_type==="income"&&/limpeza|conjunto de apartamentos|cleaning/i.test(String(e.category||""))&&!!String(e.typology||"").toUpperCase().match(/T[1-5]/);
+ const countedManualCleaning=entries.filter(e=>isManualCleaning(e)&&!(e.property_id&&serviceCleaningKeys.has(String(e.entry_date)+"|"+e.property_id+"|"+String(e.typology||"").toUpperCase().match(/T[1-5]/)?.[0])));
+ const duplicateManualCleaningIds=new Set(entries.filter(e=>isManualCleaning(e)&&e.property_id&&serviceCleaningKeys.has(String(e.entry_date)+"|"+e.property_id+"|"+String(e.typology||"").toUpperCase().match(/T[1-5]/)?.[0])).map(e=>e.id));
  let serviceRevenue=0,serviceGrossRevenue=0,serviceVat=0,autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
  completedServices.forEach(x=>{
   const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";
@@ -3685,8 +3691,10 @@ async function renderFinance(){
   autoLaundryCost+=laundry;autoAmenitiesCost+=amenities;autoKitchenCost+=kitchen;
   typ[t].cost+=(serviceCosts[x.id]||0)+laundry+amenities+kitchen;
  });
- entries.forEach(x=>{const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";if(!typ[t])return;if(x.entry_type==="income")typ[t].revenue+=Number(x.amount||0);else typ[t].cost+=Number(x.amount||0)});
- const extraIncome=entries.filter(x=>x.entry_type==="income").reduce((a,x)=>a+Number(x.amount||0),0);
+ countedManualCleaning.forEach(x=>{const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0];if(!typ[t])return;const q=Math.max(0,Number(x.quantity||1));typ[t].count+=q;typ[t].revenue+=Number(x.amount||0)});
+ entries.filter(x=>x.entry_type==="expense").forEach(x=>{const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0];if(typ[t])typ[t].cost+=Number(x.amount||0)});
+ const extraIncome=entries.filter(x=>x.entry_type==="income"&&!duplicateManualCleaningIds.has(x.id)).reduce((a,x)=>a+Number(x.amount||0),0);
+ const countedCleaningQty=completedServices.length+countedManualCleaning.reduce((a,x)=>a+Math.max(0,Number(x.quantity||1)),0);
  const payrollEntries=entries.filter(x=>x.entry_type==="expense"&&/^(salários|salarios)$/i.test(String(x.category||"")));
  const recordedPayroll=payrollEntries.reduce((a,x)=>a+Number(x.amount||0),0);
  const payroll=recordedPayroll>0?recordedPayroll:costValue("monthly_payroll",4850);
@@ -3698,8 +3706,8 @@ async function renderFinance(){
  const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
  const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
  const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense);
- const cleaningServices=completedServices.filter(x=>!!String(x.typology||"").match(/T[1-5]/i)&&!/manuten|maintenance/i.test(String(x.service_type||"")));
- const monthlyCleaningCount=cleaningServices.length;
+ const cleaningServices=completedServices;
+ const monthlyCleaningCount=countedCleaningQty;
  const fixedPerService=monthlyCleaningCount?(payroll+transport+sharedOther)/monthlyCleaningCount:0;
  const entriesByProperty={};entries.forEach(e=>{if(e.property_id)(entriesByProperty[e.property_id]??=[]).push(e)});
  const propertyDetailRows=cleaningServices.map(x=>{
@@ -3729,6 +3737,7 @@ async function renderFinance(){
  '<div class="grid"><div class="stat"><small>Faturação sem IVA</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>IVA incluído na faturação</small><strong>'+fmt(totalVatBilled)+'</strong></div><div class="stat"><small>Total faturado com IVA</small><strong>'+fmt(totalGrossBilled)+'</strong></div><div class="stat"><small>Gastos totais do mês</small><strong>'+fmt(totalExpense)+'</strong></div><div class="stat"><small>Lucro / prejuízo do mês</small><strong>'+fmt(operating)+'</strong></div><div class="stat"><small>Lucro médio por limpeza</small><strong>'+fmt(monthlyCleaningCount?operating/monthlyCleaningCount:0)+'</strong></div></div>'+
  '<div class="grid"><div class="stat"><small>Serviços concluídos</small><strong>'+completedServices.length+'</strong></div><div class="stat"><small>Receita total</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>Faturas emitidas (informativo)</small><strong>'+fmt(invoices.reduce((a,x)=>a+Number(x.total||0),0))+'</strong></div><div class="stat"><small>Pagamentos recebidos (informativo)</small><strong>'+fmt(payments.reduce((a,x)=>a+Number(x.amount||0),0))+'</strong></div></div></div>'+
  ''+
+ '<div class="panel"><div class="panel-head"><h3>Quantidade diária de limpezas por tipologia</h3><span class="muted">Operação e lançamentos manuais conciliados; sem duplicar o mesmo apartamento no mesmo dia. Manutenção excluída.</span></div>'+(()=>{const daily={};completedServices.forEach(x=>{const d=dayKey(x.finished_at),t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0];if(!d||!t)return;daily[d]??={T1:0,T2:0,T3:0,T4:0,T5:0};daily[d][t]++});countedManualCleaning.forEach(x=>{const d=String(x.entry_date||""),t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0];if(!d||!t)return;daily[d]??={T1:0,T2:0,T3:0,T4:0,T5:0};daily[d][t]+=Math.max(0,Number(x.quantity||1))});const days=Object.keys(daily).sort();return days.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Data</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>Total</th></tr></thead><tbody>'+days.map(d=>{const z=daily[d],n=typologies.reduce((a,t)=>a+z[t],0);return '<tr><td>'+esc(d)+'</td>'+typologies.map(t=>'<td>'+z[t]+'</td>').join('')+'<td><b>'+n+'</b></td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty">Sem limpezas registadas neste período.</div>'})()+'</div>'+
  '<div class="panel"><div class="panel-head"><h3>Lucro detalhado por apartamento</h3><span class="muted">Receita − custos diretos − parcela dos salários e transportes.</span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Apartamento</th><th>Tipo</th><th>Camas</th><th>Venda</th><th>Gastos diretos</th><th>Fixos rateados</th><th>Lucro estimado</th></tr></thead><tbody>'+propertyDetailRows+'</tbody></table></div></div>'+
  '<div class="panel"><div class="panel-head"><h3>Faturação e margem por tipologia</h3><span class="muted">Total com IVA, base sem IVA e IVA incluído, discriminados por tipologia.</span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Tipologia</th><th>Quantidade</th><th>Total com IVA</th><th>Sem IVA</th><th>IVA</th><th>Custos diretos</th><th>Margem</th></tr></thead><tbody>'+typRows+'</tbody></table></div>'+
  '<div class="panel"><div class="panel-head"><h3>Despesas por categoria</h3><span class="muted">Inclui salários mensais, lavandaria por cama, amenities, kit de cozinha, custos de serviço e despesas gerais.</span></div>'+(expenseRows?'<table class="table"><thead><tr><th>Categoria</th><th>Total</th></tr></thead><tbody>'+expenseRows+'</tbody></table>':'<div class="empty">Ainda não existem despesas registadas neste mês.</div>')+'</div>'+
