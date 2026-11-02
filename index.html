@@ -2835,29 +2835,20 @@ function renderClientCleaningApproval(service,media,approval){
 
 function renderCleaningFlow(service,checklist,media){
  if(!isCleaningServiceType(service.service_type))return "";
- const own=["employee","maintenance_technician"].includes(role())&&service.assigned_employee_id===currentUser.id;
+ const own=role()==="employee"&&service.assigned_employee_id===currentUser.id;
  const reviewer=["admin","supervisor"].includes(role());
- const checked=checklist.filter(i=>i.checked).length;
  const photos=media.filter(m=>m.media_type==="photo");
  const reviewed=photos.filter(m=>m.review_opened_at).length;
  const workActive=["in_progress","paused"].includes(service.status);
- const ready=workActive&&checked===ROMANO_CLEANING_CHECKLIST.length&&photos.length>0;
- let h=`<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quarto, sala, baño, cocina, lixeiros, geladeira, forno, microondas, debajo de la cama, dentro de armarios y amenities.</div></div><span class="pill">${checked}/${ROMANO_CLEANING_CHECKLIST.length}</span></div>`;
- h+=ROMANO_CLEANING_CHECKLIST.map(req=>{
-   const row=checklist.find(i=>i.item_key===req.key);
-   const change=own&&service.status!=="supervision_pending"&&service.status!=="completed"&&row
-     ? ` onchange="toggleServiceChecklist('${row.id}',this.checked,'${service.id}')"`
-     : " disabled";
-   return `<label class="line-item" style="cursor:${own?"pointer":"default"}"><span><input type="checkbox" ${row?.checked?"checked ":""}${change}> ${esc(row?.item_label||req.label)}</span><b>${row?.checked?"✓ OK":"Pendiente"}</b></label>`;
- }).join("");
- h+=`<div class="notice" style="margin-top:10px"><b>Fotos:</b> ${photos.length}${reviewer?' · <b>Revisadas:</b> '+reviewed+'/'+photos.length:""}</div>`;
+ const ready=workActive&&photos.length>=5;
+ let h='<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Comprovação da limpeza</h3><div class="muted">Anexe as fotos do serviço. Não é necessário preencher checklist.</div></div><span class="pill">'+photos.length+' fotos</span></div>';
  if(own){
-   if(service.status==="supervision_pending")h+=`<div class="notice">✓ Checklist y fotos enviados. Esperando revisión del Supervisor o Administrador.</div>`;
-   else if(service.status==="completed")h+=`<div class="notice">✓ Limpieza aprobada por Supervisor/Administrador.</div>`;
-   else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISIÓN</button></div>`;
+   if(service.status==="supervision_pending")h+='<div class="notice">✓ Fotos enviadas. Aguardando supervisão.</div>';
+   else if(service.status==="completed")h+='<div class="notice">✓ Limpeza finalizada pelo Supervisor/Administrador.</div>';
+   else h+='<div class="actions" style="margin-top:10px"><button class="btn gold" '+(ready?'':'disabled')+' onclick="requestCleaningSupervision(\''+service.id+'\')">✓ SOLICITAR SUPERVISÃO</button></div><div class="muted" style="margin-top:7px">'+(ready?'Pronto para enviar à supervisão.':'Adicione pelo menos 5 fotos para solicitar supervisão ('+photos.length+'/5).')+'</div>';
  }
  if(reviewer&&service.status==="supervision_pending"){
-   h+='<div class="notice" style="margin-top:10px"><b>Finalizar supervisión:</b> abra la galería, compruebe las evidencias y confirme la revisión para concluir el servicio. Fotos revisadas: '+reviewed+'/'+photos.length+'.</div><div class="actions" style="margin-top:10px"><button class="btn gold" type="button" onclick="reviewAllAndApproveCleaning(\''+service.id+'\')">✓ SUPERVISIONAR · FINALIZAR LIMPIEZA</button></div>';
+   h+='<div class="notice" style="margin-top:10px">Fotos anexadas: '+photos.length+'. Confirme a supervisão para finalizar a limpeza.</div><div class="actions" style="margin-top:10px"><button class="btn gold" type="button" onclick="reviewAllAndApproveCleaning(\''+service.id+'\')">✓ SUPERVISIONAR · FINALIZAR LIMPEZA</button></div>';
  }
  return h+"</div>";
 }
