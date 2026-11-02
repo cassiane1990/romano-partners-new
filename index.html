@@ -3680,8 +3680,10 @@ async function renderFinance(){
  const dayKey=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})};
  const serviceCleaningKeys=new Set(cleaningServices.filter(x=>x.property_id).map(x=>dayKey(x.finished_at)+"|"+x.property_id+"|"+String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]));
  const isManualCleaning=e=>e.entry_type==="income"&&/limpeza|conjunto de apartamentos|cleaning/i.test(String(e.category||""))&&!!String(e.typology||"").toUpperCase().match(/T[1-5]/);
- const countedManualCleaning=entries.filter(e=>isManualCleaning(e)&&!(e.property_id&&serviceCleaningKeys.has(String(e.entry_date)+"|"+e.property_id+"|"+String(e.typology||"").toUpperCase().match(/T[1-5]/)?.[0])));
- const duplicateManualCleaningIds=new Set(entries.filter(e=>isManualCleaning(e)&&e.property_id&&serviceCleaningKeys.has(String(e.entry_date)+"|"+e.property_id+"|"+String(e.typology||"").toUpperCase().match(/T[1-5]/)?.[0])).map(e=>e.id));
+ const manualCleaningSeen=new Set();
+ const countedManualCleaning=entries.filter(e=>{if(!isManualCleaning(e))return false;const t=String(e.typology||"").toUpperCase().match(/T[1-5]/)?.[0],key=e.property_id?String(e.entry_date)+"|"+e.property_id+"|"+t:"";if(e.property_id&&serviceCleaningKeys.has(key))return false;if(key&&manualCleaningSeen.has(key))return false;if(key)manualCleaningSeen.add(key);return true});
+ const countedManualCleaningIds=new Set(countedManualCleaning.map(e=>e.id));
+ const duplicateManualCleaningIds=new Set(entries.filter(e=>isManualCleaning(e)&&!countedManualCleaningIds.has(e.id)).map(e=>e.id));
  let serviceRevenue=0,serviceGrossRevenue=0,serviceVat=0,autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
  completedServices.forEach(x=>{
   const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";
