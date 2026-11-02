@@ -3631,7 +3631,8 @@ async function renderFinance(){
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0)+autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
  const totalRevenue=serviceRevenue+extraIncome,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
  const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
- const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense);
+ const alreadyAssignedExpenses=entries.filter(e=>e.entry_type==="expense"&&(e.property_id||String(e.typology||"").match(/T[1-5]/i))).reduce((a,e)=>a+Number(e.amount||0),0);
+ const sharedOther=Math.max(0,manualExpense-alreadyAssignedExpenses);
  const cleaningServices=completedServices.filter(x=>!!String(x.typology||"").match(/T[1-5]/i)&&!/manuten|maintenance/i.test(String(x.service_type||"")));
  const monthlyCleaningCount=cleaningServices.length;
  const fixedPerService=monthlyCleaningCount?(payroll+transport+sharedOther)/monthlyCleaningCount:0;
