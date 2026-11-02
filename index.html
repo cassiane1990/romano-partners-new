@@ -2794,10 +2794,14 @@ async function approveCleaningAsClient(serviceId){
  toast("✓ Limpeza aprovada. Confirmação registada.");await viewService(serviceId);
 }
 function renderClientCleaningApproval(service,media,approval){
- if(role()!=="client"||!isCleaningServiceType(service.service_type))return "";
+ if(!isCleaningServiceType(service.service_type))return "";
  const count=(media||[]).filter(m=>["photo","image","video"].includes(m.media_type)).length;
- if(approval)return '<div class="panel" style="margin-top:12px;border:1px solid #b7d2b4;background:#f4faf2"><b>✓ Limpeza aprovada pelo cliente</b><div class="muted">Registada em '+esc(new Date(approval.approved_at).toLocaleString("pt-PT"))+'.</div></div>';
- if(!count)return "";
+ if(["admin","supervisor"].includes(role())){
+  if(approval)return '<div class="panel" style="margin-top:12px;border:1px solid #b7d2b4;background:#f4faf2"><b>✓ Cliente aprovou a limpeza</b><div class="muted">Confirmação registada em '+esc(new Date(approval.approved_at).toLocaleString("pt-PT"))+'.</div></div>';
+  return count?'<div class="notice" style="margin-top:12px">⏳ Fotos disponíveis · aguardando o OK do cliente.</div>':"";
+ }
+ if(role()!=="client"||!count)return "";
+ if(approval)return '<div class="panel" style="margin-top:12px;border:1px solid #b7d2b4;background:#f4faf2"><b>✓ Limpeza aprovada por si</b><div class="muted">Confirmação registada em '+esc(new Date(approval.approved_at).toLocaleString("pt-PT"))+'.</div></div>';
  return '<div class="panel" style="margin-top:12px;background:#fffaf0"><h3>Confirmação da limpeza</h3><p>Revise as fotos e vídeos anexados. Se estiver tudo correto, confirme abaixo.</p><button class="btn gold" style="width:100%;padding:13px" onclick="approveCleaningAsClient(\''+service.id+'\')">✓ OK, LIMPEZA APROVADA</button></div>';
 }
 
