@@ -2857,7 +2857,7 @@ function renderCleaningFlow(service,checklist,media){
    else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISIÓN</button></div>`;
  }
  if(reviewer&&service.status==="supervision_pending"){
-   h+='<div class="notice" style="margin-top:10px"><b>Finalizar supervisión:</b> abra la galería, compruebe las evidencias y confirme la revisión para concluir el servicio. Fotos revisadas: '+reviewed+'/'+photos.length+'.</div><div class="actions" style="margin-top:10px"><button class="btn gold" type="button" onclick="reviewAllAndApproveCleaning(\''+service.id+'\')">✓ CONFIRMAR REVISIÓN Y FINALIZAR LIMPIEZA</button></div>';
+   h+='<div class="notice" style="margin-top:10px"><b>Finalizar supervisión:</b> abra la galería, compruebe las evidencias y confirme la revisión para concluir el servicio. Fotos revisadas: '+reviewed+'/'+photos.length+'.</div><div class="actions" style="margin-top:10px"><button class="btn gold" type="button" onclick="reviewAllAndApproveCleaning(\''+service.id+'\')">✓ SUPERVISIONAR · FINALIZAR LIMPIEZA</button></div>';
  }
  return h+"</div>";
 }
