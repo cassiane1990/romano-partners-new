@@ -3653,7 +3653,7 @@ async function renderFinance(){
  }
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Registo mensal de receitas, vendas, custos e despesas.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button></div></div><div class="empty">A carregar os valores do mês...</div></div>';
  const [sv,sc,fe,iv,pay,pr,cc]=await Promise.all([
-  sb.from("services").select("id,client_id,property_id,typology,service_type,status,agreed_amount,finished_at,scheduled_at").eq("company_id",currentProfile.company_id).in("status",["completed","approved","supervised"]).gte("finished_at",from).lt("finished_at",to),
+  sb.from("services").select("id,client_id,property_id,typology,service_type,status,agreed_amount,finished_at,scheduled_at,pricing,tax_country").eq("company_id",currentProfile.company_id).in("status",["completed","approved","supervised"]).gte("finished_at",from).lt("finished_at",to),
   sb.from("service_costs").select("id,service_id,category,description,amount,incurred_at").eq("company_id",currentProfile.company_id).gte("incurred_at",from).lt("incurred_at",to),
   sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at,property_id").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
   sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
@@ -3666,19 +3666,19 @@ async function renderFinance(){
  const services=sv.data||[],costs=sc.data||[],entries=fe.data||[],invoices=iv.data||[],payments=pay.data||[],properties=pr.data||[],costCatalog=cc.data||[];
  const ids=services.map(x=>x.id);
  let finBy={};
- if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
+ if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal,tax_amount").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
  const costByKey={};costCatalog.filter(c=>c.is_active).forEach(c=>costByKey[c.cost_key]=Number(c.unit_cost||0));
  const costValue=(key,fallback)=>costByKey[key]??fallback;
  const serviceCosts={},serviceCostCategories={};
  costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
  const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
  const typologies=["T1","T2","T3","T4","T5"];
- const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,cost:0});
+ const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,gross:0,tax:0,cost:0});
  const completedServices=services.filter(x=>["completed","approved","supervised"].includes(String(x.status||"").toLowerCase())&&x.finished_at);
- let serviceRevenue=0,autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
+ let serviceRevenue=0,serviceGrossRevenue=0,serviceVat=0,autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
  completedServices.forEach(x=>{
   const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";if(!typ[t])return;
-  typ[t].count++;const rev=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0);typ[t].revenue+=rev;serviceRevenue+=rev;
+  const pricing=x.pricing&&typeof x.pricing==="object"?x.pricing:{};const fin=finBy[x.id]||{};const gross=Number(pricing.total??fin.total??x.agreed_amount??0);const net=Number(pricing.subtotal??fin.subtotal??(gross/(1+(x.tax_country==="PT"?.23:.21))));const vat=Number(pricing.tax??fin.tax_amount??Math.max(0,gross-net));serviceRevenue+=net;serviceGrossRevenue+=gross;serviceVat+=vat;if(!typ[t])return;typ[t].count++;typ[t].revenue+=net;typ[t].gross+=gross;typ[t].tax+=vat;
   const p=propertyBy[x.property_id]||{},beds=Math.max(0,Number(p.beds_single||0)+Number(p.beds_double||0));
   const cats=serviceCostCategories[x.id]||[],hasLaundry=cats.some(c=>/lavand|laundry|roupa|linen/.test(c)),hasAmenities=cats.some(c=>/amenit/.test(c)),hasKitchen=cats.some(c=>/kit.*cozinha|cozinha.*kit|welcome kit/.test(c));
   const laundry=hasLaundry?0:beds*costValue("laundry_bed",8.74),amenities=hasAmenities?0:costValue("amenities",0.86),kitchen=hasKitchen?0:costValue("kitchen_kit",0.45);
@@ -3695,7 +3695,7 @@ async function renderFinance(){
  const transportRecorded=transportEntries.reduce((a,x)=>a+Number(x.amount||0),0);
  const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",195);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0)+autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
- const totalRevenue=serviceRevenue+extraIncome,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
+ const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
  const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
  const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense);
  const cleaningServices=completedServices.filter(x=>!!String(x.typology||"").match(/T[1-5]/i)&&!/manuten|maintenance/i.test(String(x.service_type||"")));
@@ -3707,7 +3707,7 @@ async function renderFinance(){
   const beds=Number(p.beds_single||0)+Number(p.beds_double||0),cats=serviceCostCategories[x.id]||[];
   const direct=Number(serviceCosts[x.id]||0)+(cats.some(c=>/lavand|laundry|roupa|linen/.test(c))?0:beds*costValue("laundry_bed",8.74))+(cats.some(c=>/amenit/.test(c))?0:costValue("amenities",0.86))+(cats.some(c=>/kit.*cozinha|cozinha.*kit|welcome kit/.test(c))?0:costValue("kitchen_kit",0.45));
   const linked=entriesByProperty[x.property_id]||[],linkedIncome=linked.filter(e=>e.entry_type==="income").reduce((a,e)=>a+Number(e.amount||0),0),linkedExpense=linked.filter(e=>e.entry_type==="expense").reduce((a,e)=>a+Number(e.amount||0),0);
-  const revenue=Number(x.agreed_amount??finBy[x.id]?.total??finBy[x.id]?.subtotal??0)+linkedIncome,allDirect=direct+linkedExpense,profit=revenue-allDirect-fixedPerService;
+  const px=x.pricing&&typeof x.pricing==="object"?x.pricing:{},fx=finBy[x.id]||{};const revenue=Number(px.subtotal??fx.subtotal??x.agreed_amount??0)+linkedIncome,allDirect=direct+linkedExpense,profit=revenue-allDirect-fixedPerService;
   return '<tr><td>'+esc(p.name||p.code||"Apartamento")+'</td><td>'+typ+'</td><td>'+beds+'</td><td>'+fmt(revenue)+'</td><td>'+fmt(allDirect)+'</td><td>'+fmt(fixedPerService)+'</td><td><b>'+fmt(profit)+'</b></td></tr>';
  }).join("");
  const costCatalogRows=costCatalog.map(c=>`<tr><td>${esc(c.name)}${c.is_active?"":' <span class="pill">Inativo</span>'}</td><td>${esc(c.unit)}</td><td><input type="number" min="0" step="0.01" id="cost_${c.id}" value="${Number(c.unit_cost||0).toFixed(2)}" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost('${c.id}')">Guardar</button> <button class="btn" type="button" onclick="toggleCompanyCost('${c.id}', ${!c.is_active})">${c.is_active?"Desativar":"Reativar"}</button> <button class="btn" type="button" onclick="deleteCompanyCost('${c.id}')">Excluir</button></td></tr>`).join("");
