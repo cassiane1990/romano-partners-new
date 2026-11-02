@@ -2790,7 +2790,7 @@ async function approveCleaningAsClient(serviceId){
  const client=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(client.error||!client.data){toast("Não foi possível validar a conta de cliente.");return}
  const ins=await sb.from("service_client_approvals").insert({company_id:currentProfile.company_id,service_id:serviceId,client_id:client.data.id,approved_by:currentUser.id});
- if(ins.error){toast(ins.code==="23505"?"Esta limpeza já foi aprovada.":ins.error.message);return}
+ if(ins.error){toast(ins.error.code==="23505"?"Esta limpeza já foi aprovada.":ins.error.message);return}
  toast("✓ Limpeza aprovada. Confirmação registada.");await viewService(serviceId);
 }
 function renderClientCleaningApproval(service,media,approval){
