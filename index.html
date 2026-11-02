@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-29-protect-active-work-v23">
+<head><meta name="romano-build" content="2026-11-02-auto-update-v24">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -2697,26 +2697,10 @@ function renderServiceAudit(auditRows,actorNames){
  return '<div class="notice" style="margin-bottom:12px"><strong>⏱ Evolución del servicio</strong><div style="margin-top:8px">'+timeline+'</div></div>';
 }
 
-const ROMANO_CLEANING_CHECKLIST=[
- {key:"quarto",label:"Quarto"},{key:"sala",label:"Sala"},{key:"banheiro",label:"Baño"},{key:"cozinha",label:"Cocina"},
- {key:"lixeiros",label:"Lixeiros"},{key:"geladeira",label:"Geladeira / Nevera"},{key:"forno",label:"Forno"},
- {key:"microondas",label:"Microondas"},{key:"debaixo_cama",label:"Debajo de la cama"},{key:"dentro_armarios",label:"Dentro de los armarios"},{key:"amenities",label:"Amenities"}
-];
 function isCleaningServiceType(type){
  const s=String(type||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
  if(/manten|maintenance|electric|plumb|pint|silicone|assembly|installation|hydraulic|repar/.test(s))return false;
  return s.includes("limp")||s==="cleaning"||s==="airbnb"||s.includes("hotel")||s.includes("housekeeping")||s.includes("alojamiento");
-}
-async function ensureCleaningChecklist(service){
- if(!isCleaningServiceType(service?.service_type)||!["employee","admin","supervisor"].includes(role()))return [];
- const r=await sb.rpc("ensure_cleaning_checklist",{p_service_id:service.id});if(r.error)throw r.error;
- const q=await sb.from("service_checklist_items").select("id,item_key,item_label,checked,notes,checked_by,checked_at").eq("service_id",service.id).order("created_at",{ascending:true});
- if(q.error)throw q.error;return q.data||[];
-}
-async function toggleServiceChecklist(itemId,checked,serviceId){
- if(role()!=="employee"){toast("Solo el funcionario de limpieza puede completar este checklist.");return}
- const r=await sb.from("service_checklist_items").update({checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",itemId).eq("service_id",serviceId);
- if(r.error){toast(r.error.message);return} await viewService(serviceId);
 }
 async function requestCleaningSupervision(serviceId){
  if(role()!=="employee"){serviceActionError("Solo el funcionario de limpieza puede solicitar la supervisión.");return}
@@ -2725,12 +2709,9 @@ async function requestCleaningSupervision(serviceId){
  if(current.error){serviceActionError(current.error.message);return}
  if(current.data.assigned_employee_id!==currentUser.id){serviceActionError("Este servicio no está asignado a su usuario.");return}
  if(!["in_progress","paused"].includes(current.data.status)){serviceActionError("Primero debe iniciar el servicio. Estado actual: "+(statusNames[current.data.status]||current.data.status)+".");return}
- const checklist=await sb.from("service_checklist_items").select("id,checked").eq("service_id",serviceId);
- if(checklist.error){serviceActionError(checklist.error.message);return}
  const media=await sb.from("service_media").select("id").eq("service_id",serviceId).eq("media_type","photo").limit(1);
  if(media.error){serviceActionError(media.error.message);return}
- if((checklist.data||[]).length<11||(checklist.data||[]).filter(x=>x.checked).length<11){serviceActionError("Complete todo el checklist antes de solicitar la supervisión.");return}
- if(!(media.data||[]).length){serviceActionError("Anexe al menos una foto antes de solicitar la supervisión.");return}
+ if(!(media.data||[]).length){serviceActionError("Anexe pelo menos uma fotografia antes de solicitar a supervisão.");return}
  const update=await sb.rpc("employee_request_cleaning_supervision",{p_service_id:serviceId});
  if(update.error){
    serviceActionError("No se pudo enviar la limpieza a supervisión: "+update.error.message);
@@ -2754,6 +2735,8 @@ async function deleteServiceMedia(mediaId,path,serviceId){
 }
 async function reviewServiceMedia(mediaId,path,serviceId){
  if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor o Administrador puede revisar las evidencias.");return}
+ const mediaRow=await sb.from("service_media").select("media_type").eq("id",mediaId).maybeSingle();
+ if(mediaRow.data&&mediaRow.data.media_type!=="photo"){const fileUrl=await sb.storage.from("service-media").createSignedUrl(path,300);if(fileUrl.error){toast("No se pudo abrir el anexo: "+fileUrl.error.message);return}window.open(fileUrl.data.signedUrl,"_blank","noopener");return}
  const r=await sb.rpc("review_cleaning_photo",{p_media_id:mediaId});if(r.error){toast(r.error.message);return}
  const u=await sb.storage.from("service-media").createSignedUrl(path,300);if(u.error){toast("No se pudo abrir la evidencia: "+u.error.message);return}
  window.open(u.data.signedUrl,"_blank","noopener");toast("✓ Evidencia abierta y registrada como revisada.");setTimeout(()=>viewService(serviceId),350);
@@ -2767,27 +2750,18 @@ function renderCleaningFlow(service,checklist,media){
  if(!isCleaningServiceType(service.service_type))return "";
  const own=["employee","maintenance_technician"].includes(role())&&service.assigned_employee_id===currentUser.id;
  const reviewer=["admin","supervisor"].includes(role());
- const checked=checklist.filter(i=>i.checked).length;
  const photos=media.filter(m=>m.media_type==="photo");
  const reviewed=photos.filter(m=>m.review_opened_at).length;
  const workActive=["in_progress","paused"].includes(service.status);
- const ready=workActive&&checked===ROMANO_CLEANING_CHECKLIST.length&&photos.length>0;
- let h=`<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quarto, sala, baño, cocina, lixeiros, geladeira, forno, microondas, debajo de la cama, dentro de armarios y amenities.</div></div><span class="pill">${checked}/${ROMANO_CLEANING_CHECKLIST.length}</span></div>`;
- h+=ROMANO_CLEANING_CHECKLIST.map(req=>{
-   const row=checklist.find(i=>i.item_key===req.key);
-   const change=own&&service.status!=="supervision_pending"&&service.status!=="completed"&&row
-     ? ` onchange="toggleServiceChecklist('${row.id}',this.checked,'${service.id}')"`
-     : " disabled";
-   return `<label class="line-item" style="cursor:${own?"pointer":"default"}"><span><input type="checkbox" ${row?.checked?"checked ":""}${change}> ${esc(row?.item_label||req.label)}</span><b>${row?.checked?"✓ OK":"Pendiente"}</b></label>`;
- }).join("");
- h+=`<div class="notice" style="margin-top:10px"><b>Fotos:</b> ${photos.length}${reviewer?' · <b>Revisadas:</b> '+reviewed+'/'+photos.length:""}</div>`;
+ const ready=workActive&&photos.length>0;
+ let h=`<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Registo fotográfico da limpeza</h3><div class="muted">Adicione as fotografias necessárias para comprovar o serviço. Sem checklist e sem limite fixo de fotografias.</div></div><span class="pill">${photos.length} fotos</span></div>`;
  if(own){
-   if(service.status==="supervision_pending")h+=`<div class="notice">✓ Checklist y fotos enviados. Esperando revisión del Supervisor o Administrador.</div>`;
-   else if(service.status==="completed")h+=`<div class="notice">✓ Limpieza aprobada por Supervisor/Administrador.</div>`;
-   else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISIÓN</button></div>`;
+  if(service.status==="supervision_pending")h+=`<div class="notice">✓ Fotografias enviadas. Aguardando revisão do Supervisor ou Administrador.</div>`;
+  else if(service.status==="completed")h+=`<div class="notice">✓ Limpeza aprovada pelo Supervisor/Administrador.</div>`;
+  else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISÃO</button></div>`;
  }
  if(reviewer&&service.status==="supervision_pending"){
-   h+=`<div class="notice" style="margin-top:10px"><b>Revisión obligatoria:</b> abra cada foto individualmente. El OK solo se habilita después de revisar todas.</div><div class="actions" style="margin-top:10px"><button class="btn gold" ${photos.length>0&&reviewed===photos.length?"":"disabled"} onclick="approveCleaningService('${service.id}')">✓ DAR OK · FINALIZAR LIMPIEZA</button></div>`;
+  h+=`<div class="notice" style="margin-top:10px"><b>Revisão:</b> abra cada fotografia. O OK só fica disponível depois de rever todas. Fotografias: ${photos.length} · Revistas: ${reviewed}/${photos.length}</div><div class="actions" style="margin-top:10px"><button class="btn gold" ${photos.length>0&&reviewed===photos.length?"":"disabled"} onclick="approveCleaningService('${service.id}')">✓ DAR OK · FINALIZAR LIMPEZA</button></div>`;
  }
  return h+"</div>";
 }
@@ -2856,25 +2830,26 @@ async function openEditService(id){
  const q=await sb.from("services").select("*").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(q.error||!q.data){toast("Não foi possível carregar o serviço para edição: "+(q.error?.message||"serviço não encontrado"));return}
  const x=q.data;
- if(["completed","cancelled","approved","supervised","rejected"].includes(x.status)){toast("Este serviço já não pode ser editado neste estado.");return}
+ if(["completed","cancelled","approved","supervised","rejected"].includes(x.status)||(role()==="client"&&!["requested","scheduled"].includes(x.status))){toast("Este serviço não pode ser editado pelo seu perfil neste estado.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",x.client_id).eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();if(own.error||!own.data){toast("Só pode editar os serviços da sua conta.");return}}
  const localDate=x.scheduled_at?(()=>{const d=new Date(x.scheduled_at);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)})():"";
  let noteText="";try{const n=typeof x.notes==="string"?JSON.parse(x.notes||"{}"):(x.notes||{});noteText=n.notes||n.maintenance_notes||n.legacy_notes||""}catch(e){noteText=x.notes||""}
- const employeeOptions=role()==="client"?"":'<div class="field"><label>Funcionário atribuído</label><select id="editServiceEmployee"><option value="">Sem atribuição</option>'+((window.__mpEmployees||[]).map(e=>'<option value="'+esc(e.id)+'" '+(e.id===x.assigned_employee_id?'selected':'')+'>'+esc(e.full_name||e.email||e.id)+'</option>').join(""))+'</select><small class="muted">A nova atribuição terá de ser aceite pelo funcionário.</small></div>';
+ const activeWork=["on_the_way","in_progress","paused","supervision_pending"].includes(x.status);
+ const employeeOptions=role()==="client"?"":'<div class="field"><label>Funcionário atribuído</label><select id="editServiceEmployee" '+(activeWork?'disabled':'')+'><option value="">Sem atribuição</option>'+((window.__mpEmployees||[]).map(e=>'<option value="'+esc(e.id)+'" '+(e.id===x.assigned_employee_id?'selected':'')+'>'+esc(e.full_name||e.email||e.id)+'</option>').join(""))+'</select><small class="muted">'+(activeWork?'A atribuição fica bloqueada durante a execução para não interromper o funcionário.':'A nova atribuição terá de ser aceite pelo funcionário.')+'</small></div>';
  openModal("Editar serviço · "+esc(x.code||""),'<div class="notice">Edite os dados do serviço existente. As alterações guardadas serão refletidas na ficha do serviço.</div><div class="two"><div class="field"><label>Tipo de serviço</label><select id="editServiceType"><option value="airbnb" '+(x.service_type==="airbnb"?'selected':'')+'>Limpeza Airbnb / alojamento local</option><option value="hotel" '+(x.service_type==="hotel"?'selected':'')+'>Limpeza de hotel</option><option value="office" '+(x.service_type==="office"?'selected':'')+'>Limpeza de escritório</option><option value="clinic" '+(x.service_type==="clinic"?'selected':'')+'>Limpeza de clínica</option><option value="postobra" '+(x.service_type==="postobra"?'selected':'')+'>Limpeza pós-obra</option><option value="mantenimiento" '+(x.service_type==="mantenimiento"?'selected':'')+'>Manutenção</option></select></div><div class="field"><label>Tipologia / código</label><input id="editServiceTypology" value="'+esc(x.typology||"")+'" placeholder="Ex.: T1-1B"></div></div><div class="two"><div class="field"><label>Data e hora</label><input id="editServiceDate" type="datetime-local" value="'+localDate+'"></div><div class="field"><label>Prioridade</label><select id="editServicePriority"><option value="normal" '+(x.priority==="normal"?'selected':'')+'>Normal</option><option value="high" '+(x.priority==="high"?'selected':'')+'>Alta</option><option value="urgent" '+(x.priority==="urgent"?'selected':'')+'>Urgente</option></select></div></div>'+employeeOptions+'<div class="field"><label>Descrição / instruções do serviço</label><textarea id="editServiceInstructions" rows="3">'+esc(x.instructions||"")+'</textarea></div><div class="field"><label>Observações</label><textarea id="editServiceNotes" rows="3">'+esc(noteText)+'</textarea></div><div class="field"><label>Itens do serviço (JSON)</label><textarea id="editServiceItems" rows="5" '+(role()==="client"?'readonly':'')+'>'+esc(JSON.stringify({requested_items:x.requested_items||[],additional_items:x.additional_items||[]},null,2))+'</textarea><small class="muted">Este campo preserva quantidades, packs, extras e valores. Só o altere se conhecer o formato JSON.</small></div><div class="actions"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button type="button" class="btn gold" onclick="saveEditService(\''+id+'\')">Guardar alterações</button></div>');
 }
 async function saveEditService(id){
  if(!["admin","supervisor","client"].includes(role())){toast("Seu perfil não pode editar este serviço.");return}
  const current=await sb.from("services").select("id,client_id,status,assigned_employee_id,company_id").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(current.error||!current.data){toast("Não foi possível confirmar o serviço.");return}
- if(["completed","cancelled","approved","supervised","rejected"].includes(current.data.status)){toast("Este serviço já não pode ser editado neste estado.");return}
+ if(["completed","cancelled","approved","supervised","rejected"].includes(current.data.status)||(role()==="client"&&!["requested","scheduled"].includes(current.data.status))){toast("Este serviço não pode ser editado pelo seu perfil neste estado.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("id",current.data.client_id).eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();if(own.error||!own.data){toast("Só pode editar os serviços da sua conta.");return}}
  const date=romanoMadridInputToDate($("editServiceDate")?.value||"");if(Number.isNaN(date.getTime())){toast("Indique uma data e hora válidas.");return}
  let parsed;try{parsed=JSON.parse($("editServiceItems")?.value||"{}")}catch(e){toast("O JSON dos itens não é válido. Corrija-o ou restaure o conteúdo original.");return}
  if(!parsed||!Array.isArray(parsed.requested_items)||!Array.isArray(parsed.additional_items)){toast("Os itens devem conter requested_items e additional_items em formato de lista.");return}
  const payload={service_type:$("editServiceType")?.value||"airbnb",typology:$("editServiceTypology")?.value.trim()||null,pricing_code:$("editServiceTypology")?.value.trim()||null,scheduled_at:date.toISOString(),priority:$("editServicePriority")?.value||"normal",instructions:$("editServiceInstructions")?.value.trim()||null,requested_items:parsed.requested_items,additional_items:parsed.additional_items,updated_by:currentUser.id,updated_by_at:new Date().toISOString()};
  const notesText=$("editServiceNotes")?.value.trim()||null;payload.notes=notesText===null?null:JSON.stringify({notes:notesText});
- const newEmployee=role()==="client"?current.data.assigned_employee_id:($("editServiceEmployee")?.value||null);
+ const newEmployee=role()==="client"||["on_the_way","in_progress","paused","supervision_pending"].includes(current.data.status)?current.data.assigned_employee_id:($("editServiceEmployee")?.value||null);
  if(role()!=="client"&&newEmployee!==current.data.assigned_employee_id)payload.assigned_employee_id=newEmployee;
  const upd=await sb.from("services").update(payload).eq("id",id).eq("company_id",currentProfile.company_id);
  if(upd.error){toast("Não foi possível guardar as alterações: "+upd.error.message);return}
@@ -2906,7 +2881,7 @@ async function viewService(id){
  if(r.error){toast(r.error.message);return}
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
- let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
+ const checklist=[];
  const [media,dispatch,clientQ,propQ,auditQ,archiveMedia]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
@@ -2928,7 +2903,7 @@ async function viewService(id){
  const isPendingAdminDirect=role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id;
  const canClientAdvance=role()==="client" && !["completed","cancelled"].includes(x.status);
  const adminDirectAssignmentButton=isPendingAdminDirect?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">DESIGNAR FUNCIONARIO</button></div>':"";
- const canEditService=["admin","supervisor","client"].includes(role())&&["requested","scheduled"].includes(x.status);
+ const canEditService=(["admin","supervisor"].includes(role())&&!["completed","cancelled","approved","supervised","rejected"].includes(x.status))||(role()==="client"&&["requested","scheduled"].includes(x.status));
  const editServiceButton=canEditService?'<div class="actions" style="margin-top:12px"><button class="btn gold" type="button" onclick="openEditService(\''+x.id+'\')">✎ Editar serviço</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
  const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
@@ -2946,7 +2921,7 @@ async function viewService(id){
   renderMaintenanceBillingSummary(x)+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+
  (x.assigned_employee_id?'<div class="notice" style="margin-bottom:10px"><strong>👤 Designado:</strong> '+esc(actorNames[x.assigned_employee_id]||"Funcionario/Técnico")+(["on_the_way","in_progress","completed","supervision_pending","supervised","approved"].includes(x.status)?"<br><small>✓ El profesional aceptó el servicio.</small>":"<br><small>⏳ Designación enviada · pendiente de aceptación.</small>")+'</div>':"")+
- (Object.values((dispatch.data||[]).reduce((acc,d)=>{const k=d.employee_id||d.id;if(!acc[k]||new Date(d.created_at||d.expires_at||0)>new Date(acc[k].created_at||acc[k].expires_at||0))acc[k]=d;return acc;},{})).map(d=>'<div class="line"><span><strong>'+esc(actorNames[d.employee_id]||"Funcionario/Técnico")+'</strong><br><small>'+esc(d.response||"pendiente")+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div></div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)" style="display:none"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0"><label for="serviceMediaFile" class="btn gold" style="cursor:pointer">📷 Añadir fotos / vídeos</label><span class="muted">'+((media.data||[]).filter(m=>m.media_type==="photo").length)+' fotos · '+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias</span></div>'+((role()==="maintenance_technician")?'<div class="notice" style="margin-bottom:10px">📷 Para finalizar, añada y guarde al menos 5 fotos/vídeos del trabajo en “Añadir fotos / vídeos”. Los archivos de “Faturas, notas y comprobantes” son documentos separados y no cuentan como evidencia del trabajo.</div>':"")+renderTechnicianFinishButton(x)+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button>'+((["admin","supervisor"].includes(role()))?'<button class="btn" type="button" onclick="deleteServiceMedia(\''+esc(m.id)+'\',\''+esc(m.storage_path)+'\',\''+esc(x.id)+'\')">🗑 Eliminar</button>':"")+'</span></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Arquivo permanente deste serviço</h3><span class="pill">'+(archiveMedia.data||[]).length+' ficheiro(s)</span></div>'+serviceArchiveHtml+'</div>');
+ (Object.values((dispatch.data||[]).reduce((acc,d)=>{const k=d.employee_id||d.id;if(!acc[k]||new Date(d.created_at||d.expires_at||0)>new Date(acc[k].created_at||acc[k].expires_at||0))acc[k]=d;return acc;},{})).map(d=>'<div class="line"><span><strong>'+esc(actorNames[d.employee_id]||"Funcionario/Técnico")+'</strong><br><small>'+esc(d.response||"pendiente")+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div></div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*,application/pdf,.heic,.heif,.avif,.mov,.mp4,.m4v,.avi,.mkv,.webm,.3gp,.mpeg,.mpg,.mts,.m2ts,.wmv,.flv,.ogv,.pdf" onchange="uploadServiceMedia(&#39;"+x.id+"&#39;, false)" style="display:none"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0"><label for="serviceMediaFile" class="btn gold" style="cursor:pointer">📷 '+(isCleaningServiceType(x.service_type)?"Añadir fotos / vídeos / PDF":"Añadir fotos / vídeos / PDF")+'</label><span class="muted">'+((media.data||[]).filter(m=>m.media_type==="photo").length)+' fotos · '+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias</span></div>'+((role()==="maintenance_technician")?'<div class="notice" style="margin-bottom:10px">📷 Para finalizar, añada y guarde al menos 5 fotos/vídeos del trabajo en “Añadir fotos / vídeos”. Los archivos de “Faturas, notas y comprobantes” son documentos separados y no cuentan como evidencia del trabajo.</div>':"")+renderTechnicianFinishButton(x)+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button>'+((["admin","supervisor"].includes(role()))?'<button class="btn" type="button" onclick="deleteServiceMedia(\''+esc(m.id)+'\',\''+esc(m.storage_path)+'\',\''+esc(x.id)+'\')">🗑 Eliminar</button>':"")+'</span></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Arquivo permanente deste serviço</h3><span class="pill">'+(archiveMedia.data||[]).length+' ficheiro(s)</span></div>'+serviceArchiveHtml+'</div>');
  }catch(err){
    const msg=err?.message||String(err||"No se pudo cargar la ficha del servicio.");
    const modalBody=$("modalBody");
@@ -2960,7 +2935,7 @@ function openEditService(id){
   const q=await sb.from("services").select("id,code,client_id,property_id,service_type,typology,pricing_code,agreed_amount,status,priority,scheduled_at,instructions,requested_items,additional_items,notes,company_id,tax_country").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
   if(q.error||!q.data){toast("Não foi possível carregar o serviço para edição.");return}
   const x=q.data;
-  if(!["requested","scheduled"].includes(x.status)){toast("Só é possível editar serviços aguardando confirmação ou programados.");return}
+  if(["completed","cancelled","approved","supervised","rejected"].includes(x.status)||(role()==="client"&& !["requested","scheduled"].includes(x.status))){toast("Este serviço não pode ser editado neste estado pelo seu perfil.");return}
   if(role()==="client"){const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();if(own.error||!own.data||own.data.id!==x.client_id){toast("Só pode editar os seus próprios serviços.");return}}
   const d=new Date(x.scheduled_at),local=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
   let notes={};try{notes=JSON.parse(x.notes||"{}")}catch(e){}
@@ -2972,7 +2947,7 @@ function openEditService(id){
   const allItems=[...requested,...additional];
   const itemRows=allItems.map((it,i)=>'<div class="two edit-service-item" data-item-index="'+i+'"><div class="field"><label>Item '+(i+1)+' · nome</label><input class="edit-item-name" value="'+esc(it.name||it.code||"")+'"></div><div class="field"><label>Quantidade × preço unitário</label><div class="two"><input class="edit-item-qty" type="number" min="0" step="1" value="'+Math.max(0,Number(it.quantity||1))+'"><input class="edit-item-price" type="number" min="0" step="0.01" value="'+Math.max(0,Number(it.unit_price||0))+'"></div></div></div>').join("");
   openModal("Editar todos os dados · "+esc(x.code),
-   '<div class="notice">Edite os dados do serviço, itens e valores. O histórico será preservado. Só é permitido editar antes de o serviço começar.</div>'+
+   '<div class="notice">Edite o serviço mesmo durante a execução. O funcionário atribuído receberá uma notificação com as alterações. O estado e o registo real de início serão preservados.</div>'+
    '<div class="field"><label>Imóvel / apartamento</label><select id="editServiceProperty">'+propertyOptions+'</select></div>'+
    '<div class="two"><div class="field"><label>Tipo de serviço</label><input id="editServiceType" value="'+esc(x.service_type||"")+'" readonly></div><div class="field"><label>Tipologia / código</label><input id="editServiceTypology" value="'+esc(x.typology||"")+'"></div></div>'+
    '<div class="two"><div class="field"><label>Data e hora</label><input id="editServiceDate" type="datetime-local" value="'+esc(local)+'" required></div><div class="field"><label>Prioridade</label><select id="editServicePriority"><option value="normal" '+(x.priority==="normal"?"selected":"")+'>Normal</option><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="urgent" '+(x.priority==="urgent"?"selected":"")+'>Urgente</option></select></div></div>'+
@@ -2994,10 +2969,10 @@ async function saveEditedService(id){
  if(!["admin","supervisor","client"].includes(role())){toast("Sem permissão para editar este serviço.");return}
  const date=new Date($("editServiceDate")?.value||"");
  if(Number.isNaN(date.getTime())){toast("Introduza uma data e hora válidas.");return}
- if(date.getTime()<Date.now()-60000){toast("A data do serviço não pode estar no passado.");return}
+ 
  const current=await sb.from("services").select("id,client_id,property_id,status,requested_items,additional_items,notes,service_type").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();
  if(current.error||!current.data){toast("Não foi possível validar o serviço.");return}
- if(!["requested","scheduled"].includes(current.data.status)){toast("O serviço já começou ou foi finalizado e não pode ser editado por este formulário.");return}
+ if(["completed","cancelled","approved","supervised","rejected"].includes(current.data.status)||(role()==="client"&&!["requested","scheduled"].includes(current.data.status))){toast("Este serviço não pode ser editado neste estado pelo seu perfil.");return}
  if(role()==="client"){const own=await sb.from("clients").select("id").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();if(own.error||!own.data||own.data.id!==current.data.client_id){toast("Só pode editar os seus próprios serviços.");return}}
  const propertyId=$("editServiceProperty")?.value||current.data.property_id;
  const prop=await sb.from("properties").select("id,client_id").eq("id",propertyId).eq("company_id",currentProfile.company_id).maybeSingle();
@@ -3009,10 +2984,46 @@ async function saveEditedService(id){
  const priority=$("editServicePriority")?.value||"normal",instructions=$("editServiceInstructions")?.value.trim()||null,typology=$("editServiceTypology")?.value.trim()||null;
  let notes={};try{notes=JSON.parse(current.data.notes||"{}")}catch(e){}
  notes.notes=$("editServiceNotes")?.value.trim()||null;
- const u=await sb.from("services").update({property_id:propertyId,typology,scheduled_at:date.toISOString(),priority,instructions,agreed_amount:amount,requested_items:items,additional_items:[],notes:JSON.stringify(notes),updated_by:currentUser.id,updated_at:new Date().toISOString()}).eq("id",id).eq("company_id",currentProfile.company_id).in("status",["requested","scheduled"]);
- if(u.error){toast("Não foi possível guardar: "+u.error.message);return}
- await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:id,actor_id:currentUser.id,event_type:"service_edited",metadata:{scheduled_at:date.toISOString(),priority,property_id:propertyId,typology,edited_by_role:role(),items_count:items.length}});
- closeModal();toast("Alterações guardadas.");renderServicesMaster();
+ const previous={
+ property_id:current.data.property_id,
+ typology:current.data.typology,
+ scheduled_at:current.data.scheduled_at,
+ priority:current.data.priority,
+ instructions:current.data.instructions,
+ agreed_amount:current.data.agreed_amount,
+ requested_items:current.data.requested_items||[],
+ additional_items:current.data.additional_items||[],
+ notes:current.data.notes
+};
+const next={
+ property_id:propertyId,typology,scheduled_at:date.toISOString(),priority,instructions,
+ agreed_amount:amount,requested_items:items,additional_items:[],
+ notes:JSON.stringify(notes),updated_by:currentUser.id,updated_by_at:new Date().toISOString(),updated_at:new Date().toISOString()
+};
+const labels={property_id:"Imóvel/apartamento",typology:"Tipologia",scheduled_at:"Data e horário",priority:"Prioridade",instructions:"Instruções",agreed_amount:"Valor acordado",requested_items:"Itens e quantidades",additional_items:"Itens adicionais",notes:"Observações"};
+const changed=Object.keys(labels).filter(k=>JSON.stringify(previous[k]??null)!==JSON.stringify(next[k]??null));
+if(!changed.length){toast("Não existem alterações para guardar.");return}
+const u=await sb.from("services").update(next).eq("id",id).eq("company_id",currentProfile.company_id);
+if(u.error){toast("Não foi possível guardar: "+u.error.message);return}
+const event=await sb.from("service_events").insert({company_id:currentProfile.company_id,service_id:id,actor_id:currentUser.id,event_type:"service_edited",metadata:{changed_fields:changed,field_labels:changed.map(k=>labels[k]),scheduled_at:date.toISOString(),priority,property_id:propertyId,typology,edited_by_role:role(),items_count:items.length,service_status_at_edit:current.data.status}});
+if(event.error)console.error("Serviço guardado, mas histórico não registado:",event.error.message);
+let notifyError=null;
+if(current.data.assigned_employee_id){
+ const detail=changed.map(k=>labels[k]).join(", ");
+ const notification=await sb.from("notifications").insert({
+  company_id:currentProfile.company_id,
+  recipient_id:current.data.assigned_employee_id,
+  title:"Serviço atualizado pelo "+(role()==="admin"?"Administrador":"Supervisor"),
+  body:"O serviço "+(current.data.code||id)+" foi alterado enquanto estava "+(current.data.status==="in_progress"?"em execução":current.data.status==="paused"?"pausado":current.data.status==="on_the_way"?"a caminho":"em andamento")+". Alterações: "+detail+". Abra o serviço para consultar os dados atualizados.",
+  severity:"warning",
+  related_object_type:"service",
+  related_object_id:id
+ });
+ if(notification.error){notifyError=notification.error.message;console.error("Não foi possível notificar o funcionário:",notifyError)}
+}
+closeModal();
+toast(notifyError?"Alterações guardadas, mas a notificação falhou: "+notifyError:"Alterações guardadas. O funcionário foi notificado.");
+await renderServicesMaster();
 }
 
 async function saveMaintenanceObservation(id){
@@ -3105,19 +3116,62 @@ async function setServiceStatusPremium(id,status){
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("service_status",{service_id:id,status,started_at:status==="in_progress"?now:null,finished_at:status==="completed"?now:null},current.data.updated_at);toast("Red interrumpida · estado puesto en cola")}else toast(r.error.message);return}
  toast("✓ Estado actualizado: "+(statusNames[status]||status));closeModal();await renderServicesMaster();updateOfflineIndicator();
 }
-async function uploadServiceMedia(serviceId){
- const input=$("serviceMediaFile");const files=Array.from(input?.files||[]);if(!files.length)return;
- for(const file of files){
-   const ext=(file.name.split(".").pop()||"bin").toLowerCase();
-   const type=file.type.startsWith("video")?"video":file.type.startsWith("audio")?"audio":(file.type.includes("pdf")||file.type.includes("word")||file.type.includes("excel")||/\\.(pdf|docx?|xlsx?)$/i.test(file.name))?"document":"photo";
-   const path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
-   const up=await sb.storage.from("service-media").upload(path,file,{upsert:false,contentType:file.type});
-   if(up.error){toast("Error al adjuntar "+file.name+": "+up.error.message);continue}
-   const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:type,storage_path:path,file_name:file.name,mime_type:file.type,size_bytes:file.size});
-   if(ins.error){await sb.storage.from("service-media").remove([path]);toast("Error al guardar "+file.name+": "+ins.error.message);continue}
- }
+function romanoMediaKind(file){
+ const name=String(file?.name||"").toLowerCase(),mime=String(file?.type||"").toLowerCase();
+ const ext=(name.match(/\.([a-z0-9]+)$/i)||[])[1]||"";
+ const imageExt=["jpg","jpeg","png","gif","webp","bmp","tif","tiff","heic","heif","avif","svg","jfif","raw","dng","cr2","nef","arw","orf","rw2"];
+ const videoExt=["mp4","m4v","mov","avi","mkv","webm","3gp","3g2","mpeg","mpg","mts","m2ts","wmv","flv","ogv","vob","mxf"];
+ if(mime.startsWith("image/")||imageExt.includes(ext))return "photo";
+ if(mime.startsWith("video/")||videoExt.includes(ext))return "video";
+ if(mime==="application/pdf"||ext==="pdf")return "document";
+ return "";
+}
+function romanoMediaMime(file){
+ if(file.type)return file.type;
+ const ext=(String(file.name||"").toLowerCase().match(/\.([a-z0-9]+)$/i)||[])[1]||"";
+ const map={jpg:"image/jpeg",jpeg:"image/jpeg",jfif:"image/jpeg",png:"image/png",gif:"image/gif",webp:"image/webp",bmp:"image/bmp",tif:"image/tiff",tiff:"image/tiff",heic:"image/heic",heif:"image/heif",avif:"image/avif",svg:"image/svg+xml",mp4:"video/mp4",m4v:"video/mp4",mov:"video/quicktime",avi:"video/x-msvideo",mkv:"video/x-matroska",webm:"video/webm","3gp":"video/3gpp",mpeg:"video/mpeg",mpg:"video/mpeg",mts:"video/mp2t",m2ts:"video/mp2t",wmv:"video/x-ms-wmv",flv:"video/x-flv",ogv:"video/ogg",pdf:"application/pdf"};
+ return map[ext]||"application/octet-stream";
+}
+async function uploadServiceMedia(serviceId,photosOnly=false){
+ const input=$("serviceMediaFile"),files=Array.from(input?.files||[]);
+ if(!files.length)return;
+ const eligible=files.filter(f=>romanoMediaKind(f)),rejected=files.length-eligible.length;
+ if(!eligible.length){toast("Formato não reconhecido. Anexe fotografias, vídeos ou ficheiros PDF.");if(input)input.value="";return}
+ const panel=input?.closest(".panel"),status=document.createElement("div");
+ status.className="notice";status.style.margin="10px 0";status.textContent="A preparar anexos…";
+ panel?.appendChild(status);
+ const setStatus=message=>{status.textContent=message};
+ let done=0,failed=0;
+ const queue=eligible.map(file=>({file}));
+ const worker=async()=>{
+  while(queue.length){
+   const item=queue.shift();if(!item)break;
+   try{
+    const kind=romanoMediaKind(item.file),mime=romanoMediaMime(item.file);
+    setStatus("A enviar ficheiros "+(done+failed+1)+"/"+eligible.length+"…");
+    if(item.file.size>50*1024*1024)throw new Error("O ficheiro excede o limite de 50 MB.");
+    const ext=(String(item.file.name||"ficheiro").split(".").pop()||"bin").toLowerCase().replace(/[^a-z0-9]/g,"")||"bin";
+    const path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
+    const up=await sb.storage.from("service-media").upload(path,item.file,{upsert:false,contentType:mime,cacheControl:"3600"});
+    if(up.error)throw up.error;
+    const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:kind,storage_path:path,file_name:item.file.name,mime_type:mime,size_bytes:item.file.size});
+    if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
+    done++;
+   }catch(err){failed++;console.error("ROMANO media upload:",err);item.error=err?.message||String(err)}
+   setStatus("Anexos guardados: "+done+"/"+eligible.length+(failed?" · falharam: "+failed:""));
+  }
+ };
+ await Promise.all(Array.from({length:Math.min(3,eligible.length)},worker));
  if(input)input.value="";
- toast("Archivos adjuntos guardados");viewService(serviceId)
+ if(done){
+  setStatus(done+" ficheiro(s) guardado(s) no serviço."+(failed?" "+failed+" falharam.":"")+(rejected?" "+rejected+" formato(s) não reconhecido(s).":""));
+  await viewService(serviceId);
+  toast(done+" anexo(s) guardado(s)."+(failed?" "+failed+" falharam.":"")+(rejected?" "+rejected+" formato(s) ignorados.":""));
+ }else{
+  setStatus("Nenhum ficheiro foi guardado. "+(rejected?rejected+" formato(s) não reconhecidos.":"Verifique a ligação e tente novamente."));
+  toast("Não foi possível guardar os anexos. Verifique o formato e a ligação.");
+ }
+ setTimeout(()=>status.remove(),failed||rejected?10000:2500);
 }
 async function downloadServiceMedia(path){
  const r=await sb.storage.from("service-media").createSignedUrl(path,300);
@@ -3565,6 +3619,7 @@ async function renderDocuments(){
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Documentos seguros</h3><div class="muted">Documentación vinculada a clientes · Storage privado + RLS</div></div></div><p class="muted">Cada archivo queda asociado a un cliente concreto y el acceso se valida en el backend.</p>'+(cards.length?'<table class="table"><thead><tr><th>Cliente</th><th>Documento</th><th>Tipo</th><th>Archivo</th><th>Fecha</th><th></th></tr></thead><tbody>'+cards.map(x=>'<tr><td>'+esc(x.clients?.name||"—")+'</td><td>'+esc(x.title)+'</td><td>'+esc(documentTypeLabel(x.document_type))+'</td><td>'+esc(x.file_name)+' · '+formatFileSize(x.size_bytes)+'</td><td>'+esc(new Date(x.created_at).toLocaleDateString("es-ES"))+'</td><td>'+(x._url?'<a class="btn" href="'+esc(x._url)+'" target="_blank" rel="noopener">Ver / Descargar</a>':"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No hay documentos cargados.</div>')+'</div>';
 }
 
+function setFinanceTab(tab){window.__romanoFinanceTab=tab==="costs"?"costs":"calculations";renderFinance();}
 async function renderFinance(){
  const admin=role()==="admin";
  const monthDefault=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit"}).format(new Date());
@@ -3573,6 +3628,7 @@ async function renderFinance(){
  const from=new Date(yy,mm-1,1).toISOString();
  const to=new Date(yy,mm,1).toISOString();
  const fmt=v=>Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"});
+ const financeTab=window.__romanoFinanceTab||"calculations";
  if(!admin){
   const [iv,pay]=await Promise.all([
    sb.from("invoices").select("number,status,subtotal,tax_rate,tax_amount,total,due_at,paid_at,created_at").order("created_at",{ascending:false}).limit(100),
@@ -3587,7 +3643,7 @@ async function renderFinance(){
  const [sv,sc,fe,iv,pay,pr,cc]=await Promise.all([
   sb.from("services").select("id,client_id,property_id,typology,service_type,status,agreed_amount,finished_at,scheduled_at").eq("company_id",currentProfile.company_id).in("status",["completed","approved","supervised"]).gte("finished_at",from).lt("finished_at",to),
   sb.from("service_costs").select("id,service_id,category,description,amount,incurred_at").eq("company_id",currentProfile.company_id).gte("incurred_at",from).lt("incurred_at",to),
-  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at,property_id").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
+  sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at,property_id,hours,hourly_rate,unit_mode,unit_label").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
   sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
   sb.from("payments").select("amount,paid_at").eq("company_id",currentProfile.company_id).gte("paid_at",from).lt("paid_at",to),
   sb.from("properties").select("id,name,code,beds_single,beds_double").eq("company_id",currentProfile.company_id),
@@ -3617,7 +3673,8 @@ async function renderFinance(){
   autoLaundryCost+=laundry;autoAmenitiesCost+=amenities;autoKitchenCost+=kitchen;
   typ[t].cost+=(serviceCosts[x.id]||0)+laundry+amenities+kitchen;
  });
- entries.forEach(x=>{const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";if(!typ[t])return;if(x.entry_type==="income")typ[t].revenue+=Number(x.amount||0);else typ[t].cost+=Number(x.amount||0)});
+ entries.filter(x=>!/manuten|maintenance/i.test(String(x.category||""))).forEach(x=>{const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";if(!typ[t])return;if(x.entry_type==="income")typ[t].revenue+=Number(x.amount||0);else typ[t].cost+=Number(x.amount||0)});
+ const maintenanceEntries=entries.filter(x=>/manuten|maintenance/i.test(String(x.category||""))),maintenanceIncome=maintenanceEntries.filter(x=>x.entry_type==="income").reduce((a,x)=>a+Number(x.amount||0),0),maintenanceExpense=maintenanceEntries.filter(x=>x.entry_type==="expense").reduce((a,x)=>a+Number(x.amount||0),0),maintenanceHours=maintenanceEntries.reduce((a,x)=>a+Number((x.hours??(x.unit_mode==="hour"?x.quantity:0))||0),0),maintenanceHourlyAvg=maintenanceHours?maintenanceIncome/maintenanceHours:0;
  const extraIncome=entries.filter(x=>x.entry_type==="income").reduce((a,x)=>a+Number(x.amount||0),0);
  const payrollEntries=entries.filter(x=>x.entry_type==="expense"&&/^(salários|salarios)$/i.test(String(x.category||"")));
  const recordedPayroll=payrollEntries.reduce((a,x)=>a+Number(x.amount||0),0);
@@ -3629,7 +3686,8 @@ async function renderFinance(){
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0)+autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
  const totalRevenue=serviceRevenue+extraIncome,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
  const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
- const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense);
+ const alreadyAssignedExpenses=entries.filter(e=>e.entry_type==="expense"&&(e.property_id||String(e.typology||"").match(/T[1-5]/i))).reduce((a,e)=>a+Number(e.amount||0),0);
+ const sharedOther=Math.max(0,manualExpense-alreadyAssignedExpenses);
  const cleaningServices=completedServices.filter(x=>!!String(x.typology||"").match(/T[1-5]/i)&&!/manuten|maintenance/i.test(String(x.service_type||"")));
  const monthlyCleaningCount=cleaningServices.length;
  const fixedPerService=monthlyCleaningCount?(payroll+transport+sharedOther)/monthlyCleaningCount:0;
@@ -3644,19 +3702,20 @@ async function renderFinance(){
  }).join("");
  const costCatalogRows=costCatalog.map(c=>`<tr><td>${esc(c.name)}${c.is_active?"":' <span class="pill">Inativo</span>'}</td><td>${esc(c.unit)}</td><td><input type="number" min="0" step="0.01" id="cost_${c.id}" value="${Number(c.unit_cost||0).toFixed(2)}" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost('${c.id}')">Guardar</button> <button class="btn" type="button" onclick="toggleCompanyCost('${c.id}', ${!c.is_active})">${c.is_active?"Desativar":"Reativar"}</button> <button class="btn" type="button" onclick="deleteCompanyCost('${c.id}')">Excluir</button></td></tr>`).join("");
  const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense"),...(recordedPayroll>0?[]:[{category:"Salários",amount:payroll}]),...(transportRecorded>0?[]:[{category:"Transportes",amount:transport}]),...(autoLaundryCost?[{category:"Lavandaria (custo por cama)",amount:autoLaundryCost}]:[]),...(autoAmenitiesCost?[{category:"Amenities",amount:autoAmenitiesCost}]:[]),...(autoKitchenCost?[{category:"Kit cozinha",amount:autoKitchenCost}]:[])].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
- const typRows=typologies.map(t=>'<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].cost)+'</td><td><b>'+fmt(typ[t].revenue-typ[t].cost)+'</b></td></tr>').join("");
+ const typRows=typologies.map(t=>{const fixed=typ[t].count*fixedPerService,totalCost=typ[t].cost+fixed,profit=typ[t].revenue-totalCost,costPer=typ[t].count?totalCost/typ[t].count:0,profitPer=typ[t].count?profit/typ[t].count:0;return '<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].cost)+'</td><td>'+fmt(fixed)+'</td><td>'+fmt(totalCost)+'</td><td>'+fmt(costPer)+'</td><td><b>'+fmt(profitPer)+'</b></td><td><b>'+fmt(profit)+'</b></td></tr>'}).join("");
  const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
- const entryRows=entries.map(x=>'<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td>'+esc(x.description||"—")+'</td><td>'+esc(x.typology||"—")+(x.property_id?'<div class="muted">Apartamento associado</div>':"")+'</td><td>'+Number(x.quantity||0)+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="editFinanceEntry(\&#39;'+String(x.id)+'\&#39;)">Editar</button> <button class="btn" type="button" onclick="deleteFinanceEntry(\&#39;'+String(x.id)+'\&#39;)">Apagar</button></td></tr>').join("");
+ const entryRows=entries.map(x=>'<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td style="white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.45">'+esc(x.description||"—")+'</td><td>'+esc(x.typology||"—")+(x.property_id?'<div class="muted">Apartamento associado</div>':"")+'</td><td>'+Number(x.hours??x.quantity??0)+(x.unit_mode==="hour"?" h":"")+'</td><td>'+(x.unit_mode==="hour"?fmt(x.hourly_rate??x.unit_amount)+" / h":"—")+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="editFinanceEntry(\&#39;'+String(x.id)+'\&#39;)">Editar</button> <button class="btn" type="button" onclick="deleteFinanceEntry(\&#39;'+String(x.id)+'\&#39;)">Apagar</button></td></tr>').join("");
  $("content").innerHTML=
- '<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Mês: '+esc(month)+' · Os serviços concluídos vêm da operação; os lançamentos manuais ficam guardados no PostgreSQL.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button><button class="btn" type="button" onclick="newFinanceEntry()">＋ Novo lançamento</button></div></div>'+
- '<div class="grid"><div class="stat"><small>Vendas totais do mês</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>Gastos totais do mês</small><strong>'+fmt(totalExpense)+'</strong></div><div class="stat"><small>Lucro / prejuízo do mês</small><strong>'+fmt(operating)+'</strong></div><div class="stat"><small>Lucro médio por limpeza</small><strong>'+fmt(monthlyCleaningCount?operating/monthlyCleaningCount:0)+'</strong></div></div>'+
- '<div class="grid"><div class="stat"><small>Serviços concluídos</small><strong>'+completedServices.length+'</strong></div><div class="stat"><small>Receita total</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>Faturas emitidas (informativo)</small><strong>'+fmt(invoices.reduce((a,x)=>a+Number(x.total||0),0))+'</strong></div><div class="stat"><small>Pagamentos recebidos (informativo)</small><strong>'+fmt(payments.reduce((a,x)=>a+Number(x.amount||0),0))+'</strong></div></div></div>'+
- '<div class="panel"><div class="panel-head"><h3>Custos unitários da empresa</h3><span class="muted">Altera aqui os teus custos reais; os cálculos usam estes valores.</span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Custo</th><th>Unidade</th><th>Valor (€)</th><th></th></tr></thead><tbody>'+costCatalogRows+'</tbody></table></div><div class="muted">Podes atualizar lavandaria por cama, amenities por limpeza, kit por limpeza, salários e transporte mensal. Outros custos podem ser lançados em “Novo lançamento”.</div></div>'+
- '<div class="panel"><div class="panel-head"><h3>Lucro detalhado por apartamento</h3><span class="muted">Receita − custos diretos − parcela dos salários e transportes.</span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Apartamento</th><th>Tipo</th><th>Camas</th><th>Venda</th><th>Gastos diretos</th><th>Fixos rateados</th><th>Lucro estimado</th></tr></thead><tbody>'+propertyDetailRows+'</tbody></table></div></div>'+
- '<div class="panel"><div class="panel-head"><h3>Produção e margem por tipologia</h3><span class="muted">Margem de contribuição = receita dos serviços − custos diretamente associados</span></div><table class="table"><thead><tr><th>Tipologia</th><th>Quantidade</th><th>Receita</th><th>Custos diretos</th><th>Margem</th></tr></thead><tbody>'+typRows+'</tbody></table></div>'+
- '<div class="panel"><div class="panel-head"><h3>Despesas por categoria</h3><span class="muted">Inclui salários mensais, lavandaria por cama, amenities, kit de cozinha, custos de serviço e despesas gerais.</span></div>'+(expenseRows?'<table class="table"><thead><tr><th>Categoria</th><th>Total</th></tr></thead><tbody>'+expenseRows+'</tbody></table>':'<div class="empty">Ainda não existem despesas registadas neste mês.</div>')+'</div>'+
- '<div class="panel"><div class="panel-head"><h3>Lançamentos manuais</h3><span class="muted">Vendas extras, salários, lavandaria, montagem, amenities, kits, transporte e despesas fixas.</span></div>'+(entryRows?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Tipologia</th><th>Qtd.</th><th>Valor</th><th></th></tr></thead><tbody>'+entryRows+'</tbody></table></div>':'<div class="empty">Nenhum lançamento manual. Use “Novo lançamento” para registar vendas extras ou despesas.</div>')+'</div>'+
- '<div class="panel"><div class="muted"><b>Nota:</b> as faturas e os pagamentos são apresentados separadamente para não somar duas vezes a mesma receita. Despesas sem tipologia entram no resultado mensal, mas não são distribuídas artificialmente pelas margens T1–T5.</div></div>';
+ '<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Mês: '+esc(month)+' · Os serviços concluídos vêm da operação; os lançamentos manuais ficam guardados no PostgreSQL.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button><button class="btn" type="button" onclick="newFinanceEntry()">＋ Novo lançamento</button></div></div><div class="actions" style="margin-top:12px"><button class="btn '+(financeTab==="calculations"?"gold":"")+'" type="button" onclick="setFinanceTab(\'calculations\')">CÁLCULOS</button><button class="btn '+(financeTab==="costs"?"gold":"")+'" type="button" onclick="setFinanceTab(\'costs\')">CUSTOS UNITÁRIOS</button></div>'+
+ '<div class="grid" style="display:'+(financeTab==="calculations"?"grid":"none")+'"><div class="stat"><small>Vendas totais do mês</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>Gastos totais do mês</small><strong>'+fmt(totalExpense)+'</strong></div><div class="stat"><small>Lucro / prejuízo do mês</small><strong>'+fmt(operating)+'</strong></div><div class="stat"><small>Lucro médio por limpeza</small><strong>'+fmt(monthlyCleaningCount?operating/monthlyCleaningCount:0)+'</strong></div></div>'+
+ '<div class="grid" style="display:'+(financeTab==="calculations"?"grid":"none")+'"><div class="stat"><small>Serviços concluídos</small><strong>'+completedServices.length+'</strong></div><div class="stat"><small>Receita total</small><strong>'+fmt(totalRevenue)+'</strong></div><div class="stat"><small>Faturas emitidas (informativo)</small><strong>'+fmt(invoices.reduce((a,x)=>a+Number(x.total||0),0))+'</strong></div><div class="stat"><small>Pagamentos recebidos (informativo)</small><strong>'+fmt(payments.reduce((a,x)=>a+Number(x.amount||0),0))+'</strong></div></div></div>'+
+ '<div class="grid" style="display:'+(financeTab==="calculations"?"grid":"none")+'"><div class="stat"><small>Receita de manutenção (separada da limpeza)</small><strong>'+fmt(maintenanceIncome)+'</strong></div><div class="stat"><small>Horas de manutenção</small><strong>'+maintenanceHours.toLocaleString("pt-PT")+' h</strong></div><div class="stat"><small>Valor médio por hora</small><strong>'+fmt(maintenanceHourlyAvg)+'</strong></div><div class="stat"><small>Despesas de manutenção</small><strong>'+fmt(maintenanceExpense)+'</strong></div></div>'+
+ '<div class="panel" style="display:'+(financeTab==="costs"?"block":"none")+'"><div class="panel-head"><h3>Custos unitários da empresa</h3><span class="muted">Altera aqui os teus custos reais; os cálculos usam estes valores.</span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Custo</th><th>Unidade</th><th>Valor (€)</th><th></th></tr></thead><tbody>'+costCatalogRows+'</tbody></table></div><div class="muted">Podes atualizar lavandaria por cama, amenities por limpeza, kit por limpeza, salários e transporte mensal. Outros custos podem ser lançados em “Novo lançamento”.</div></div>'+
+ '<div class="panel" style="display:'+(financeTab==="calculations"?"block":"none")+'"><div class="panel-head"><h3>Lucro detalhado por apartamento</h3><span class="muted">Receita − custos diretos − parcela dos salários e transportes.</span></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Apartamento</th><th>Tipo</th><th>Camas</th><th>Venda</th><th>Gastos diretos</th><th>Fixos rateados</th><th>Lucro estimado</th></tr></thead><tbody>'+propertyDetailRows+'</tbody></table></div></div>'+
+ '<div class="panel" style="display:'+(financeTab==="calculations"?"block":"none")+'"><div class="panel-head"><h3>Lucro e custo total por tipologia</h3><span class="muted">Lucro após custos diretos e rateio dos custos mensais partilhados.</span></div><table class="table"><thead><tr><th>Tipologia</th><th>Limpezas</th><th>Vendas totais</th><th>Custos diretos</th><th>Custos mensais rateados</th><th>Gasto total</th><th>Custo por limpeza</th><th>Lucro por limpeza</th><th>Lucro total</th></tr></thead><tbody>'+typRows+'</tbody></table></div>'+
+ '<div class="panel" style="display:'+(financeTab==="calculations"?"block":"none")+'"><div class="panel-head"><h3>Despesas por categoria</h3><span class="muted">Inclui salários mensais, lavandaria por cama, amenities, kit de cozinha, custos de serviço e despesas gerais.</span></div>'+(expenseRows?'<table class="table"><thead><tr><th>Categoria</th><th>Total</th></tr></thead><tbody>'+expenseRows+'</tbody></table>':'<div class="empty">Ainda não existem despesas registadas neste mês.</div>')+'</div>'+
+ '<div class="panel" style="display:'+(financeTab==="calculations"?"block":"none")+'"><div class="panel-head"><h3>Lançamentos manuais</h3><span class="muted">Vendas extras, salários, lavandaria, montagem, amenities, kits, transporte e despesas fixas.</span></div>'+(entryRows?'<div style="overflow-x:auto"><table class="table" style="min-width:1050px;table-layout:fixed"><colgroup><col style="width:105px"><col style="width:95px"><col style="width:145px"><col style="width:360px"><col style="width:150px"><col style="width:90px"><col style="width:120px"><col style="width:115px"><col style="width:150px"></colgroup><thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Tipologia</th><th>Horas / qtd.</th><th>Valor por hora</th><th>Valor total</th><th></th></tr></thead><tbody>'+entryRows+'</tbody></table></div>':'<div class="empty">Nenhum lançamento manual. Use “Novo lançamento” para registar vendas extras ou despesas.</div>')+'</div>'+
+ '<div class="panel" style="display:'+(financeTab==="calculations"?"block":"none")+'"><div class="muted"><b>Nota:</b> as faturas e os pagamentos são apresentados separadamente para não somar duas vezes a mesma receita. Despesas associadas a apartamento ou tipologia entram nessa categoria; salários, transportes e despesas gerais sem associação são rateados pelo número de limpezas concluídas.</div></div>';
 }
 async function saveCompanyCost(id){
  if(role()!=="admin"){toast("Apenas o Administrador pode alterar custos.");return}
@@ -3778,7 +3837,7 @@ async function saveFinanceEntry(e,id=null){
  if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unit)||unit<=0){toast("Introduza apenas as horas e confirme a tarifa automática do catálogo.");return}
  const propertyId=$("feProperty").value||null,property=(window.__financeProperties||[]).find(v=>v.id===propertyId);
  const maintenanceName=maintenance?($("feMaintenanceType").selectedOptions?.[0]?.textContent||"").split(" · ")[0]:""; const description=maintenance?([maintenanceName,$("feWorkDescription").value.trim()].filter(Boolean).join(" — ")):$("feDescription").value.trim();
- const payload={entry_type:$("feType").value,category:$("feCategory").value,description:description||null,typology:$("feTypology").value||null,quantity,unit_amount:unit,amount:Math.round(quantity*unit*100)/100,entry_date:$("feDate").value,client_id:$("feClient").value||property?.client_id||null,property_id:propertyId,hours:maintenance?quantity:null,hourly_rate:maintenance?unit:null,unit_mode:maintenance?"hour":null,unit_label:maintenance?"hora":($("feCategory").value==="Limpeza"?"limpeza":null)};
+ const payload={entry_type:$("feType").value,category:$("feCategory").value,description:description||null,typology:$("feTypology").value||null,quantity,unit_amount:unit,entry_date:$("feDate").value,client_id:$("feClient").value||property?.client_id||null,property_id:propertyId,hours:maintenance?quantity:null,hourly_rate:maintenance?unit:null,unit_mode:maintenance?"hour":"unit",unit_label:maintenance?"hora":($("feCategory").value==="Limpeza"?"limpeza":"unidade")};
  const query=id?sb.from("finance_entries").update(payload).eq("id",id).eq("company_id",currentProfile.company_id):sb.from("finance_entries").insert({...payload,company_id:currentProfile.company_id,created_by:currentUser.id});
  const r=await query.select("id").single();if(r.error){toast("Não foi possível guardar: "+r.error.message);return}
  closeModal();toast(id?"Lançamento atualizado.":"Lançamento financeiro guardado.");await renderFinance();
@@ -4420,7 +4479,7 @@ window.addEventListener("focus",()=>{romanoApplyPendingUpdate();checkRomanoProdu
 window.addEventListener("pageshow",()=>{registerRomanoServiceWorker().catch(()=>{});checkRomanoProductionUpdate()},{passive:true});
 function scheduleRomanoSWUpdates(){
  if(__romanoSWUpdateTimer)clearInterval(__romanoSWUpdateTimer);
- __romanoSWUpdateTimer=setInterval(()=>{registerRomanoServiceWorker().catch(()=>{});checkRomanoProductionUpdate()},120000);
+ __romanoSWUpdateTimer=setInterval(()=>{registerRomanoServiceWorker().catch(()=>{});checkRomanoProductionUpdate()},60000);
 }
 scheduleRomanoSWUpdates();
 async function testBackgroundNotification(){
@@ -4447,10 +4506,10 @@ function roleAvatarUrl(roleValue){return roleAvatarSvg(roleValue,96);}
 
 const ROMANO_I18N={
 es:{
- "Solicitações de materiais":"Solicitudes de materiales","Pedir material":"Solicitar material","Marcar resolvido":"Marcar como finalizado","Apagar":"Eliminar","Sem solicitações.":"No hay solicitudes.","Resolvido":"Finalizado","Solicitado":"Solicitado","Programado":"Programado","A caminho":"En camino","En curso":"Iniciado","Iniciado":"Iniciado","Finalizado":"Finalizado","Prioridade urgente":"Prioridad urgente","LIMPIEZA URGENTE":"LIMPIEZA URGENTE","Nuevo servicio":"Nuevo servicio","Servicios":"Servicios","Dashboard 360":"Panel 360","Centro operativo":"Centro operativo","Calendario / Agenda":"Calendario / Agenda","Solicitudes de cambio de horario":"Solicitudes de cambio de horario","Catálogo de Mantenimiento":"Catálogo de mantenimiento","Catálogo de Limpieza":"Catálogo de limpieza","Clientes":"Clientes","Propiedades / Apartamentos":"Propiedades / Apartamentos","Unidades / Áreas":"Unidades / Áreas","Representantes":"Representantes","Empleados":"Empleados","Equipos / Plan mensul":"Equipos / Plan mensual","Mi Jornada":"Mi jornada","Geolocalización / Radar":"Geolocalización / Radar","Stock de productos y materiales":"Stock de productos y materiales","Servicios recurrentes":"Servicios recurrentes","Presupuestos":"Presupuestos","Finanzas":"Finanzas","Recibos / Comprobantes":"Recibos / comprobantes","Facturas":"Facturas","Documentos / Contratos":"Documentos / contratos","Histórico de servicios":"Historial de servicios","Arquivo de fotos, vídeos e incidências":"Archivo de fotos, vídeos e incidencias","Inspeção de apartamentos":"Inspección de apartamentos","Notificaciones":"Notificaciones","Búsqueda global":"Búsqueda global","Informes":"Informes","Sincronización offline":"Sincronización sin conexión","Backup / Recuperación":"Copia de seguridad / Recuperación","Auditoría":"Auditoría","Privacidad / RGPD":"Privacidad / RGPD","Seguridad / MFA":"Seguridad / MFA","Mi perfil":"Mi perfil","Cerrar sesión":"Cerrar sesión","Cerrar":"Cerrar","Actualizar":"Actualizar","Instalar app":"Instalar aplicación","Ver detalle":"Ver detalle","Eliminar":"Eliminar","Designar funcionario":"Asignar empleado","Prioridad":"Prioridad","Urgente":"Urgente","Normal":"Normal","Cliente":"Cliente","Apartamento":"Apartamento","Dirección":"Dirección","Tipología":"Tipología","Fecha":"Fecha","Sin programar":"Sin programar","Sin IVA":"Base imponible","IVA":"IVA","Total":"Total","Pendiente":"Pendiente","Aceptado":"Aceptado","Rechazado":"Rechazado","Nuevo presupuesto":"Nuevo presupuesto","Esperando aprobación":"Pendiente de aprobación","Aceptados":"Aceptados","Rechazados":"Rechazados","Facturas generadas":"Facturas generadas","Histórico de presupuestos":"Historial de presupuestos","Configuración del correo responsable":"Configuración del correo responsable","Enviar presupuesto al cliente":"Enviar presupuesto al cliente","Enviar esta factura al cliente":"Enviar esta factura al cliente","Guardar":"Guardar","Cancelar":"Cancelar","Editar":"Editar","Buscar":"Buscar","Nombre":"Nombre","Correo electrónico":"Correo electrónico","Teléfono":"Teléfono","Guardar cambios":"Guardar cambios","Sin resultados":"Sin resultados","No hay servicios registrados.":"No hay servicios registrados.","Emergencias 24H":"Emergencias 24 h","Abrir incidencia":"Abrir incidencia","Pendiente de aceptación":"Pendiente de aceptación","En camino":"En camino","Español":"Español","Português":"Portugués"
+ "Solicitações de materiais":"Solicitudes de materiales","Pedir material":"Solicitar material","Marcar resolvido":"Marcar como finalizado","Apagar":"Eliminar","Sem solicitações.":"No hay solicitudes.","Resolvido":"Finalizado","Solicitado":"Solicitado","Programado":"Programado","A caminho":"En camino","En curso":"Iniciado","Iniciado":"Iniciado","Finalizado":"Finalizado","Prioridade urgente":"Prioridad urgente","LIMPIEZA URGENTE":"LIMPIEZA URGENTE","Nuevo servicio":"Nuevo servicio","Servicios":"Servicios","Dashboard 360":"Panel 360","Centro operativo":"Centro operativo","Calendario / Agenda":"Calendario / Agenda","Solicitudes de cambio de horario":"Solicitudes de cambio de horario","Catálogo de Mantenimiento":"Catálogo de mantenimiento","Catálogo de Limpieza":"Catálogo de limpieza","Clientes":"Clientes","Propiedades / Apartamentos":"Propiedades / Apartamentos","Unidades / Áreas":"Unidades / Áreas","Representantes":"Representantes","Empleados":"Empleados","Equipos / Plan mensul":"Equipos / Plan mensual","Mi Jornada":"Mi jornada","Geolocalización / Radar":"Geolocalización / Radar","Stock de productos y materiales":"Stock de productos y materiales","Servicios recurrentes":"Servicios recurrentes","Presupuestos":"Presupuestos","Finanzas":"Finanzas","Recibos / Comprobantes":"Recibos / comprobantes","Facturas":"Facturas","Documentos / Contratos":"Documentos / contratos","Histórico de servicios":"Historial de servicios","Arquivo de fotos, vídeos e incidências":"Archivo de fotos, vídeos e incidencias","Inspeção de apartamentos":"Inspección de apartamentos","Notificaciones":"Notificaciones","Búsqueda global":"Búsqueda global","Informes":"Informes","Sincronización offline":"Sincronización sin conexión","Backup / Recuperación":"Copia de seguridad / Recuperación","Auditoría":"Auditoría","Privacidad / RGPD":"Privacidad / RGPD","Seguridad / MFA":"Seguridad / MFA","Mi perfil":"Mi perfil","Cerrar sesión":"Cerrar sesión","Cerrar":"Cerrar","Actualizar":"Actualizar","Instalar app":"Instalar aplicación","Ver detalle":"Ver detalle","Eliminar":"Eliminar","Designar funcionario":"Asignar empleado","Prioridad":"Prioridad","Urgente":"Urgente","Normal":"Normal","Cliente":"Cliente","Apartamento":"Apartamento","Dirección":"Dirección","Tipología":"Tipología","Fecha":"Fecha","Sin programar":"Sin programar","Sin IVA":"Base imponible","IVA":"IVA","Total":"Total","Pendiente":"Pendiente","Aceptado":"Aceptado","Rechazado":"Rechazado","Nuevo presupuesto":"Nuevo presupuesto","Esperando aprobación":"Pendiente de aprobación","Aceptados":"Aceptados","Rechazados":"Rechazados","Facturas generadas":"Facturas generadas","Histórico de presupuestos":"Historial de presupuestos","Configuración del correo responsable":"Configuración del correo responsable","Enviar presupuesto al cliente":"Enviar presupuesto al cliente","Enviar esta factura al cliente":"Enviar esta factura al cliente","Guardar":"Guardar","Cancelar":"Cancelar","Editar":"Editar","Buscar":"Buscar","Nombre":"Nombre","Correo electrónico":"Correo electrónico","Teléfono":"Teléfono","Guardar cambios":"Guardar cambios","Sin resultados":"Sin resultados","No hay servicios registrados.":"No hay servicios registrados.","Emergencias 24H":"Emergencias 24 h","Abrir incidencia":"Abrir incidencia","Pendiente de aceptación":"Pendiente de aceptación","En camino":"En camino","Español":"Español","Português":"Portugués","Instruções de acesso e dados do imóvel":"Instrucciones de acceso y datos del inmueble","Não existem instruções de acesso preenchidas na ficha deste imóvel.":"No hay instrucciones de acceso registradas en la ficha de este inmueble.","Localização das chaves":"Ubicación de las llaves","Morada do depósito das chaves":"Dirección del depósito de llaves","Código do depósito":"Código del depósito","Código da porta exterior":"Código de la puerta exterior","Instruções para entrega/retirada das chaves":"Instrucciones para la entrega/recogida de llaves","Morada":"Dirección","Código postal":"Código postal","Cidade":"Ciudad","País":"País","Camas individuais":"Camas individuales","Camas duplas/King":"Camas dobles/King"
 },
 pt:{
- "Solicitudes de materiales":"Solicitações de materiais","Solicitar material":"Pedir material","Marcar como finalizado":"Marcar como concluído","No hay solicitudes.":"Não há solicitações.","Finalizado":"Finalizado","Solicitado":"Solicitado","Programado":"Programado","En camino":"A caminho","Iniciado":"Iniciado","Prioridad urgente":"Prioridade urgente","Nuevo servicio":"Novo serviço","Servicios":"Serviços","Panel 360":"Painel 360","Dashboard 360":"Painel 360","Centro operativo":"Centro operacional","Calendario / Agenda":"Calendário / Agenda","Solicitudes de cambio de horario":"Solicitações de alteração de horário","Catálogo de mantenimiento":"Catálogo de manutenção","Catálogo de limpieza":"Catálogo de limpeza","Clientes":"Clientes","Propiedades / Apartamentos":"Propriedades / Apartamentos","Unidades / Áreas":"Unidades / Áreas","Representantes":"Representantes","Empleados":"Funcionários","Equipos / Plan mensual":"Equipas / Plano mensal","Mi jornada":"A minha jornada","Geolocalización / Radar":"Geolocalização / Radar","Solicitudes de materiales":"Solicitações de materiais","Stock de productos y materiales":"Stock de produtos e materiais","Servicios recurrentes":"Serviços recorrentes","Presupuestos":"Orçamentos","Finanzas":"Finanças","Recibos / comprobantes":"Recibos / comprovativos","Facturas":"Faturas","Documentos / contratos":"Documentos / contratos","Historial de servicios":"Histórico de serviços","Archivo de fotos, vídeos e incidencias":"Arquivo de fotos, vídeos e ocorrências","Inspección de apartamentos":"Inspeção de apartamentos","Notificaciones":"Notificações","Búsqueda global":"Pesquisa global","Informes":"Relatórios","Sincronización sin conexión":"Sincronização offline","Copia de seguridad / Recuperación":"Cópia de segurança / Recuperação","Auditoría":"Auditoria","Privacidad / RGPD":"Privacidade / RGPD","Seguridad / MFA":"Segurança / MFA","Mi perfil":"O meu perfil","Cerrar sesión":"Terminar sessão","Cerrar":"Fechar","Actualizar":"Atualizar","Instalar aplicación":"Instalar aplicação","Ver detalle":"Ver detalhe","Eliminar":"Eliminar","Asignar empleado":"Atribuir funcionário","Prioridad":"Prioridade","Urgente":"Urgente","Normal":"Normal","Cliente":"Cliente","Apartamento":"Apartamento","Dirección":"Morada","Tipología":"Tipologia","Fecha":"Data","Sin programar":"Sem agendamento","Base imponible":"Valor sem IVA","IVA":"IVA","Total":"Total","Pendiente":"Pendente","Aceptado":"Aceite","Rechazado":"Recusado","Nuevo presupuesto":"Novo orçamento","Pendiente de aprobación":"A aguardar aprovação","Aceptados":"Aceites","Rechazados":"Recusados","Facturas generadas":"Faturas geradas","Historial de presupuestos":"Histórico de orçamentos","Configuración del correo responsable":"Configuração do e-mail responsável","Enviar presupuesto al cliente":"Enviar orçamento ao cliente","Enviar esta factura al cliente":"Enviar esta fatura ao cliente","Guardar":"Guardar","Cancelar":"Cancelar","Editar":"Editar","Buscar":"Pesquisar","Nombre":"Nome","Correo electrónico":"E-mail","Teléfono":"Telefone","Guardar cambios":"Guardar alterações","Sin resultados":"Sem resultados","No hay servicios registrados.":"Não há serviços registados.","Emergencias 24 h":"Emergências 24H","Abrir incidencia":"Abrir ocorrência","Pendiente de aceptación":"A aguardar aceitação","Español":"Espanhol","Portugués":"Português (original)","Limpieza Airbnb":"Limpeza Airbnb","Limpieza alojamiento":"Limpeza de alojamento","Mantenimiento":"Manutenção","Pintura":"Pintura","Fontanería":"Canalização","Electricidad":"Eletricidade","Limpieza clínica":"Limpeza de clínica","Limpieza oficina":"Limpeza de escritório","Sin IVA":"Sem IVA","Base imponible":"Valor base","Dirección":"Morada","Solicitado":"Solicitado","En curso":"Em curso","A camino":"A caminho","Finalizado":"Finalizado"
+ "Solicitudes de materiales":"Solicitações de materiais","Solicitar material":"Pedir material","Marcar como finalizado":"Marcar como concluído","No hay solicitudes.":"Não há solicitações.","Finalizado":"Finalizado","Solicitado":"Solicitado","Programado":"Programado","En camino":"A caminho","Iniciado":"Iniciado","Prioridad urgente":"Prioridade urgente","Nuevo servicio":"Novo serviço","Servicios":"Serviços","Panel 360":"Painel 360","Dashboard 360":"Painel 360","Centro operativo":"Centro operacional","Calendario / Agenda":"Calendário / Agenda","Solicitudes de cambio de horario":"Solicitações de alteração de horário","Catálogo de mantenimiento":"Catálogo de manutenção","Catálogo de limpieza":"Catálogo de limpeza","Clientes":"Clientes","Propiedades / Apartamentos":"Propriedades / Apartamentos","Unidades / Áreas":"Unidades / Áreas","Representantes":"Representantes","Empleados":"Funcionários","Equipos / Plan mensual":"Equipas / Plano mensal","Mi jornada":"A minha jornada","Geolocalización / Radar":"Geolocalização / Radar","Solicitudes de materiales":"Solicitações de materiais","Stock de productos y materiales":"Stock de produtos e materiais","Servicios recurrentes":"Serviços recorrentes","Presupuestos":"Orçamentos","Finanzas":"Finanças","Recibos / comprobantes":"Recibos / comprovativos","Facturas":"Faturas","Documentos / contratos":"Documentos / contratos","Historial de servicios":"Histórico de serviços","Archivo de fotos, vídeos e incidencias":"Arquivo de fotos, vídeos e ocorrências","Inspección de apartamentos":"Inspeção de apartamentos","Notificaciones":"Notificações","Búsqueda global":"Pesquisa global","Informes":"Relatórios","Sincronización sin conexión":"Sincronização offline","Copia de seguridad / Recuperación":"Cópia de segurança / Recuperação","Auditoría":"Auditoria","Privacidad / RGPD":"Privacidade / RGPD","Seguridad / MFA":"Segurança / MFA","Mi perfil":"O meu perfil","Cerrar sesión":"Terminar sessão","Cerrar":"Fechar","Actualizar":"Atualizar","Instalar aplicación":"Instalar aplicação","Ver detalle":"Ver detalhe","Eliminar":"Eliminar","Asignar empleado":"Atribuir funcionário","Prioridad":"Prioridade","Urgente":"Urgente","Normal":"Normal","Cliente":"Cliente","Apartamento":"Apartamento","Dirección":"Morada","Tipología":"Tipologia","Fecha":"Data","Sin programar":"Sem agendamento","Base imponible":"Valor sem IVA","IVA":"IVA","Total":"Total","Pendiente":"Pendente","Aceptado":"Aceite","Rechazado":"Recusado","Nuevo presupuesto":"Novo orçamento","Pendiente de aprobación":"A aguardar aprovação","Aceptados":"Aceites","Rechazados":"Recusados","Facturas generadas":"Faturas geradas","Historial de presupuestos":"Histórico de orçamentos","Configuración del correo responsable":"Configuração do e-mail responsável","Enviar presupuesto al cliente":"Enviar orçamento ao cliente","Enviar esta factura al cliente":"Enviar esta fatura ao cliente","Guardar":"Guardar","Cancelar":"Cancelar","Editar":"Editar","Buscar":"Pesquisar","Nombre":"Nome","Correo electrónico":"E-mail","Teléfono":"Telefone","Guardar cambios":"Guardar alterações","Sin resultados":"Sem resultados","No hay servicios registrados.":"Não há serviços registados.","Emergencias 24 h":"Emergências 24H","Abrir incidencia":"Abrir ocorrência","Pendiente de aceptación":"A aguardar aceitação","Español":"Espanhol","Portugués":"Português (original)","Limpieza Airbnb":"Limpeza Airbnb","Limpieza alojamiento":"Limpeza de alojamento","Mantenimiento":"Manutenção","Pintura":"Pintura","Fontanería":"Canalização","Electricidad":"Eletricidade","Limpieza clínica":"Limpeza de clínica","Limpieza oficina":"Limpeza de escritório","Sin IVA":"Sem IVA","Base imponible":"Valor base","Dirección":"Morada","Solicitado":"Solicitado","En curso":"Em curso","A camino":"A caminho","Finalizado":"Finalizado","Instruções de acesso e dados do imóvel":"Instruções de acesso e dados do imóvel","Não existem instruções de acesso preenchidas na ficha deste imóvel.":"Não existem instruções de acesso preenchidas na ficha deste imóvel.","Localização das chaves":"Localização das chaves","Morada do depósito das chaves":"Morada do depósito das chaves","Código do depósito":"Código do depósito","Código da porta exterior":"Código da porta exterior","Instruções para entrega/retirada das chaves":"Instruções para entrega/retirada das chaves","Morada":"Morada","Código postal":"Código postal","Cidade":"Cidade","País":"País","Camas individuais":"Camas individuais","Camas duplas/King":"Camas duplas/King"
 }};
 function romanoLang(){return localStorage.getItem("romano_language")==="pt"?"pt":"es"}
 function romanoTranslateText(text,lang){
