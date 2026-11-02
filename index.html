@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-10-29-protect-active-work-v23">
+<head><meta name="romano-build" content="2026-11-02-auto-update-v24">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -4435,7 +4435,7 @@ window.addEventListener("focus",()=>{romanoApplyPendingUpdate();checkRomanoProdu
 window.addEventListener("pageshow",()=>{registerRomanoServiceWorker().catch(()=>{});checkRomanoProductionUpdate()},{passive:true});
 function scheduleRomanoSWUpdates(){
  if(__romanoSWUpdateTimer)clearInterval(__romanoSWUpdateTimer);
- __romanoSWUpdateTimer=setInterval(()=>{registerRomanoServiceWorker().catch(()=>{});checkRomanoProductionUpdate()},120000);
+ __romanoSWUpdateTimer=setInterval(()=>{registerRomanoServiceWorker().catch(()=>{});checkRomanoProductionUpdate()},60000);
 }
 scheduleRomanoSWUpdates();
 async function testBackgroundNotification(){
