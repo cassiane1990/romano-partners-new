@@ -3676,8 +3676,11 @@ async function renderFinance(){
  const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,gross:0,tax:0,cost:0});
  const isCleaningService=x=>{const v=String(x.service_type||"").toLowerCase();return !!String(x.typology||"").toUpperCase().match(/T[1-5]/)&&!/manuten|maintenance|repar|electric|fontan|plumb|pintur|paint|montagem|assembly/.test(v)};
  const completedServices=services.filter(x=>["completed","approved","supervised"].includes(String(x.status||"").toLowerCase())&&x.finished_at);
- const cleaningServices=completedServices.filter(isCleaningService);
  const dayKey=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})};
+ const serviceSeen=new Set();
+ const cleaningServices=completedServices.filter(x=>{if(!isCleaningService(x))return false;const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0],key=x.property_id?dayKey(x.finished_at)+"|"+x.property_id+"|"+t:"service:"+x.id;if(serviceSeen.has(key))return false;serviceSeen.add(key);return true});
+ const uniqueCleaningServiceIds=new Set(cleaningServices.map(x=>x.id));
+ const financialServices=completedServices.filter(x=>!isCleaningService(x)||uniqueCleaningServiceIds.has(x.id));
  const serviceCleaningKeys=new Set(cleaningServices.filter(x=>x.property_id).map(x=>dayKey(x.finished_at)+"|"+x.property_id+"|"+String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]));
  const isManualCleaning=e=>e.entry_type==="income"&&/limpeza|conjunto de apartamentos|cleaning/i.test(String(e.category||""))&&!!String(e.typology||"").toUpperCase().match(/T[1-5]/);
  const manualCleaningSeen=new Set();
