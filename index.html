@@ -2697,26 +2697,10 @@ function renderServiceAudit(auditRows,actorNames){
  return '<div class="notice" style="margin-bottom:12px"><strong>⏱ Evolución del servicio</strong><div style="margin-top:8px">'+timeline+'</div></div>';
 }
 
-const ROMANO_CLEANING_CHECKLIST=[
- {key:"quarto",label:"Quarto"},{key:"sala",label:"Sala"},{key:"banheiro",label:"Baño"},{key:"cozinha",label:"Cocina"},
- {key:"lixeiros",label:"Lixeiros"},{key:"geladeira",label:"Geladeira / Nevera"},{key:"forno",label:"Forno"},
- {key:"microondas",label:"Microondas"},{key:"debaixo_cama",label:"Debajo de la cama"},{key:"dentro_armarios",label:"Dentro de los armarios"},{key:"amenities",label:"Amenities"}
-];
 function isCleaningServiceType(type){
  const s=String(type||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
  if(/manten|maintenance|electric|plumb|pint|silicone|assembly|installation|hydraulic|repar/.test(s))return false;
  return s.includes("limp")||s==="cleaning"||s==="airbnb"||s.includes("hotel")||s.includes("housekeeping")||s.includes("alojamiento");
-}
-async function ensureCleaningChecklist(service){
- if(!isCleaningServiceType(service?.service_type)||!["employee","admin","supervisor"].includes(role()))return [];
- const r=await sb.rpc("ensure_cleaning_checklist",{p_service_id:service.id});if(r.error)throw r.error;
- const q=await sb.from("service_checklist_items").select("id,item_key,item_label,checked,notes,checked_by,checked_at").eq("service_id",service.id).order("created_at",{ascending:true});
- if(q.error)throw q.error;return q.data||[];
-}
-async function toggleServiceChecklist(itemId,checked,serviceId){
- if(role()!=="employee"){toast("Solo el funcionario de limpieza puede completar este checklist.");return}
- const r=await sb.from("service_checklist_items").update({checked:!!checked,checked_by:currentUser.id,checked_at:checked?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",itemId).eq("service_id",serviceId);
- if(r.error){toast(r.error.message);return} await viewService(serviceId);
 }
 async function requestCleaningSupervision(serviceId){
  if(role()!=="employee"){serviceActionError("Solo el funcionario de limpieza puede solicitar la supervisión.");return}
@@ -2725,12 +2709,9 @@ async function requestCleaningSupervision(serviceId){
  if(current.error){serviceActionError(current.error.message);return}
  if(current.data.assigned_employee_id!==currentUser.id){serviceActionError("Este servicio no está asignado a su usuario.");return}
  if(!["in_progress","paused"].includes(current.data.status)){serviceActionError("Primero debe iniciar el servicio. Estado actual: "+(statusNames[current.data.status]||current.data.status)+".");return}
- const checklist=await sb.from("service_checklist_items").select("id,checked").eq("service_id",serviceId);
- if(checklist.error){serviceActionError(checklist.error.message);return}
  const media=await sb.from("service_media").select("id").eq("service_id",serviceId).eq("media_type","photo").limit(1);
  if(media.error){serviceActionError(media.error.message);return}
- if((checklist.data||[]).length<11||(checklist.data||[]).filter(x=>x.checked).length<11){serviceActionError("Complete todo el checklist antes de solicitar la supervisión.");return}
- if(!(media.data||[]).length){serviceActionError("Anexe al menos una foto antes de solicitar la supervisión.");return}
+ if(!(media.data||[]).length){serviceActionError("Anexe pelo menos uma fotografia antes de solicitar a supervisão.");return}
  const update=await sb.rpc("employee_request_cleaning_supervision",{p_service_id:serviceId});
  if(update.error){
    serviceActionError("No se pudo enviar la limpieza a supervisión: "+update.error.message);
@@ -2767,27 +2748,18 @@ function renderCleaningFlow(service,checklist,media){
  if(!isCleaningServiceType(service.service_type))return "";
  const own=["employee","maintenance_technician"].includes(role())&&service.assigned_employee_id===currentUser.id;
  const reviewer=["admin","supervisor"].includes(role());
- const checked=checklist.filter(i=>i.checked).length;
  const photos=media.filter(m=>m.media_type==="photo");
  const reviewed=photos.filter(m=>m.review_opened_at).length;
  const workActive=["in_progress","paused"].includes(service.status);
- const ready=workActive&&checked===ROMANO_CLEANING_CHECKLIST.length&&photos.length>0;
- let h=`<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Checklist de limpieza</h3><div class="muted">Quarto, sala, baño, cocina, lixeiros, geladeira, forno, microondas, debajo de la cama, dentro de armarios y amenities.</div></div><span class="pill">${checked}/${ROMANO_CLEANING_CHECKLIST.length}</span></div>`;
- h+=ROMANO_CLEANING_CHECKLIST.map(req=>{
-   const row=checklist.find(i=>i.item_key===req.key);
-   const change=own&&service.status!=="supervision_pending"&&service.status!=="completed"&&row
-     ? ` onchange="toggleServiceChecklist('${row.id}',this.checked,'${service.id}')"`
-     : " disabled";
-   return `<label class="line-item" style="cursor:${own?"pointer":"default"}"><span><input type="checkbox" ${row?.checked?"checked ":""}${change}> ${esc(row?.item_label||req.label)}</span><b>${row?.checked?"✓ OK":"Pendiente"}</b></label>`;
- }).join("");
- h+=`<div class="notice" style="margin-top:10px"><b>Fotos:</b> ${photos.length}${reviewer?' · <b>Revisadas:</b> '+reviewed+'/'+photos.length:""}</div>`;
+ const ready=workActive&&photos.length>0;
+ let h=`<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Registo fotográfico da limpeza</h3><div class="muted">Adicione as fotografias necessárias para comprovar o serviço. Sem checklist e sem limite fixo de fotografias.</div></div><span class="pill">${photos.length} fotos</span></div>`;
  if(own){
-   if(service.status==="supervision_pending")h+=`<div class="notice">✓ Checklist y fotos enviados. Esperando revisión del Supervisor o Administrador.</div>`;
-   else if(service.status==="completed")h+=`<div class="notice">✓ Limpieza aprobada por Supervisor/Administrador.</div>`;
-   else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISIÓN</button></div>`;
+  if(service.status==="supervision_pending")h+=`<div class="notice">✓ Fotografias enviadas. Aguardando revisão do Supervisor ou Administrador.</div>`;
+  else if(service.status==="completed")h+=`<div class="notice">✓ Limpeza aprovada pelo Supervisor/Administrador.</div>`;
+  else h+=`<div class="actions" style="margin-top:10px"><button class="btn gold" ${ready?"":"disabled"} onclick="requestCleaningSupervision('${service.id}')">✓ SOLICITAR SUPERVISÃO</button></div>`;
  }
  if(reviewer&&service.status==="supervision_pending"){
-   h+=`<div class="notice" style="margin-top:10px"><b>Revisión obligatoria:</b> abra cada foto individualmente. El OK solo se habilita después de revisar todas.</div><div class="actions" style="margin-top:10px"><button class="btn gold" ${photos.length>0&&reviewed===photos.length?"":"disabled"} onclick="approveCleaningService('${service.id}')">✓ DAR OK · FINALIZAR LIMPIEZA</button></div>`;
+  h+=`<div class="notice" style="margin-top:10px"><b>Revisão:</b> abra cada fotografia. O OK só fica disponível depois de rever todas. Fotografias: ${photos.length} · Revistas: ${reviewed}/${photos.length}</div><div class="actions" style="margin-top:10px"><button class="btn gold" ${photos.length>0&&reviewed===photos.length?"":"disabled"} onclick="approveCleaningService('${service.id}')">✓ DAR OK · FINALIZAR LIMPEZA</button></div>`;
  }
  return h+"</div>";
 }
@@ -2906,7 +2878,7 @@ async function viewService(id){
  if(r.error){toast(r.error.message);return}
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
- let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
+ const checklist=[];
  const [media,dispatch,clientQ,propQ,auditQ,archiveMedia]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
@@ -2946,7 +2918,7 @@ async function viewService(id){
   renderMaintenanceBillingSummary(x)+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Dispatch</h3><span class="pill">5 min</span></div>'+
  (x.assigned_employee_id?'<div class="notice" style="margin-bottom:10px"><strong>👤 Designado:</strong> '+esc(actorNames[x.assigned_employee_id]||"Funcionario/Técnico")+(["on_the_way","in_progress","completed","supervision_pending","supervised","approved"].includes(x.status)?"<br><small>✓ El profesional aceptó el servicio.</small>":"<br><small>⏳ Designación enviada · pendiente de aceptación.</small>")+'</div>':"")+
- (Object.values((dispatch.data||[]).reduce((acc,d)=>{const k=d.employee_id||d.id;if(!acc[k]||new Date(d.created_at||d.expires_at||0)>new Date(acc[k].created_at||acc[k].expires_at||0))acc[k]=d;return acc;},{})).map(d=>'<div class="line"><span><strong>'+esc(actorNames[d.employee_id]||"Funcionario/Técnico")+'</strong><br><small>'+esc(d.response||"pendiente")+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div></div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="image/*,video/*" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;)" style="display:none"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0"><label for="serviceMediaFile" class="btn gold" style="cursor:pointer">📷 Añadir fotos / vídeos</label><span class="muted">'+((media.data||[]).filter(m=>m.media_type==="photo").length)+' fotos · '+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias</span></div>'+((role()==="maintenance_technician")?'<div class="notice" style="margin-bottom:10px">📷 Para finalizar, añada y guarde al menos 5 fotos/vídeos del trabajo en “Añadir fotos / vídeos”. Los archivos de “Faturas, notas y comprobantes” son documentos separados y no cuentan como evidencia del trabajo.</div>':"")+renderTechnicianFinishButton(x)+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button>'+((["admin","supervisor"].includes(role()))?'<button class="btn" type="button" onclick="deleteServiceMedia(\''+esc(m.id)+'\',\''+esc(m.storage_path)+'\',\''+esc(x.id)+'\')">🗑 Eliminar</button>':"")+'</span></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Arquivo permanente deste serviço</h3><span class="pill">'+(archiveMedia.data||[]).length+' ficheiro(s)</span></div>'+serviceArchiveHtml+'</div>');
+ (Object.values((dispatch.data||[]).reduce((acc,d)=>{const k=d.employee_id||d.id;if(!acc[k]||new Date(d.created_at||d.expires_at||0)>new Date(acc[k].created_at||acc[k].expires_at||0))acc[k]=d;return acc;},{})).map(d=>'<div class="line"><span><strong>'+esc(actorNames[d.employee_id]||"Funcionario/Técnico")+'</strong><br><small>'+esc(d.response||"pendiente")+' · '+esc(d.distance_m?Math.round(d.distance_m)+" m":"distancia no disponible")+'</small></span><span>'+esc(d.expires_at?new Date(d.expires_at).toLocaleTimeString("es-ES"):"—")+'</span></div>').join("")||'<div class="empty">Sin intentos.</div>')+'</div></div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Historial · quién creó y modificó</h3></div>'+renderServiceAudit(auditRows,actorNames)+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>'+mediaTitle+'</h3><div class="muted">'+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias · '+mediaHint+'</div></div></div><input type="file" id="serviceMediaFile" multiple accept="'+(isCleaningServiceType(x.service_type)?"image/*":"image/*,video/*")+'" onchange="uploadServiceMedia(&#39;'+x.id+'&#39;, '+(isCleaningServiceType(x.service_type)?"true":"false")+')" style="display:none"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0"><label for="serviceMediaFile" class="btn gold" style="cursor:pointer">📷 '+(isCleaningServiceType(x.service_type)?"Añadir fotos":"Añadir fotos / vídeos")+'</label><span class="muted">'+((media.data||[]).filter(m=>m.media_type==="photo").length)+' fotos · '+((media.data||[]).filter(m=>["photo","video"].includes(m.media_type)).length)+' evidencias</span></div>'+((role()==="maintenance_technician")?'<div class="notice" style="margin-bottom:10px">📷 Para finalizar, añada y guarde al menos 5 fotos/vídeos del trabajo en “Añadir fotos / vídeos”. Los archivos de “Faturas, notas y comprobantes” son documentos separados y no cuentan como evidencia del trabajo.</div>':"")+renderTechnicianFinishButton(x)+((media.data||[]).map(m=>'<div class="line"><span><b>'+esc(m.file_name)+'</b><br><small>'+esc(m.media_type)+' · '+(m.review_opened_at?'✓ Revisada':'Pendiente de revisión')+'</small></span><button class="btn '+(["admin","supervisor"].includes(role())?"gold":"")+'" onclick="'+(["admin","supervisor"].includes(role())?"reviewServiceMedia(\'"+esc(m.id)+"\',\'"+esc(m.storage_path)+"\',\'"+esc(x.id)+"\')":"downloadServiceMedia(\'"+esc(m.storage_path)+"\')")+'">'+(["admin","supervisor"].includes(role())?(m.review_opened_at?"Abrir de nuevo":"Abrir y registrar revisión"):"Abrir")+'</button>'+((["admin","supervisor"].includes(role()))?'<button class="btn" type="button" onclick="deleteServiceMedia(\''+esc(m.id)+'\',\''+esc(m.storage_path)+'\',\''+esc(x.id)+'\')">🗑 Eliminar</button>':"")+'</span></div>').join("")||'<div class="empty">Sin fotos ni evidencias.</div>')+'</div><div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Arquivo permanente deste serviço</h3><span class="pill">'+(archiveMedia.data||[]).length+' ficheiro(s)</span></div>'+serviceArchiveHtml+'</div>');
  }catch(err){
    const msg=err?.message||String(err||"No se pudo cargar la ficha del servicio.");
    const modalBody=$("modalBody");
@@ -3105,9 +3077,10 @@ async function setServiceStatusPremium(id,status){
  if(r.error){if(networkError(r.error)){await queueOfflineMutation("service_status",{service_id:id,status,started_at:status==="in_progress"?now:null,finished_at:status==="completed"?now:null},current.data.updated_at);toast("Red interrumpida · estado puesto en cola")}else toast(r.error.message);return}
  toast("✓ Estado actualizado: "+(statusNames[status]||status));closeModal();await renderServicesMaster();updateOfflineIndicator();
 }
-async function uploadServiceMedia(serviceId){
+async function uploadServiceMedia(serviceId,photosOnly=false){
  const input=$("serviceMediaFile");const files=Array.from(input?.files||[]);if(!files.length)return;
  for(const file of files){
+   if(photosOnly&&!file.type.startsWith("image/")){toast("Este serviço de limpeza aceita apenas fotografias: "+file.name);continue}
    const ext=(file.name.split(".").pop()||"bin").toLowerCase();
    const type=file.type.startsWith("video")?"video":file.type.startsWith("audio")?"audio":(file.type.includes("pdf")||file.type.includes("word")||file.type.includes("excel")||/\\.(pdf|docx?|xlsx?)$/i.test(file.name))?"document":"photo";
    const path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
