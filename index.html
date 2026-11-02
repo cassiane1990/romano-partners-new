@@ -3716,11 +3716,13 @@ async function renderFinance(){
  const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
  window.__financeEntriesById=Object.fromEntries(entries.map(x=>[x.id,x]));
  window.__financePropertyById=propertyBy;
+ window.__financeEntriesById=Object.fromEntries(entries.map(x=>[x.id,x]));
+ window.__financePropertyById=propertyBy;
  const entryRows=entries.map(x=>{
   const p=x.property_id?propertyBy[x.property_id]:null;
   const combined=/combinad/i.test(String(x.description||""));
   const shortService=x.category==="Manutenção"?(combined?"Serviços combinados":"Serviço de manutenção"):(x.description||x.category||"—");
-  return '<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td>'+esc(shortService)+' <button class="btn" type="button" onclick="openFinanceEntryDetails(\'\'+String(x.id)+'\')">Ver serviço</button></td><td>'+esc(p?.name||p?.code||"—")+'</td><td>'+esc(x.typology||"—")+'</td><td>'+Number(x.quantity||0)+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="editFinanceEntry(\'\'+String(x.id)+'\')">Editar</button> <button class="btn" type="button" onclick="deleteFinanceEntry(\'\'+String(x.id)+'\')">Apagar</button></td></tr>';
+  return '<tr><td>'+esc(x.entry_date)+'</td><td><span class="pill">'+(x.entry_type==="income"?"Receita":"Despesa")+'</span></td><td>'+esc(x.category)+'</td><td>'+esc(shortService)+' <button class="btn" type="button" onclick="openFinanceEntryDetails(&#39;'+String(x.id)+'&#39;)">Ver serviço</button></td><td>'+esc(p?.name||p?.code||"—")+'</td><td>'+esc(x.typology||"—")+'</td><td>'+Number(x.quantity||0)+'</td><td>'+fmt(x.amount)+'</td><td><button class="btn" type="button" onclick="editFinanceEntry(&#39;'+String(x.id)+'&#39;)">Editar</button> <button class="btn" type="button" onclick="deleteFinanceEntry(&#39;'+String(x.id)+'&#39;)">Apagar</button></td></tr>';
  }).join("");
  $("content").innerHTML=
  '<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Mês: '+esc(month)+' · Os serviços concluídos vêm da operação; os lançamentos manuais ficam guardados no PostgreSQL.</div></div><div class="actions"><button class="btn" type="button" onclick="openPage(\'company_costs\')">Custos da empresa</button><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button><button class="btn" type="button" onclick="newFinanceEntry()">＋ Novo lançamento</button></div></div>'+
