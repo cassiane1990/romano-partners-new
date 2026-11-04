@@ -3213,7 +3213,7 @@ async function uploadServiceMedia(serviceId){
    }catch(err){failed++;if(state)state.textContent="Erro: "+(err?.message||"falha no envio");}
   }
  };
- await Promise.all(Array.from({length:Math.min(3,cards.length)},()=>worker()));
+ await Promise.all(Array.from({length:cards.length},()=>worker()));
  cards.forEach(x=>URL.revokeObjectURL(x.url));
  if(input){input.value="";input.disabled=false;input.dataset.uploading="0"}
  toast(ok+" ficheiro(s) anexado(s)"+(failed?" · "+failed+" falha(s)":"")+"." );
