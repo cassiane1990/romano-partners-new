@@ -2788,11 +2788,26 @@ async function openServiceMediaGallery(serviceId){
  }));
  openModal("Todas as evidências · "+items.length,'<div class="notice">Toque numa foto para ampliar. Os vídeos podem ser reproduzidos aqui. Use Apagar apenas se algum ficheiro estiver incorreto.</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px;margin-top:12px">'+cards.join("")+'</div>');
 }
+function closeServiceEvidenceViewer(){
+ const layer=document.getElementById("romanoEvidenceLightbox");
+ if(layer){const media=layer.querySelector("video");if(media){media.pause();media.removeAttribute("src");media.load()}layer.remove()}
+}
 function openServiceEvidenceViewer(url,type,name){
- const media=type==="video"
-  ? '<video controls autoplay playsinline style="width:100%;max-height:70vh;object-fit:contain;background:#111" src="'+esc(url)+'"></video>'
-  : '<img src="'+esc(url)+'" alt="'+esc(name)+'" style="width:100%;max-height:75vh;object-fit:contain;touch-action:pinch-zoom;background:#111">';
- openModal(name,media+'<div class="muted" style="margin-top:8px;text-align:center">Amplie com os dedos. Nos vídeos, use os controlos para reproduzir.</div>');
+ if(!url){toast("Não foi possível abrir esta evidência.");return}
+ closeServiceEvidenceViewer();
+ const layer=document.createElement("div");layer.id="romanoEvidenceLightbox";
+ layer.style.cssText="position:fixed;inset:0;z-index:2147483000;background:rgba(10,10,10,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;box-sizing:border-box";
+ layer.addEventListener("click",e=>{if(e.target===layer)closeServiceEvidenceViewer()});
+ const top=document.createElement("div");top.style.cssText="width:100%;max-width:1100px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:white;margin-bottom:12px;font:600 14px system-ui";
+ const label=document.createElement("div");label.textContent=name||"Evidência";label.style.cssText="overflow-wrap:anywhere;min-width:0";
+ const close=document.createElement("button");close.type="button";close.textContent="✕ Fechar";close.setAttribute("aria-label","Fechar imagem ampliada");close.style.cssText="flex:none;border:1px solid rgba(255,255,255,.5);border-radius:10px;background:#292929;color:white;padding:10px 14px;font:600 14px system-ui";close.addEventListener("click",closeServiceEvidenceViewer);
+ top.append(label,close);layer.appendChild(top);
+ let media;
+ if(type==="video"){media=document.createElement("video");media.controls=true;media.autoplay=true;media.playsInline=true;media.style.cssText="display:block;max-width:96vw;max-height:82vh;width:auto;height:auto;object-fit:contain;background:#111";media.src=url}
+ else{media=document.createElement("img");media.alt=name||"Foto ampliada";media.draggable=false;media.style.cssText="display:block;max-width:96vw;max-height:82vh;width:auto;height:auto;object-fit:contain;touch-action:pan-x pan-y pinch-zoom;background:#111";media.src=url}
+ layer.appendChild(media);document.body.appendChild(layer);
+ const escHandler=e=>{if(e.key==="Escape"){closeServiceEvidenceViewer();document.removeEventListener("keydown",escHandler)}};
+ document.addEventListener("keydown",escHandler);
 }
 
 async function shareServicePhotosWhatsApp(serviceId,clientName,clientPhone,serviceCode){
