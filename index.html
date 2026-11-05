@@ -2777,16 +2777,32 @@ async function openServiceMediaGallery(serviceId){
  if(q.error){toast(q.error.message);return}
  const items=q.data||[];
  if(!items.length){openModal("Evidências do serviço",'<div class="empty">Ainda não há fotos ou vídeos neste serviço.</div>');return}
- const cards=await Promise.all(items.map(async m=>{
+ const cards=await Promise.all(items.map(async (m,index)=>{
   const u=await sb.storage.from("service-media").createSignedUrl(m.storage_path,900);
   const url=u.data?.signedUrl||"";
   const video=m.media_type==="video"||/\.(mp4|mov|webm|m4v)$/i.test(m.file_name||"");
   const preview=video
    ? '<video controls playsinline preload="metadata" style="width:100%;height:155px;object-fit:contain;background:#171717;border-radius:9px" src="'+esc(url)+'"></video>'
-   : '<img loading="lazy" src="'+esc(url)+'" alt="'+esc(m.file_name||"Evidência")+'" onclick="openServiceEvidenceViewer('+JSON.stringify(url)+',\'image\','+JSON.stringify(m.file_name||"Foto")+')" style="width:100%;height:155px;object-fit:cover;border-radius:9px;cursor:zoom-in">';
-  return '<article style="border:1px solid #e5dac8;border-radius:12px;padding:7px;background:#fff;min-width:0"><div>'+preview+'</div><div style="font-size:11px;font-weight:700;overflow-wrap:anywhere;margin:6px 0">'+esc(m.file_name||"Evidência")+'</div><button class="btn" type="button" onclick="deleteServiceMedia(\''+m.id+'\','+JSON.stringify(m.storage_path)+',\''+serviceId+'\')">🗑 Apagar</button></article>';
+   : '<button type="button" data-romano-open="'+index+'" aria-label="Ampliar '+esc(m.file_name||"foto")+'" style="display:block;width:100%;padding:0;border:0;background:#171717;border-radius:9px;overflow:hidden"><img loading="lazy" src="'+esc(url)+'" alt="'+esc(m.file_name||"Evidência")+'" style="display:block;width:100%;height:155px;object-fit:cover;cursor:zoom-in"></button>';
+  const html='<article style="border:1px solid #e5dac8;border-radius:12px;padding:7px;background:#fff;min-width:0"><div>'+preview+'</div><div style="font-size:11px;font-weight:700;overflow-wrap:anywhere;margin:6px 0">'+esc(m.file_name||"Evidência")+'</div><button class="btn" type="button" data-romano-delete="'+index+'">🗑 Apagar</button></article>';
+  return {html,url,video};
  }));
- openModal("Todas as evidências · "+items.length,'<div class="notice">Toque numa foto para ampliar. Os vídeos podem ser reproduzidos aqui. Use Apagar apenas se algum ficheiro estiver incorreto.</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px;margin-top:12px">'+cards.join("")+'</div>');
+ openModal("Todas as evidências · "+items.length,'<div class="notice">Toque numa foto para ampliar. Os vídeos podem ser reproduzidos aqui. Use Apagar apenas se algum ficheiro estiver incorreto.</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px;margin-top:12px">'+cards.map(x=>x.html).join("")+'</div>');
+ const evidenceBody=$("modalBody");
+ evidenceBody.querySelectorAll("[data-romano-open]").forEach(button=>{
+  button.addEventListener("click",()=>{
+   const item=cards[Number(button.dataset.romanoOpen)];
+   const media=items[Number(button.dataset.romanoOpen)];
+   if(item?.url)openServiceEvidenceViewer(item.url,"image",media?.file_name||"Foto");
+   else toast("Não foi possível abrir esta evidência.");
+  });
+ });
+ evidenceBody.querySelectorAll("[data-romano-delete]").forEach(button=>{
+  button.addEventListener("click",()=>{
+   const index=Number(button.dataset.romanoDelete),media=items[index];
+   if(media)deleteServiceMedia(media.id,media.storage_path,serviceId);
+  });
+ });
 }
 function closeServiceEvidenceViewer(){
  const layer=document.getElementById("romanoEvidenceLightbox");
