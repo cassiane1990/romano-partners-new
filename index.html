@@ -6367,14 +6367,14 @@ function masterItemRows(){const rows=[...masterLinenRows()];[["KITCHEN","Kit bie
 function masterClientCleaningOptions(){
  const clientId=$("mpClient")?.value||"";
  if(clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a")return[
-  {code:"T1-1B",name:"ALEHOST · T1 · limpieza 24,00 € SIN IVA",price:24,tax:false},
-  {code:"T2-1B",name:"ALEHOST · T2 · 1 baño · limpieza 28,00 € SIN IVA",price:28,tax:false},
-  {code:"T2-2B",name:"ALEHOST · T2+ · 2 baños · limpieza 30,00 € SIN IVA",price:30,tax:false},
-  {code:"T3-2B",name:"ALEHOST · T3 · 2 baños · limpieza 34,00 € SIN IVA",price:34,tax:false},
-  {code:"T3-3B",name:"ALEHOST · T3+ · 3 baños · limpieza 36,00 € SIN IVA",price:36,tax:false},
-  {code:"T4-2B",name:"ALEHOST · T4 · 2 baños · limpieza 38,00 € SIN IVA",price:38,tax:false},
-  {code:"T4-3B",name:"ALEHOST · T4+ · 3 baños · limpieza 40,00 € SIN IVA",price:40,tax:false},
-  {code:"T4-4B",name:"ALEHOST · T4++ · 4 baños · limpieza 45,00 € SIN IVA",price:45,tax:false}
+  {code:"T1-1B",name:"ALEHOST · T1 · limpieza 49,71 € IVA incluido · descuento incluido",price:49.71,tax:true},
+  {code:"T2-1B",name:"ALEHOST · T2 · 1 baño · limpieza 73,20 € IVA incluido · descuento incluido",price:73.20,tax:true},
+  {code:"T2-2B",name:"ALEHOST · T2 · 2 baños · limpieza 75,45 € IVA incluido · descuento incluido",price:75.45,tax:true},
+  {code:"T3-2B",name:"ALEHOST · T3 · limpieza 98,93 € IVA incluido · descuento incluido",price:98.93,tax:true},
+  {code:"T3-3B",name:"ALEHOST · T3 · 3 baños · limpieza 98,93 € IVA incluido · descuento incluido",price:98.93,tax:true},
+  {code:"T4-2B",name:"ALEHOST · T4 · 2 baños · precio a confirmar",price:null,tax:true},
+  {code:"T4-3B",name:"ALEHOST · T4 · 3 baños · precio a confirmar",price:null,tax:true},
+  {code:"T4-4B",name:"ALEHOST · T4 · 4 baños · precio a confirmar",price:null,tax:true}
  ];
  return null;
 }
@@ -6576,9 +6576,10 @@ async function masterUpdateDiscountSummary(){
  const clientCleaningPct=cleaningPct,clientLaundryPct=laundryPct;
  if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled){cleaningPct=0;laundryPct=0}
  const clean=masterSelectedCleaning(),items=masterItemRows();
+ const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
+ if(isAlehost)cleaningPct=0;
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
- const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code);
  const extraGross=Math.round(laundryBase*100)/100;
  const cleaningBase=Math.round((Number(clean.price||0)*Number(clean.qty||1)*(clean.opt?.tax?1:1+vatRate))*100)/100;
@@ -6609,7 +6610,7 @@ async function savePremiumService(){
  const employeeId=$("mpEmployee")?.value||null,internal=["admin","supervisor"].includes(role());
  const discountQuery=demoMode?{data:demoFindClient(clientId)||{},error:null}:await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).single();
  if(discountQuery.error){toast("No se pudieron cargar los descuentos del cliente: "+discountQuery.error.message);return}
- const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,cleaningPct=discountsActive?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
+ const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",cleaningPct=discountsActive&&!isAlehost?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
  const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
