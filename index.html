@@ -6421,7 +6421,7 @@ function masterLoadPropertyBeds(){
  const id=$("mpProperty")?.value,p=(demoMode?DEMO_PROPERTIES:((window.__mpProps||[]))).find(x=>x.id===id);if(!p)return;
  const single=document.querySelector("[data-qty='LINEN_SINGLE']"),double=document.querySelector("[data-qty='LINEN_KING']");
  const selected=masterSelectedCleaning(),code=String(selected.opt?.code||"").toUpperCase();
- const typologyMatch=code.match(/^T(\\d+)/),bedroomCount=typologyMatch?Math.max(1,Number(typologyMatch[1])):null;
+ const typologyMatch=code.match(/^T(\d+)/),bedroomCount=typologyMatch?Math.max(1,Number(typologyMatch[1])):null;
  const isAlehost=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
  const bedRow=$("mpBedQuantityRow"),bedNotice=$("mpBedQuantityNotice");if(bedRow)bedRow.style.display=isAlehost?"none":"";if(bedNotice)bedNotice.style.display=isAlehost?"none":"";
  const propertySingle=Math.max(0,Number(p.beds_single||0)),propertyDouble=Math.max(0,Number(p.beds_double||0));
