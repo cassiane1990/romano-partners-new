@@ -6372,9 +6372,9 @@ function masterClientCleaningOptions(){
   {code:"T2-2B",name:"ALEHOST · T2 · 2 baños · limpieza 75,45 € IVA incluido · descuento incluido",price:75.45,tax:true},
   {code:"T3-2B",name:"ALEHOST · T3 · limpieza 98,93 € IVA incluido · descuento incluido",price:98.93,tax:true},
   {code:"T3-3B",name:"ALEHOST · T3 · 3 baños · limpieza 98,93 € IVA incluido · descuento incluido",price:98.93,tax:true},
-  {code:"T4-2B",name:"ALEHOST · T4 · 2 baños · precio a confirmar",price:null,tax:true},
-  {code:"T4-3B",name:"ALEHOST · T4 · 3 baños · precio a confirmar",price:null,tax:true},
-  {code:"T4-4B",name:"ALEHOST · T4 · 4 baños · precio a confirmar",price:null,tax:true}
+  {code:"T4-2B",name:"ALEHOST · T4 · 2 baños · limpieza 38,00 € SIN IVA",price:38,tax:false},
+  {code:"T4-3B",name:"ALEHOST · T4+ · 3 baños · limpieza 40,00 € SIN IVA",price:40,tax:false},
+  {code:"T4-4B",name:"ALEHOST · T4++ · 4 baños · limpieza 45,00 € SIN IVA",price:45,tax:false}
  ];
  return null;
 }
@@ -6613,7 +6613,6 @@ async function savePremiumService(){
  const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",cleaningPct=discountsActive&&!isAlehost?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
- const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code),extraGross=Math.round(laundryBase*100)/100;
  // Descontos separados: limpeza apenas sobre a limpeza; roupa extra apenas sobre packs extra, ambos sem IVA. Amenities ficam sempre fora.
  const cleaningBase=Math.round((Number(clean.price||0)*Number(clean.qty||1)*(clean.opt?.tax?1:1+vatRate))*100)/100;
