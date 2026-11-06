@@ -4698,7 +4698,7 @@ async function teams(){
    const ids=employees.map(x=>x.profile_id).filter(Boolean);
    const roles=ids.length?(await sb.from("profiles").select("id,role").in("id",ids).eq("active",true)).data||[]:[];
    const roleMap=new Map(roles.map(x=>[x.id,x.role]));
-   employees=employees.filter(x=>["employee","maintenance_technician"].includes(roleMap.get(x.profile_id))).map(x=>({...x,profile_role:roleMap.get(x.profile_id)}));
+   employees=employees.filter(x=>!x.profile_id||["employee","maintenance_technician"].includes(roleMap.get(x.profile_id))).map(x=>({...x,profile_role:roleMap.get(x.profile_id)||null}));
  }
  let schedules=[];
  if(demoMode){window.__DEMO_SCHEDULES=window.__DEMO_SCHEDULES||[];schedules=window.__DEMO_SCHEDULES.filter(x=>String(x.work_date||"").slice(0,7)===ym)}
@@ -4757,7 +4757,7 @@ async function newTeamSchedule(employeeProfileId="",date=""){
    const ids=(ep.data||[]).map(x=>x.profile_id).filter(Boolean);
    const pr=ids.length?await sb.from("profiles").select("id,role,active").in("id",ids).eq("active",true):{data:[]};
    const roleMap=new Map((pr.data||[]).map(x=>[x.id,x.role]));
-   employees=(ep.data||[]).filter(x=>["employee","maintenance_technician"].includes(roleMap.get(x.profile_id)));
+   employees=(ep.data||[]).filter(x=>!x.profile_id||["employee","maintenance_technician"].includes(roleMap.get(x.profile_id)));
  }
  openModal("Planificar jornada",'<form onsubmit="saveTeamSchedule(event)"><div class="two"><div class="field"><label>Funcionario</label><select id="tsEmployee" required>'+employees.map(e=>'<option value="'+esc(e.id)+'" '+(e.id===employeeProfileId?"selected":"")+'>'+esc(e.full_name||e.employee_code)+' · '+esc(e.function_title||"")+'</option>').join("")+'</select></div><div class="field"><label>Fecha</label><input id="tsDate" type="date" value="'+esc(date||new Date().toISOString().slice(0,10))+'" required></div></div><div class="two"><div class="field"><label>Entrada</label><input id="tsStart" type="time" value="09:00"></div><div class="field"><label>Salida</label><input id="tsEnd" type="time" value="17:00"></div></div><div class="field"><label>Tipo de día</label><select id="tsType"><option value="work">Trabajo</option><option value="off">Descanso</option><option value="holiday">Vacaciones</option><option value="sick">Baja / ausencia</option></select></div><div class="field"><label>Observaciones</label><textarea id="tsNotes" rows="3"></textarea></div><button class="primary">Guardar jornada</button></form>');
 }
