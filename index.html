@@ -6345,12 +6345,16 @@ function qtyOptions(selected=0,max=10){let h="";for(let i=0;i<=max;i++)h+="<opti
 function masterSelectedQty(code){const el=document.querySelector("[data-qty='"+code+"']");return Math.max(0,Number(el?.value||0))}
 function masterExtraLinenBase(items,typologyCode){
  const code=String(typologyCode||"").toUpperCase();
- const bedroomMatch=code.match(/^T(\d+)/);
+ const bedroomMatch=code.match(/^T(\\d+)/);
  let includedPacks=bedroomMatch?Math.max(1,Number(bedroomMatch[1])):0;
- return (items||[]).filter(x=>String(x.category||"").toLowerCase()==="ropa"||/laundry|linen|ropa|lavander|pack cama|sofá-cama/i.test(String(x.name||"")+" "+String(x.code||"")+" "+String(x.detail||""))).reduce((sum,x)=>{
+ const linenItems=(items||[]).filter(x=>{
+  const category=String(x.category||"").toLowerCase(),name=String(x.name||""),itemCode=String(x.code||"").toUpperCase(),detail=String(x.detail||"");
+  return category==="ropa"||/laundry|linen|ropa|lavander|pack cama|sofá.?cama|sofa.?cama/i.test(name+" "+itemCode+" "+detail)||itemCode.startsWith("SOFA");
+ });
+ return linenItems.reduce((sum,x)=>{
   const qty=Math.max(0,Number(x.quantity||0)),unit=Math.max(0,Number(x.unit_price||0)),itemCode=String(x.code||"").toUpperCase();
   if(itemCode==="SINGLE"||itemCode==="KING"){const included=Math.min(qty,includedPacks);includedPacks-=included;return sum+Math.max(0,qty-included)*unit}
-  // Sofá-cama e qualquer outro pack não incluído na tipologia são sempre extras.
+  // Sofás-cama e outros packs não incluídos na tipologia entram sempre no desconto de roupa extra.
   return sum+qty*unit;
  },0);
 }
