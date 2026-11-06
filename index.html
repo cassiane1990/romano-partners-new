@@ -6379,7 +6379,18 @@ function masterExtraLinenBase(items,typologyCode){
   return category==="ropa"&&(isSofa||isExplicitExtra);
  }).reduce((sum,x)=>sum+Math.max(0,Number(x.quantity||0))*Math.max(0,Number(x.unit_price||0)),0);
 }
-function masterLinenRows(){const rows=[],isAlehost=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",code=String(masterSelectedCleaning().opt?.code||"").toUpperCase(),m=code.match(/^T(\d+)/),beds=m?Math.max(1,Number(m[1])):0;if(isAlehost&&beds){rows.push({category:"ropa",code:"KING",name:"Ropa y lavandería · "+beds+" cama(s) × 16,87 € SIN IVA",quantity:beds,unit_price:16.87,tax:false})}else{const single=masterSelectedQty("LINEN_SINGLE"),king=masterSelectedQty("LINEN_KING");if(single)rows.push({category:"ropa",code:"SINGLE",name:"Pack cama individual 90×200",quantity:single,unit_price:15.57,tax:false});if(king)rows.push({category:"ropa",code:"KING",name:"Pack cama doble / King 180×200",quantity:king,unit_price:16.87,tax:false})}const sofaType=$("mpSofaType")?.value||"none",sofaQty=masterSelectedQty("SOFA_BED");if(sofaType!=="none"&&sofaQty)rows.push({category:"ropa",code:sofaType==="single"?"SOFA-S":"SOFA-K",name:sofaType==="single"?"Sofá-cama individual":"Sofá-cama doble / casal",quantity:sofaQty,unit_price:sofaType==="single"?15.57:16.87,tax:false});return rows}
+function masterLinenRows(){
+ const rows=[],isAlehost=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
+ // ALEHOST: a roupa normal por tipologia já está incluída no preço integral comercial. Não adicionar nem descontar outra vez.
+ if(!isAlehost){
+  const single=masterSelectedQty("LINEN_SINGLE"),king=masterSelectedQty("LINEN_KING");
+  if(single)rows.push({category:"ropa",code:"SINGLE",name:"Pack cama individual 90×200",quantity:single,unit_price:15.57,tax:false});
+  if(king)rows.push({category:"ropa",code:"KING",name:"Pack cama doble / King 180×200",quantity:king,unit_price:16.87,tax:false});
+ }
+ const sofaType=$("mpSofaType")?.value||"none",sofaQty=masterSelectedQty("SOFA_BED");
+ if(sofaType!=="none"&&sofaQty)rows.push({category:"ropa",code:sofaType==="single"?"SOFA-S":"SOFA-K",name:sofaType==="single"?"Sofá-cama individual extra":"Sofá-cama doble / casal extra",quantity:sofaQty,unit_price:sofaType==="single"?15.57:16.87,tax:false,detail:"Pack extra sujeito a desconto de 3%"});
+ return rows;
+}
 const MAINTENANCE_RATES={normal:{label:"Normal · tarifa progresiva",type:"progressive",rates:[45,40,32,30,29,28,27]},emergency:{label:"Urgencia 24H · 60 €/hora",type:"flat",rate:60},night:{label:"Noche / madrugada · 80 €/hora",type:"flat",rate:80},holiday:{label:"Domingos / festivos · 90 €/hora",type:"flat",rate:90},travel_center:{label:"Desplazamiento centro · 15 €",type:"fixed",rate:15},travel_out:{label:"Desplazamiento fuera de centro · 20 €",type:"fixed",rate:20}};
 const MAINTENANCE_TYPES=[["none","No"],["preventive","Preventivo"],["corrective","Correctivo"],["silicone","Silicone"],["painting","Pintura"],["assembly","Montaje"],["installation","Instalación"],["hydraulic","Hidráulica"],["electric","Eléctrica"],["other","Otros"]];
 function masterMaintenanceOptions(){const rows=[],type=$("mpMaintenance")?.value||"none";if(type==="none")return rows;const rateKey=$("mpMaintenanceRate")?.value||"normal",rate=MAINTENANCE_RATES[rateKey]||MAINTENANCE_RATES.normal,hours=Math.max(1,Number($("mpMaintenanceHours")?.value||1));let gross=0,detail="";if(type==="other"){gross=Math.max(0,Number($("mpMaintenanceOtherValue")?.value||0));detail="Valor personalizado · IVA incluido"}else if(rate.type==="progressive"){if(hours>rate.rates.length)return[{category:"maintenance",code:type,name:$("mpMaintenance").selectedOptions[0]?.textContent||type,quantity:1,unit_price:0,tax:true,invalid:true,detail:"Más de 7 horas: solicitar tarifa adicional."}];gross=rate.rates.slice(0,hours).reduce((a,b)=>a+b,0);detail=rate.rates.slice(0,hours).map((v,i)=>(i+1)+"ª hora "+masterMoney(v)).join(" + ")}else if(rate.type==="flat"){gross=rate.rate*hours;detail=hours+" h × "+masterMoney(rate.rate)+"/h"}else{gross=rate.rate;detail="1 servicio"}rows.push({category:"maintenance",code:type+"-"+rateKey,name:($("mpMaintenance").selectedOptions[0]?.textContent||type)+" · "+(type==="other"?"Valor personalizado":rate.label),quantity:1,unit_price:gross,tax:true,detail,observation:$("mpMaintenanceNote")?.value.trim()||null,rate_key:rateKey,hours});return rows}
@@ -6388,14 +6399,14 @@ function masterItemRows(){const rows=[...masterLinenRows()];[["KITCHEN","Kit coc
 function masterClientCleaningOptions(){
  const clientId=$("mpClient")?.value||"";
  if(clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a")return[
-  {code:"T1-1B",name:"ALEHOST · T1 · limpieza 24,00 € SIN IVA",price:24,tax:false},
-  {code:"T2-1B",name:"ALEHOST · T2 · 1 baño · limpieza 28,00 € SIN IVA",price:28,tax:false},
-  {code:"T2-2B",name:"ALEHOST · T2+ · 2 baños · limpieza 30,00 € SIN IVA",price:30,tax:false},
-  {code:"T3-2B",name:"ALEHOST · T3 · 2 baños · limpieza 34,00 € SIN IVA",price:34,tax:false},
-  {code:"T3-3B",name:"ALEHOST · T3+ · 3 baños · limpieza 36,00 € SIN IVA",price:36,tax:false},
-  {code:"T4-2B",name:"ALEHOST · T4 · 2 baños · limpieza 38,00 € SIN IVA",price:38,tax:false},
-  {code:"T4-3B",name:"ALEHOST · T4+ · 3 baños · limpieza 40,00 € SIN IVA",price:40,tax:false},
-  {code:"T4-4B",name:"ALEHOST · T4++ · 4 baños · limpieza 45,00 € SIN IVA",price:45,tax:false}
+  {code:"T1-1B",name:"ALEHOST · T1 · serviço integral €49,71 (IVA incluído; desconto de 7% já aplicado)",price:49.71,tax:true},
+  {code:"T2-1B",name:"ALEHOST · T2 · 1 baño · serviço integral €73,20 (IVA incluído; desconto de 7% já aplicado)",price:73.20,tax:true},
+  {code:"T2-2B",name:"ALEHOST · T2 · 2 baños · serviço integral €75,45 (IVA incluído; desconto de 7% já aplicado)",price:75.45,tax:true},
+  {code:"T3-2B",name:"ALEHOST · T3 · serviço integral €98,93 (IVA incluído; desconto de 7% já aplicado)",price:98.93,tax:true},
+  {code:"T3-3B",name:"ALEHOST · T3 · 3 baños · serviço integral €98,93 (IVA incluído; desconto de 7% já aplicado)",price:98.93,tax:true},
+  {code:"T4-2B",name:"ALEHOST · T4 · 2 baños · tarifa integral a confirmar",price:null,tax:true},
+  {code:"T4-3B",name:"ALEHOST · T4+ · 3 baños · tarifa integral a confirmar",price:null,tax:true},
+  {code:"T4-4B",name:"ALEHOST · T4++ · 4 baños · tarifa integral a confirmar",price:null,tax:true}
  ];
  return null;
 }
@@ -6594,10 +6605,10 @@ async function masterUpdateDiscountSummary(){
   }
  }
  if(request!==__mpDiscountPreviewRequest)return;
- const clientCleaningPct=cleaningPct,clientLaundryPct=laundryPct;
+ const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
+ const clientCleaningPct=cleaningPct,clientLaundryPct=isAlehost?3:laundryPct;
  if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled){cleaningPct=0;laundryPct=0}
  const clean=masterSelectedCleaning(),items=masterItemRows();
- const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code);
@@ -6631,7 +6642,7 @@ async function savePremiumService(){
  const employeeId=$("mpEmployee")?.value||null,internal=["admin","supervisor"].includes(role());
  const discountQuery=demoMode?{data:demoFindClient(clientId)||{},error:null}:await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).single();
  if(discountQuery.error){toast("No se pudieron cargar los descuentos del cliente: "+discountQuery.error.message);return}
- const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",cleaningPct=discountsActive&&!isAlehost?clientCleaningPct:0,laundryPct=discountsActive?clientLaundryPct:0;
+ const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),clientLaundryPct=Math.max(0,Math.min(100,Number(discountQuery.data?.laundry_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",cleaningPct=discountsActive&&!isAlehost?clientCleaningPct:0,laundryPct=discountsActive&&isAlehost?3:(discountsActive?clientLaundryPct:0);
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code),extraGross=Math.round(laundryBase*100)/100;
