@@ -1991,8 +1991,10 @@ async function romanoPackLoadDiscount(){
 }
 function romanoPackUpdateTotal(){
  const items={individual:$("rpcPackIndividual")?.value,double:$("rpcPackDouble")?.value,single_beds:$("rpcPackSingleBeds")?.value,amenities:$("rpcPackAmenities")?.value};
- const original=romanoPackTotal(items),d=__romanoPackDiscount;
- const discount=d.enabled?Math.round(original*d.percent)/100:0;
+ const d=__romanoPackDiscount;
+ const clothing=Number(items.individual||0)*ROMANO_PACK_PRICES.individual+Number(items.double||0)*ROMANO_PACK_PRICES.double+Number(items.single_beds||0)*ROMANO_PACK_PRICES.single_beds;
+ const discount=d.enabled?Math.round(clothing*d.percent)/100:0;
+ const original=romanoPackTotal(items);
  const el=$("rpcPackTotal");if(el)el.textContent=romanoPackMoney(Math.max(0,Math.round((original-discount)*100)/100));
  const detail=$("rpcPackDiscountAmount");if(detail)detail.textContent=d.enabled?"Desconto aplicado: − "+romanoPackMoney(discount):"Desconto: "+romanoPackMoney(0);
 }
