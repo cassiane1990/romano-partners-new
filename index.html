@@ -6344,19 +6344,10 @@ function addServiceAdditionalRow(){__mpAdditionalSeq++;$("mpAdditionalList").ins
 function qtyOptions(selected=0,max=10){let h="";for(let i=0;i<=max;i++)h+="<option value='"+i+"' "+(Number(selected)===i?"selected":"")+">"+i+"</option>";return h}
 function masterSelectedQty(code){const el=document.querySelector("[data-qty='"+code+"']");return Math.max(0,Number(el?.value||0))}
 function masterExtraLinenBase(items,typologyCode){
- const code=String(typologyCode||"").toUpperCase();
- const bedroomMatch=code.match(/^T(\\d+)/);
- let includedPacks=bedroomMatch?Math.max(1,Number(bedroomMatch[1])):0;
- const linenItems=(items||[]).filter(x=>{
+ return (items||[]).filter(x=>{
   const category=String(x.category||"").toLowerCase(),name=String(x.name||""),itemCode=String(x.code||"").toUpperCase(),detail=String(x.detail||"");
   return category==="ropa"||/laundry|linen|ropa|lavander|pack cama|sofá.?cama|sofa.?cama/i.test(name+" "+itemCode+" "+detail)||itemCode.startsWith("SOFA");
- });
- return linenItems.reduce((sum,x)=>{
-  const qty=Math.max(0,Number(x.quantity||0)),unit=Math.max(0,Number(x.unit_price||0)),itemCode=String(x.code||"").toUpperCase();
-  if(itemCode==="SINGLE"||itemCode==="KING"){const included=Math.min(qty,includedPacks);includedPacks-=included;return sum+Math.max(0,qty-included)*unit}
-  // Sofás-cama e outros packs não incluídos na tipologia entram sempre no desconto de roupa extra.
-  return sum+qty*unit;
- },0);
+ }).reduce((sum,x)=>sum+Math.max(0,Number(x.quantity||0))*Math.max(0,Number(x.unit_price||0)),0);
 }
 function masterLinenRows(){const rows=[],isAlehost=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",code=String(masterSelectedCleaning().opt?.code||"").toUpperCase(),m=code.match(/^T(\d+)/),beds=m?Math.max(1,Number(m[1])):0;if(isAlehost&&beds){rows.push({category:"ropa",code:"KING",name:"Ropa y lavandería · "+beds+" cama(s) × 16,87 € SIN IVA",quantity:beds,unit_price:16.87,tax:false})}else{const single=masterSelectedQty("LINEN_SINGLE"),king=masterSelectedQty("LINEN_KING");if(single)rows.push({category:"ropa",code:"SINGLE",name:"Pack cama individual 90×200",quantity:single,unit_price:15.57,tax:false});if(king)rows.push({category:"ropa",code:"KING",name:"Pack cama doble / King 180×200",quantity:king,unit_price:16.87,tax:false})}const sofaType=$("mpSofaType")?.value||"none",sofaQty=masterSelectedQty("SOFA_BED");if(sofaType!=="none"&&sofaQty)rows.push({category:"ropa",code:sofaType==="single"?"SOFA-S":"SOFA-K",name:sofaType==="single"?"Sofá-cama individual":"Sofá-cama doble / casal",quantity:sofaQty,unit_price:sofaType==="single"?15.57:16.87,tax:false});return rows}
 const MAINTENANCE_RATES={normal:{label:"Normal · tarifa progresiva",type:"progressive",rates:[45,40,32,30,29,28,27]},emergency:{label:"Urgencia 24H · 60 €/hora",type:"flat",rate:60},night:{label:"Noche / madrugada · 80 €/hora",type:"flat",rate:80},holiday:{label:"Domingos / festivos · 90 €/hora",type:"flat",rate:90},travel_center:{label:"Desplazamiento centro · 15 €",type:"fixed",rate:15},travel_out:{label:"Desplazamiento fuera de centro · 20 €",type:"fixed",rate:20}};
