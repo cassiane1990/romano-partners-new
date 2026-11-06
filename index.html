@@ -6577,18 +6577,18 @@ async function masterUpdateDiscountSummary(){
  const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code);
  const extraGross=Math.round(laundryBase*(1+vatRate)*100)/100;
- const serviceBase=isAlehost?originalTotal:Math.max(0,Math.round((originalTotal-extraGross)*100)/100);
- const cleaningDiscount=Math.round(serviceBase*cleaningPct)/100,laundryDiscount=isAlehost?0:Math.round(extraGross*laundryPct)/100;
+ const cleaningBase=Math.round((Number(clean.price||0)*Number(clean.qty||1)*(clean.opt?.tax?1:1+vatRate))*100)/100;
+ const cleaningDiscount=Math.round(cleaningBase*cleaningPct)/100,laundryDiscount=Math.round(extraGross*laundryPct)/100;
  const discountTotal=Math.round((cleaningDiscount+laundryDiscount)*100)/100;
  const total=Math.max(0,Math.round((originalTotal-discountTotal)*100)/100),ratio=originalTotal>0?total/originalTotal:1;
  const subtotal=Math.max(0,Math.round(originalSub*ratio*100)/100);
  const tax=Math.max(0,Math.round((total-subtotal)*100)/100);
  const money=v=>masterMoney(Math.round(Number(v||0)*100)/100);
  box.innerHTML="<div class='panel-head' style='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap'><div><h3 style='margin:0'>Descontos</h3><span class='pill'>"+(__romanoServiceDiscountsEnabled&&clientDiscountsEnabled?"Ativados":"Desativados")+"</span></div><button type='button' class='btn "+(__romanoServiceDiscountsEnabled?"gold":"")+" ' onclick='toggleServiceDiscounts()'>"+(__romanoServiceDiscountsEnabled?"Desativar descontos":"Ativar descontos")+"</button></div>"+
- "<div class='line-item'><span>Pacote da tipologia · total original com IVA (inclui os packs previstos)</span><b>"+money(serviceBase)+"</b></div>"+
- "<div class='line-item'><span>Desconto do pacote ("+cleaningPct.toLocaleString('es-ES')+"%)</span><b>− "+money(cleaningDiscount)+"</b></div>"+
+ "<div class='line-item'><span>Valor da limpeza · sem roupa e amenities</span><b>"+money(cleaningBase)+"</b></div>"+
+ "<div class='line-item'><span>Desconto na limpeza ("+cleaningPct.toLocaleString('es-ES')+"%)</span><b>− "+money(cleaningDiscount)+"</b></div>"+
  "<div class='line-item'><span>Packs de roupa extra · preço com IVA</span><b>"+money(extraGross)+"</b></div>"+
- "<div class='line-item'><span>"+(isAlehost?"Desconto do cliente ("+cleaningPct.toLocaleString('es-ES')+"%)":"Desconto de 3% nos packs extra")+"</span><b>− "+money(laundryDiscount)+"</b></div>"+
+ "<div class='line-item'><span>Desconto nos packs extra ("+laundryPct.toLocaleString('es-ES')+"%)</span><b>− "+money(laundryDiscount)+"</b></div>"+
  "<div class='line-item'><span>Total de descontos</span><b>− "+money(discountTotal)+"</b></div>"+
  "<div class='line-item'><span>Subtotal após descontos</span><b>"+money(subtotal)+"</b></div>"+
  "<div class='line-item'><span>IVA recalculado</span><b>"+money(tax)+"</b></div>"+
@@ -6610,9 +6610,9 @@ async function savePremiumService(){
  const vatRate=Number($("mpVat")?.value||21)/100;
  const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code),extraGross=Math.round(laundryBase*(1+vatRate)*100)/100;
- // ALEHOST: o desconto comercial de 7% do cliente incide sobre o total dos componentes selecionados.
- const cleaningBase=isAlehost?originalTotal:Math.max(0,Math.round((originalTotal-extraGross)*100)/100);
- const cleaningDiscountAmount=Math.round(cleaningBase*cleaningPct)/100,laundryDiscountAmount=isAlehost?0:Math.round(extraGross*laundryPct)/100,discountAmount=Math.round((cleaningDiscountAmount+laundryDiscountAmount)*100)/100;
+ // Descontos separados: limpeza apenas sobre a limpeza; roupa extra apenas sobre packs extra. Amenities ficam sempre fora.
+ const cleaningBase=Math.round((Number(clean.price||0)*Number(clean.qty||1)*(clean.opt?.tax?1:1+vatRate))*100)/100;
+ const cleaningDiscountAmount=Math.round(cleaningBase*cleaningPct)/100,laundryDiscountAmount=Math.round(extraGross*laundryPct)/100,discountAmount=Math.round((cleaningDiscountAmount+laundryDiscountAmount)*100)/100;
  const discountedTotal=Math.max(0,Math.round((originalTotal-discountAmount)*100)/100),discountRatio=originalTotal>0?discountedTotal/originalTotal:1,discountedSub=Math.max(0,Math.round(originalSub*discountRatio*100)/100),discountedTax=Math.max(0,Math.round((discountedTotal-discountedSub)*100)/100);
  const discountDetails={enabled:discountsActive,cleaning_percent:cleaningPct,cleaning_original:Math.round(cleaningBase*100)/100,cleaning_discount:Math.round(cleaningDiscountAmount*100)/100,laundry_percent:laundryPct,laundry_original:Math.round(laundryBase*100)/100,laundry_discount:Math.round(laundryDiscountAmount*100)/100,discount_total:discountAmount,subtotal_original:originalSub,subtotal_discounted:discountedSub,tax_original:originalTax,tax_discounted:discountedTax,total_original:originalTotal,total_discounted:discountedTotal};
  const payload={company_id:currentProfile.company_id,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,agreed_amount:discountedSub,discount_details:discountDetails,priority:$("mpPriority").value,scheduled_at:requestedSchedule.toISOString(),status:internal?"scheduled":"requested",supervisor_approved_at:internal?new Date().toISOString():null,requested_items:items.filter(x=>x.category!=="additional"),instructions:$("mpNotes").value.trim()||null,notes:null,tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:true,additional_items:additional,created_by:currentUser.id,updated_by:currentUser.id,created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString(),pricing:{cleaning_original:clean.price,cleaning_tax_included:!!clean.opt?.tax,cleaning_quantity:clean.qty,urgent_cleaning:$("mpPriority").value==="urgent",cleaning_basis:clean.cat.basis,subtotal:discountedSub,tax:discountedTax,total:discountedTotal,discount_details:discountDetails,sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};
