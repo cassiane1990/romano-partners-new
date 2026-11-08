@@ -2418,10 +2418,11 @@ async function openClientEditModal(x){
  const props=ps.length?ps.map(p=>clientPropertyInlineHtml(p,x,demoMode?"demo":"real")).join(""):'<div class="empty">No hay apartamentos asociados a este cliente.</div>';
  openModal("Editar cliente",'<div id="ecClientEditForm"><div style="display:flex;gap:15px;align-items:center;margin-bottom:12px"><div id="ecPhotoPreview">'+photoBox(photo,x.name,false)+'</div><div class="field" style="flex:1;margin-top:0"><label>Foto de perfil</label><input id="ecPhoto" type="file" accept="image/*" onchange="photoPreview(\'ecPhoto\',\'ecPhotoPreview\',\''+esc(x.name||"Cliente")+'\')"><small class="muted">Seleccione una nueva foto para reemplazarla</small></div></div><div class="two"><div class="field"><label>Nombre</label><input id="ecName" value="'+esc(x.name||"")+'" required></div><div class="field"><label>Email</label><input id="ecEmail" type="email" value="'+esc(x.email||"")+'"></div></div><div class="field"><label>Teléfono</label><input id="ecPhone" value="'+esc(x.phone||"")+'"></div><div class="field"><label>Notas</label><textarea id="ecNotes">'+esc(x.notes||"")+'</textarea></div><div class="panel" style="margin:15px 0"><div class="panel-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3>Descuento exclusivo (%)</h3><div class="muted">Solo se aplica a este cliente.</div><span id="ecDiscountStatus" class="pill">'+(x.discounts_enabled===false?'Desativados':'Ativados')+'</span></div><input type="hidden" id="ecDiscountsEnabled" value="'+(x.discounts_enabled===false?'false':'true')+'"></div><div style="display:flex;justify-content:flex-start;margin:10px 0 14px"><button type="button" id="ecDiscountToggle" class="btn gold" style="display:inline-flex!important;visibility:visible!important;opacity:1!important;position:relative;z-index:5;min-height:44px;padding:12px 20px;font-weight:700;border:1px solid #c99a48;border-radius:12px;background:#f8edda;color:#3d2c16" onclick="toggleClientDiscounts(\''+esc(x.id)+'\')">'+(x.discounts_enabled===false?'Ativar descontos':'Desativar descontos')+'</button></div><div class="two"><div class="field"><label>Descuento en limpieza (%)</label><input id="ecCleaningDiscount" type="number" min="0" max="100" step="0.01" onchange="saveClientDiscountSettings(\''+esc(x.id)+'\')" value="'+Number(x.cleaning_discount_percent||0)+'"></div><div class="field"><label>Descuento en packs de ropa (%)</label><input id="ecLaundryDiscount" type="number" min="0" max="100" step="0.01" onchange="saveClientDiscountSettings(\''+esc(x.id)+'\')" value="'+Number(x.laundry_discount_percent||0)+'"></div></div></div><div class="panel" style="margin:15px 0"><div class="panel-head"><div><h3>Propiedades / Apartamentos</h3><div class="muted">'+ps.length+' apartamento(s) asociados</div></div><button type="button" class="btn gold" onclick="newClientProperty(\''+esc(x.id)+'\')">+ Nuevo inmueble</button></div>'+props+'<div class="panel" style="margin:15px 0"><div class="panel-head"><div><h3>Acceso a ROMANO PARTNERS</h3><div class="muted">Envíe o reenvíe la invitación de acceso al cliente.</div></div></div><button type="button" class="btn gold" onclick="sendClientAccessInvite(\''+esc(x.id)+'\')">✉ Enviar invitación de acceso</button></div></div><button type="button" class="primary" onclick="saveClientEdit(event,\''+esc(x.id)+'\')">Guardar cambios</button></div>');
 }
+const ROMANO_AUTH_REDIRECT="https://romano-partners-new.pages.dev";
 async function sendExistingAccessRecovery(email){
  const e=String(email||"").trim().toLowerCase();
  if(!e)return{error:new Error("Falta el e-mail.")};
- const rr=await sb.auth.resetPasswordForEmail(e,{redirectTo:window.location.origin});
+ const rr=await sb.auth.resetPasswordForEmail(e,{redirectTo:ROMANO_AUTH_REDIRECT});
  return rr;
 }
 async function sendClientAccessInvite(id){
@@ -2429,7 +2430,7 @@ async function sendClientAccessInvite(id){
  const q=await sb.from("clients").select("name,email").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error||!q.data){toast(q.error?.message||"Cliente no encontrado.");return}
  if(!q.data.email){toast("Este cliente no tiene e-mail registrado.");return}
- const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"client",entity_id:id,email:q.data.email,full_name:q.data.name,role:"client",redirect_to:window.location.origin}});
+ const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"client",entity_id:id,email:q.data.email,full_name:q.data.name,role:"client",redirect_to:ROMANO_AUTH_REDIRECT}});
  if(inv.error||inv.data?.error){toast("No se pudo enviar la invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  if(inv.data?.existing){
    const recovery=await sendExistingAccessRecovery(q.data.email);
@@ -3551,7 +3552,7 @@ async function saveEmployee(e){
  if(sendInvite){
    if(!data.email) toast("Funcionario creado, pero falta el e-mail para enviar la invitación.");
    else{
-     const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:data.email,full_name:data.full_name,role:accessRole,redirect_to:window.location.origin}});
+     const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:data.email,full_name:data.full_name,role:accessRole,redirect_to:ROMANO_AUTH_REDIRECT}});
      if(inv.error||inv.data?.error) toast("Funcionario criado. La invitación no fue enviada: "+(inv.data?.error||inv.error?.message||"erro desconhecido"));
      else toast("Funcionario creado e invitación de acceso enviada.");
    }
@@ -3653,7 +3654,7 @@ async function sendEmployeeAccessInvite(id){
  const q=await sb.from("employee_profiles").select("full_name,email,function_title").eq("id",id).eq("company_id",currentProfile.company_id).single();
  if(q.error||!q.data){toast(q.error?.message||"Funcionario no encontrado.");return}
  if(!q.data.email){toast("Este funcionario no tiene e-mail registrado.");return}
- const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:q.data.email,full_name:q.data.full_name,role:employeeRoleFromFunction(q.data.function_title),redirect_to:window.location.origin}});
+ const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"employee",entity_id:id,email:q.data.email,full_name:q.data.full_name,role:employeeRoleFromFunction(q.data.function_title),redirect_to:ROMANO_AUTH_REDIRECT}});
  if(inv.error||inv.data?.error){toast("No se pudo enviar la invitación: "+(inv.data?.error||inv.error?.message||"error desconocido"));return}
  if(inv.data?.existing){
    const recovery=await sendExistingAccessRecovery(q.data.email);
