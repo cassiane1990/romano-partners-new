@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-08-auth-pwa-auto-update-v26">
+<head><meta name="romano-build" content="2026-11-08-performance-pwa-v27">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -2266,7 +2266,7 @@ let __romanoClockTimer=null,__romanoRefreshBusy=false,__romanoPullStartY=0,__rom
 function startRomanoMadridClock(){
  if(__romanoClockTimer)clearInterval(__romanoClockTimer);
  updateDate();
- __romanoClockTimer=setInterval(()=>updateDate(),1000);
+ __romanoClockTimer=setInterval(()=>updateDate(),30000);
 }
 async function refreshRomanoApp(){
  if(__romanoRefreshBusy)return;
@@ -4579,13 +4579,11 @@ async function checkRomanoProductionUpdate(){
  if(__romanoUpdateCheckBusy||document.visibilityState==="hidden")return;
  __romanoUpdateCheckBusy=true;
  try{
-  // Always read the actual build marker; CDN ETags/HEAD responses can remain stale on installed PWAs.
-  const url="/index.html?__romano_build_check="+Date.now();
-  const response=await fetch(url,{method:"GET",cache:"no-store",credentials:"same-origin",headers:{"Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"}});
+  // Check a tiny version file instead of downloading the 800+ KB application document.
+  const response=await fetch("/version.json?check="+Date.now(),{method:"GET",cache:"no-store",credentials:"same-origin",headers:{"Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"}});
   if(!response.ok)return;
-  const body=await response.text();
-  const match=body.match(/<meta\s+name=["']romano-build["']\s+content=["']([^"']+)["']/i);
-  const revision=match?.[1];
+  const data=await response.json();
+  const revision=data?.build;
   if(!revision)return;
   if(__romanoPageETag===null){__romanoPageETag=revision;return}
   if(revision!==__romanoPageETag){
@@ -4595,7 +4593,7 @@ async function checkRomanoProductionUpdate(){
   }
  }catch(e){console.warn("ROMANO update check:",e)}finally{__romanoUpdateCheckBusy=false}
 }
-setInterval(checkRomanoProductionUpdate,30000);
+// Version checks run every 2 minutes using a tiny JSON file, not the full app HTML.
 document.addEventListener("visibilitychange",()=>{
  if(document.visibilityState==="visible"){
   checkRomanoProductionUpdate();
