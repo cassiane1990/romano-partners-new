@@ -2422,7 +2422,7 @@ const ROMANO_AUTH_REDIRECT="https://romano-partners-new.pages.dev";
 async function sendExistingAccessRecovery(email){
  const e=String(email||"").trim().toLowerCase();
  if(!e)return{error:new Error("Falta el e-mail.")};
- const rr=await sb.auth.resetPasswordForEmail(e,{redirectTo:ROMANO_AUTH_REDIRECT});
+ const rr=await sb.auth.resetPasswordForEmail(e,{redirectTo:ROMANO_AUTH_REDIRECT+"/?recovery=1"});
  return rr;
 }
 async function sendClientAccessInvite(id){
@@ -4709,6 +4709,31 @@ $("resetBtn").onclick=async()=>{
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));$("recovery").classList.remove("hidden");return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED"){setTimeout(()=>{enterAppFromSession(session).catch(err=>console.error("Auth session restore failed",err))},0)}});
+function showRomanoRecovery(message=""){
+ document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));
+ $("recovery").classList.remove("hidden");
+ const box=$("recoveryMsg");if(box){box.textContent=message;box.classList.toggle("hidden",!message)}
+}
+$("recoveryBtn").onclick=async()=>{
+ const password=$("recoveryPassword")?.value||"",confirm=$("recoveryPasswordConfirm")?.value||"",box=$("recoveryMsg"),btn=$("recoveryBtn");
+ const msg=t=>{if(box){box.textContent=t;box.classList.remove("hidden")}};
+ if(password.length<8){msg("A senha deve ter pelo menos 8 caracteres.");return}
+ if(password!==confirm){msg("As senhas não coincidem.");return}
+ btn.disabled=true;btn.textContent="Guardando...";
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){msg("O link de recuperação expirou ou já foi utilizado. Solicite um novo e-mail e abra o link no mesmo navegador.");return}
+  const {error}=await sb.auth.updateUser({password});
+  if(error){msg("Não foi possível guardar a senha: "+error.message);return}
+  $("recoveryPassword").value="";$("recoveryPasswordConfirm").value="";
+  msg("Senha alterada com sucesso. Já pode entrar com o seu e-mail e a nova senha.");
+  await sb.auth.signOut();
+ }catch(err){msg("Erro ao alterar a senha: "+(err?.message||String(err)))}
+ finally{btn.disabled=false;btn.textContent="Guardar nueva contraseña"}
+};
+if(new URLSearchParams(location.search).get("recovery")==="1"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"){
+ setTimeout(async()=>{const {data:{session}}=await sb.auth.getSession();if(session)showRomanoRecovery();},500);
+}
 (async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
 
 async function renderClientsPremium(){return renderClients()}
