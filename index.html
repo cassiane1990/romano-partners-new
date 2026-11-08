@@ -4559,11 +4559,11 @@ let __romanoSWUpdateTimer=null;
 let __romanoPageETag=null;
 let __romanoUpdateCheckBusy=false;
 function romanoHasUnsafeWorkInProgress(){
- const modal=document.querySelector(".modal,.modal-backdrop,[role='dialog']");
+ const modalOpen=[...document.querySelectorAll(".modal,.modal-backdrop,[role='dialog']")].some(el=>!el.classList.contains("hidden")&&el.getAttribute("aria-hidden")!=="true"&&el.getClientRects().length>0);
  const focused=document.activeElement;
  const formEditing=focused?.matches?.("input,textarea,select,[contenteditable='true']");
  const dirtyForm=[...document.querySelectorAll("form")].some(f=>f.dataset.dirty==="true");
- return !!(modal||formEditing||dirtyForm||window.__romanoSaving===true||window.__authBusy===true);
+ return !!(modalOpen||formEditing||dirtyForm||window.__romanoSaving===true||window.__authBusy===true);
 }
 // Recarrega a aplicação instalada quando a nova versão está ativa e não há trabalho por guardar.
 function romanoApplyPendingUpdate(){
