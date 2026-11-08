@@ -4521,10 +4521,7 @@ async function startRealtime(){
    const scheduleChanged=changed&&payload.old.scheduled_at!==payload.new.scheduled_at;
    if(statusChanged&&["completed","approved"].includes(payload.new.status))notifyClientServiceFinished(payload.new);
    if(!(statusChanged||assignmentChanged||scheduleChanged||payload.eventType==="INSERT"||payload.eventType==="DELETE"))return;
-   if(document.querySelector("#content")){
-     const active=document.querySelector("#masterNav button.active")?.dataset.page||document.querySelector(".nav button.active")?.dataset.page;
-     if(["dashboard","services","calendar","locations","service_journey"].includes(active))openPage(active);
-   }
+   // Alterações remotas não recarregam a tela; use o botão Atualizar para consultar os dados.
  })
  .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},(payload)=>{
    if(!payload.new||payload.new.recipient_id!==currentUser?.id)return;
