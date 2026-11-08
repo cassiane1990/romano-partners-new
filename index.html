@@ -1463,7 +1463,7 @@ async function renderJourneyMaster(){
    const journals=[];
    $("content").innerHTML=supervisorJourneyHtml+renderAdminJourneyHtml(employees,schedules,journals,todayKey,employeeFilter,nameFilter);
    if(window.__journeyAdminTimer)clearInterval(window.__journeyAdminTimer);
-   window.__journeyAdminTimer=setInterval(()=>{if(location.hash.startsWith("#journey"))renderJourneyMaster();else{clearInterval(window.__journeyAdminTimer);window.__journeyAdminTimer=null}},60000);
+   window.__journeyAdminTimer=null;
    return;
  }
 
@@ -2261,7 +2261,7 @@ function canSeeFinance(){return ["admin","client"].includes(role())}
 function canManageDocuments(){return role()==="admin"}
 function canOwnDocument(doc){return !!doc && (role()==="admin" || doc.uploaded_by===currentUser?.id)}
 function greeting(){const h=Number(romanoMadridParts(new Date()).hour);return h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}
-function updateDate(){const el=$("dateLine");if(el)el.textContent=new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date())+" · España (Madrid)"}
+function updateDate(){const el=$("dateLine");if(el)el.textContent=new Intl.DateTimeFormat("es-ES",{timeZone:ROMANO_TIME_ZONE,weekday:"long",day:"2-digit",month:"long",hour:"2-digit",minute:"2-digit"}).format(new Date())+" · España (Madrid)"}
 let __romanoClockTimer=null,__romanoRefreshBusy=false,__romanoPullStartY=0,__romanoPullTracking=false;
 function startRomanoMadridClock(){
  if(__romanoClockTimer)clearInterval(__romanoClockTimer);
@@ -2273,11 +2273,19 @@ async function refreshRomanoApp(){
  if(!$("modal")?.classList.contains("hidden")){toast("Cierre la ventana abierta antes de actualizar.");return}
  __romanoRefreshBusy=true;
  const b=$("refreshAppBtn"),old=b?.textContent;
- if(b)b.textContent="↻ Actualizando…";
- try{await registerRomanoServiceWorker();}catch(e){}
- setTimeout(()=>location.reload(),250);
+ if(b){b.disabled=true;b.textContent="↻ Actualizando…";}
+ try{
+  const key=window.__romanoCurrentPage||document.querySelector("#masterNav button.active")?.dataset.page||"dashboard";
+  const page=pages[key];
+  if(!page||typeof page[1]!=="function")throw new Error("No se pudo identificar la pantalla actual.");
+  await page[1]();
+  toast("✓ Información actualizada.");
+ }catch(e){toast("No se pudo actualizar: "+(e.message||e));}
+ finally{__romanoRefreshBusy=false;if(b){b.disabled=false;b.textContent=old||"↻ Actualizar";}}
 }
 function initRomanoPullToRefresh(){
+ // Atualização dos dados somente pelo botão manual; gesto de puxar para atualizar desativado.
+ return;
  if(window.__romanoPullReady)return;
  window.__romanoPullReady=true;
  const indicator=document.createElement("div");
@@ -4574,7 +4582,7 @@ function romanoApplyPendingUpdate(){
  window.location.reload();
  return true;
 }
-setInterval(()=>{if(window.__romanoUpdatePending)romanoApplyPendingUpdate()},5000);
+// Atualizações da versão do aplicativo são verificadas separadamente; não há polling de dados.
 async function checkRomanoProductionUpdate(){
  if(__romanoUpdateCheckBusy||document.visibilityState==="hidden")return;
  __romanoUpdateCheckBusy=true;
@@ -4805,7 +4813,7 @@ async function teams(){
  else h+='<div class="rpc-month-calendar"><div class="rpc-weekdays">'+["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>'<div>'+d+'</div>').join("")+'</div><div class="rpc-month-grid">'+Array.from({length:(new Date(yy,mm-1,1).getDay()+6)%7},()=>'<div class="rpc-empty-day"></div>').join("")+Array.from({length:days},(_,i)=>{const date=ym+"-"+String(i+1).padStart(2,"0");const dayItems=employees.map(e=>{const x=byKey.get(e.id+"|"+date);if(!x)return '<button class="rpc-person-day unset" onclick="newTeamSchedule(\''+e.id+'\',\''+date+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>＋ Planificar</span></button>';const st=statusFor(x,e,date);const hours=x.day_type==="work"&&x.start_time?((x.start_time||"").slice(0,5)+"–"+(x.end_time||"").slice(0,5)):"";return '<button class="rpc-person-day '+st.cls+'" onclick="editTeamSchedule(\''+x.id+'\')"><b>'+esc(e.full_name||e.employee_code)+'</b><span>'+esc(st.label)+(hours?" · "+esc(hours):"")+'</span></button>'}).join("");return '<div class="rpc-month-day"><div class="rpc-date">'+String(i+1).padStart(2,"0")+'</div>'+dayItems+'</div>'}).join("")+'</div></div>';
  h+='</div>';$("content").innerHTML=h;
  if(window.__teamsStatusTimer)clearInterval(window.__teamsStatusTimer);
- window.__teamsStatusTimer=setInterval(()=>{if(location.hash.startsWith("#teams"))teams();else{clearInterval(window.__teamsStatusTimer);window.__teamsStatusTimer=null}},60000);
+ window.__teamsStatusTimer=null;
 }
 function teamsMonth(delta){const d=new Date();const cur=new Date(d.getFullYear(),d.getMonth()+delta,1);location.hash="teams?month="+cur.toISOString().slice(0,7);openPage("teams")}
 async function newTeamSchedule(employeeProfileId="",date=""){
@@ -6804,7 +6812,7 @@ function startChatDirectoryRealtime(){
    })
    .subscribe();
 }
-function startChatPolling(){stopChatPolling();window.__chatPoll=setInterval(()=>{if(__activeChatId)refreshChatMessages();else renderChatContacts()},3000)}
+function startChatPolling(){stopChatPolling();window.__chatPoll=null;}
 async function renderChatPremium(){
  stopChatPolling();stopChatRealtime();startChatDirectoryRealtime();__activeChatId=null;__activeChatTitle="";
  const chatRole=role();
