@@ -1488,7 +1488,7 @@ async function renderJourneyMaster(){
  if(sq.error||wq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(sq.error?.message||wq.error?.message||"No se pudo cargar la jornada.")+'</div></div>';return}
  $("content").innerHTML=supervisorJourneyHtml+renderAdminJourneyHtml(employees,sq.data||[],wq.data||[],todayKey,employeeFilter,nameFilter);
  if(window.__journeyAdminTimer)clearInterval(window.__journeyAdminTimer);
- window.__journeyAdminTimer=setInterval(()=>{if(location.hash.startsWith("#journey"))renderJourneyMaster();else{clearInterval(window.__journeyAdminTimer);window.__journeyAdminTimer=null}},60000);
+ window.__journeyAdminTimer=null;
 }
 
 function journeyHoursLabel(checkIn,checkOut){
@@ -2266,7 +2266,7 @@ let __romanoClockTimer=null,__romanoRefreshBusy=false,__romanoPullStartY=0,__rom
 function startRomanoMadridClock(){
  if(__romanoClockTimer)clearInterval(__romanoClockTimer);
  updateDate();
- __romanoClockTimer=setInterval(()=>updateDate(),30000);
+ __romanoClockTimer=null;
 }
 async function refreshRomanoApp(){
  if(__romanoRefreshBusy)return;
@@ -4532,9 +4532,9 @@ async function startRealtime(){
    toast("🔔 "+(payload.new.title||"Nueva alerta")+(payload.new.body?" · "+payload.new.body:""));
    playNotificationSound();
    if("Notification" in window&&Notification.permission==="granted"){try{const n=new Notification(payload.new.title||"ROMANO PROPERTY CARE",{body:payload.new.body||"Nueva alerta",tag:"romano-"+payload.new.id});n.onclick=()=>{window.focus();n.close();openNotification(payload.new.id,payload.new.title,payload.new.body)}}catch(e){}}
-   if(active==="notifications"||active==="dashboard")openPage(active);
+   // A tela só recarrega dados quando o usuário pressiona Atualizar.
  })
- .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{if(window.__activeChatId)refreshChatMessages();})
+ .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{})
  .subscribe();
 }
 let __romanoInstallPrompt=null;
@@ -6794,7 +6794,7 @@ function startChatRealtime(){
  stopChatRealtime();
  if(!__activeChatId||!sb?.channel)return;
  window.__chatRealtime=sb.channel("romano-chat-"+__activeChatId)
-   .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages",filter:"thread_id=eq."+__activeChatId},()=>refreshChatMessages())
+   .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages",filter:"thread_id=eq."+__activeChatId},()=>{})
    .subscribe();
 }
 function startChatDirectoryRealtime(){
@@ -6803,7 +6803,6 @@ function startChatDirectoryRealtime(){
  window.__chatDirectoryRealtime=sb.channel("romano-chat-directory-"+currentUser.id)
    .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},async payload=>{
      if(payload.new?.sender_id===currentUser.id)return;
-     await renderChatContacts();
      if(payload.new?.thread_id!==__activeChatId){
        const p=await sb.from("profiles").select("full_name,role").eq("id",payload.new.sender_id).maybeSingle();
        const who=p.data?.full_name||((p.data?.role==="supervisor")?"Supervisor":"Novo contato");
