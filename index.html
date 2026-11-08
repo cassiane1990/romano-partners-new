@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-02-finance-cleaning-reconcile-v24">
+<head><meta name="romano-build" content="2026-11-08-auth-pwa-auto-update-v25">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -2397,7 +2397,7 @@ async function saveClient(e){
  if($("cSendInvite")?.checked===true){
    if(!email) toast("Cliente creado, pero falta el e-mail para enviar la invitación.");
    else{
-     const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"client",entity_id:clientId,email,full_name:name,role:"client",redirect_to:window.location.origin}});
+     const inv=await sb.functions.invoke("romano-create-access",{body:{entity_type:"client",entity_id:clientId,email,full_name:name,role:"client",redirect_to:ROMANO_AUTH_REDIRECT}});
      if(inv.error||inv.data?.error) toast("Cliente criado. La invitación no fue enviada: "+(inv.data?.error||inv.error?.message||"erro desconhecido"));
      else toast("Cliente creado e invitación de acceso enviada.");
    }
@@ -4539,8 +4539,9 @@ async function registerRomanoServiceWorker(){
   if(!window.__romanoSWControllerWatch){
    window.__romanoSWControllerWatch=true;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
-    // A nova versão fica instalada em segundo plano. Nunca recarregar a página ativa.
     window.__romanoUpdatePending=true;
+    // Atualiza todas as instalações assim que for seguro, preservando formulários e operações em curso.
+    setTimeout(()=>romanoApplyPendingUpdate(),1500);
    });
   }
   const reg=await navigator.serviceWorker.register("/sw.js",{scope:"/",updateViaCache:"none"});
@@ -4563,8 +4564,14 @@ function romanoHasUnsafeWorkInProgress(){
  const dirtyForm=[...document.querySelectorAll("form")].some(f=>f.dataset.dirty==="true");
  return !!(modal||formEditing||dirtyForm||window.__romanoSaving===true||window.__authBusy===true);
 }
-// Mantém compatibilidade com os pontos existentes da aplicação, sem reload automático.
-function romanoApplyPendingUpdate(){return false}
+// Recarrega a aplicação instalada quando a nova versão está ativa e não há trabalho por guardar.
+function romanoApplyPendingUpdate(){
+ if(!window.__romanoUpdatePending||window.__romanoReloading||romanoHasUnsafeWorkInProgress())return false;
+ window.__romanoReloading=true;
+ window.location.reload();
+ return true;
+}
+setInterval(()=>{if(window.__romanoUpdatePending)romanoApplyPendingUpdate()},5000);
 async function checkRomanoProductionUpdate(){
  if(__romanoUpdateCheckBusy||document.visibilityState==="hidden")return;
  __romanoUpdateCheckBusy=true;
@@ -4580,9 +4587,8 @@ async function checkRomanoProductionUpdate(){
   if(__romanoPageETag===null){__romanoPageETag=revision;return}
   if(revision!==__romanoPageETag){
    window.__romanoUpdatePending=true;
-   // Os ficheiros novos já estão a ser servidos pelo Service Worker.
-   // A sessão atual continua intacta; a versão nova abre no próximo arranque do app.
    __romanoPageETag=revision;
+   romanoApplyPendingUpdate();
   }
  }catch(e){}finally{__romanoUpdateCheckBusy=false}
 }
@@ -4696,7 +4702,7 @@ $("signupBtn").onclick=async()=>{
 };
 $("resetBtn").onclick=async()=>{
  const email=$("email").value.trim();if(!email){toast("Informe o email.");return}
- const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+ const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:ROMANO_AUTH_REDIRECT});
  if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
 };
 
