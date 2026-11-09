@@ -3252,12 +3252,14 @@ async function romanoOptimizePhoto(file){
  }catch(_){return file}
 }
 async function uploadServiceMedia(serviceId){
- const input=$("serviceMediaFile");const files=Array.from(input?.files||[]);if(!files.length)return;
+ const input=$("serviceMediaFile"),files=Array.from(input?.files||[]);
+ if(!files.length)return;
  if(input.dataset.uploading==="1"){toast("Aguarde: já existe um envio em andamento.");return}
  input.dataset.uploading="1";input.disabled=true;
  let status=document.getElementById("serviceMediaUploadStatus");
  if(!status){status=document.createElement("div");status.id="serviceMediaUploadStatus";status.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px;margin:10px 0";input.insertAdjacentElement("afterend",status)}
- const cards=files.map((file,i)=>{
+ status.innerHTML="";
+ const cards=files.map(file=>{
   const url=URL.createObjectURL(file),card=document.createElement("div");
   card.style.cssText="border:1px solid #e5dac8;border-radius:10px;padding:7px;min-width:0;background:#fff";
   const visual=file.type.startsWith("video/")?'<video muted playsinline preload="metadata" style="width:100%;height:76px;object-fit:cover;border-radius:7px" src="'+url+'"></video>':file.type.startsWith("image/")?'<img loading="eager" style="width:100%;height:76px;object-fit:cover;border-radius:7px" src="'+url+'">':'<div style="height:76px;display:grid;place-items:center;font-size:25px">📄</div>';
@@ -3268,25 +3270,36 @@ async function uploadServiceMedia(serviceId){
  const worker=async()=>{
   while(cursor<cards.length){
    const item=cards[cursor++],file=item.file,state=item.card.querySelector("[data-upload-state]");
-   try{
-    if(state)state.textContent="A preparar…";
-    const prepared=await romanoOptimizePhoto(file);
-    const ext=(prepared.name.split(".").pop()||"bin").toLowerCase();
-    const type=prepared.type.startsWith("video")?"video":prepared.type.startsWith("audio")?"audio":(prepared.type.includes("pdf")||prepared.type.includes("word")||prepared.type.includes("excel")||/\.(pdf|docx?|xlsx?)$/i.test(file.name))?"document":"photo";
-    const path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
-    if(state)state.textContent="A enviar…";
-    const up=await sb.storage.from("service-media").upload(path,prepared,{upsert:false,contentType:prepared.type||"application/octet-stream",cacheControl:"31536000"});
-    if(up.error)throw up.error;
-    const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:type,storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size});
-    if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
-    ok++;finished++;if(state)state.textContent="✓ Enviada · "+finished+"/"+cards.length;
-   }catch(err){failed++;finished++;if(state)state.textContent="Erro · "+finished+"/"+cards.length+": "+(err?.message||"falha no envio");}
+   let lastError=null,saved=false;
+   for(let attempt=1;attempt<=3&&!saved;attempt++){
+    let path=null;
+    try{
+     if(state)state.textContent=attempt===1?"A preparar…":"A tentar novamente ("+attempt+"/3)…";
+     const prepared=await romanoOptimizePhoto(file);
+     const ext=(prepared.name.split(".").pop()||"bin").toLowerCase();
+     const type=prepared.type.startsWith("video")?"video":prepared.type.startsWith("audio")?"audio":(prepared.type.includes("pdf")||prepared.type.includes("word")||prepared.type.includes("excel")||/\.(pdf|docx?|xlsx?)$/i.test(file.name))?"document":"photo";
+     path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
+     if(state)state.textContent="A enviar…";
+     const up=await sb.storage.from("service-media").upload(path,prepared,{upsert:false,contentType:prepared.type||"application/octet-stream",cacheControl:"31536000"});
+     if(up.error)throw up.error;
+     const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:type,storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size});
+     if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
+     saved=true;ok++;
+    }catch(err){lastError=err;if(attempt<3)await new Promise(resolve=>setTimeout(resolve,700*attempt))}
+   }
+   finished++;
+   if(saved){if(state)state.textContent="✓ Enviada · "+finished+"/"+cards.length}
+   else{failed++;if(state)state.textContent="Falhou · "+(lastError?.message||"erro no envio")}
   }
  };
- await Promise.all(Array.from({length:Math.min(4,cards.length)},()=>worker()));
- cards.forEach(x=>URL.revokeObjectURL(x.url));
- if(input){input.value="";input.disabled=false;input.dataset.uploading="0"}
- toast(ok+" ficheiro(s) anexado(s)"+(failed?" · "+failed+" falha(s)":"")+"." );
+ try{
+  // Sem limite de quantidade: fila em pequenos lotes para evitar falhas no telemóvel/rede.
+  await Promise.all(Array.from({length:Math.min(2,cards.length)},()=>worker()));
+ }finally{
+  cards.forEach(x=>URL.revokeObjectURL(x.url));
+  if(input){input.disabled=false;input.dataset.uploading="0";if(!failed)input.value=""}
+ }
+ toast(ok+" de "+files.length+" ficheiro(s) guardado(s)"+(failed?" · "+failed+" falha(s); mantenha a ficha aberta e tente novamente.":"." ));
  if(ok)await viewService(serviceId);
 }
 async function downloadServiceMedia(path){
