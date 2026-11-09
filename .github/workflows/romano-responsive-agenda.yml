@@ -28,7 +28,7 @@ jobs:
       - name: Verify service worker refresh behavior
         shell: bash
         run: |
-          grep -q 'const CACHE="romano-pwa-v56";' sw.js
+          grep -q 'const CACHE="romano-pwa-v57";' sw.js
           grep -q 'self.skipWaiting()' sw.js
           grep -q 'clients.claim()' sw.js
           grep -q 'cache:"no-store"' sw.js
