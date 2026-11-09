@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-08-performance-pwa-v27">
+<head><meta name="romano-build" content="2026-11-09-reliable-one-tap-updates-v29">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -2273,13 +2273,27 @@ async function refreshRomanoApp(){
  if(!$("modal")?.classList.contains("hidden")){toast("Cierre la ventana abierta antes de actualizar.");return}
  __romanoRefreshBusy=true;
  const b=$("refreshAppBtn"),old=b?.textContent;
- if(b){b.disabled=true;b.textContent="↻ Actualizando…";}
+ if(b){b.disabled=true;b.textContent="↻ Buscando actualización…";}
  try{
+  const response=await fetch("/version.json?manual="+Date.now(),{method:"GET",cache:"no-store",credentials:"same-origin",headers:{"Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"}});
+  if(!response.ok)throw new Error("No se pudo comprobar la versión publicada.");
+  const data=await response.json();
+  const published=String(data?.build||"").trim();
+  const installed=String(document.querySelector('meta[name="romano-build"]')?.content||"").trim();
+  if(!published)throw new Error("El servidor no informó la versión de la aplicación.");
+  const reg=await registerRomanoServiceWorker();
+  if(reg)await reg.update().catch(()=>{});
+  if(published!==installed){
+   window.__romanoUpdatePending=true;
+   if(b)b.textContent="↻ Instalando versión…";
+   window.location.reload();
+   return;
+  }
   const key=window.__romanoCurrentPage||document.querySelector("#masterNav button.active")?.dataset.page||"dashboard";
   const page=pages[key];
   if(!page||typeof page[1]!=="function")throw new Error("No se pudo identificar la pantalla actual.");
   await page[1]();
-  toast("✓ Información actualizada.");
+  toast("✓ Aplicación al día · información actualizada.");
  }catch(e){toast("No se pudo actualizar: "+(e.message||e));}
  finally{__romanoRefreshBusy=false;if(b){b.disabled=false;b.textContent=old||"↻ Actualizar";}}
 }
@@ -4576,7 +4590,7 @@ async function registerRomanoServiceWorker(){
  }catch(e){console.warn("ROMANO Service Worker:",e);return null}
 }
 let __romanoSWUpdateTimer=null;
-let __romanoPageETag=null;
+let __romanoPageETag=String(document.querySelector('meta[name="romano-build"]')?.content||"").trim()||null;
 let __romanoUpdateCheckBusy=false;
 function romanoHasUnsafeWorkInProgress(){
  const modalOpen=[...document.querySelectorAll(".modal,.modal-backdrop,[role='dialog']")].some(el=>!el.classList.contains("hidden")&&el.getAttribute("aria-hidden")!=="true"&&el.getClientRects().length>0);
