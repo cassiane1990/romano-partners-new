@@ -16,21 +16,25 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Verify automatic update detector
+      - name: Verify one-tap production update flow
         shell: bash
         run: |
-          grep -q 'async function checkRomanoProductionUpdate()' index.html
-          grep -q 'romanoUpdatePending' index.html
+          grep -q 'async function refreshRomanoApp()' index.html
+          grep -q 'version.json?manual=' index.html
+          grep -q 'romano-build' index.html
           grep -q 'updateViaCache:"none"' index.html
+          grep -q 'window.location.reload()' index.html
 
-      - name: Verify PWA cache refresh
+      - name: Verify service worker refresh behavior
         shell: bash
         run: |
-          grep -q 'const CACHE="romano-pwa-v46";' sw.js
-          grep -q 'SKIP_WAITING' sw.js
-          grep -q 'clients.claim' sw.js
+          grep -q 'const CACHE="romano-pwa-v56";' sw.js
+          grep -q 'self.skipWaiting()' sw.js
+          grep -q 'clients.claim()' sw.js
+          grep -q 'cache:"no-store"' sw.js
 
       - name: Verify cache-control headers
         shell: bash
         run: |
           grep -q 'no-cache, no-store, must-revalidate' _headers
+          grep -A1 '^/version.json$' _headers | grep -q 'no-cache, no-store, must-revalidate'
