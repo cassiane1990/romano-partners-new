@@ -1474,7 +1474,7 @@ async function renderJourneyMaster(){
  if(pids.length){
    const pr=await sb.from("profiles").select("id,role,active").in("id",pids).eq("active",true);
    const roleMap=new Map((pr.data||[]).map(x=>[x.id,x.role]));
-   employees=employees.filter(x=>["employee","maintenance_technician"].includes(roleMap.get(x.profile_id)));
+   employees=employees.filter(x=>!x.profile_id||!roleMap.has(x.profile_id)||["employee","maintenance_technician"].includes(roleMap.get(x.profile_id)));
  }
  if(employeeFilter)employees=employees.filter(x=>x.profile_id===employeeFilter||x.id===employeeFilter);
  if(nameFilter)employees=employees.filter(x=>String(x.full_name||"").toLowerCase().includes(nameFilter.toLowerCase())||String(x.employee_code||"").toLowerCase().includes(nameFilter.toLowerCase()));
