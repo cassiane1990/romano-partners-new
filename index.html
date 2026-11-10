@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-10-my-private-monthly-schedule-v33">
+<head><meta name="romano-build" content="2026-11-10-monthly-employee-calendar-v34">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -155,7 +155,41 @@ button[data-action="create"],button[data-action="save"]{
 .inspection-admin-actions .btn{min-height:46px;padding:12px 16px!important;font-size:14px!important;white-space:normal!important;line-height:1.35!important}
 .inspection-admin-actions .btn.danger{border-color:#c45b4d!important;color:#96382d!important;background:#fff4f1!important}
 @media(max-width:600px){.inspection-admin-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}.inspection-admin-actions .btn{width:100%!important;min-height:48px!important;text-align:center}}
-.evidence-swipe-row .evidence-swipe-delete{position:absolute;right:0;top:0;bottom:0;width:170px;border:0;border-radius:0 14px 14px 0;background:#b42318;color:#fff;font-weight:700;padding:12px;display:flex;align-items:center;justify-content:center;text-align:center}.evidence-swipe-row .evidence-swipe-card{width:100%}.evidence-swipe-row.is-swiped .evidence-swipe-card{transform:translateX(-175px)}@media(hover:hover){.evidence-swipe-row:hover .evidence-swipe-delete{cursor:pointer}}.inspection-swipe-row .inspection-swipe-delete{position:absolute;right:0;top:0;bottom:0;width:185px;border:0;border-radius:0 14px 14px 0;background:#b42318;color:#fff;font-weight:700;padding:12px;display:flex;align-items:center;justify-content:center;text-align:center}.inspection-swipe-row .inspection-swipe-card{width:100%}.inspection-swipe-row.is-swiped .inspection-swipe-card{transform:translateX(-190px)}@media(hover:hover){.inspection-swipe-row:hover .inspection-swipe-delete{cursor:pointer}}</style></style></style><style id="romano-urgent-cleaning-style">.service-urgent-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:5px 9px;border-radius:999px;background:#fff0ed;color:#a72d20;border:1px solid #efb7ad;font-size:10px;font-weight:800;letter-spacing:.06em}.services-flow{flex-wrap:wrap}.services-flow span{white-space:nowrap}</style>
+.evidence-swipe-row .evidence-swipe-delete{position:absolute;right:0;top:0;bottom:0;width:170px;border:0;border-radius:0 14px 14px 0;background:#b42318;color:#fff;font-weight:700;padding:12px;display:flex;align-items:center;justify-content:center;text-align:center}.evidence-swipe-row .evidence-swipe-card{width:100%}.evidence-swipe-row.is-swiped .evidence-swipe-card{transform:translateX(-175px)}@media(hover:hover){.evidence-swipe-row:hover .evidence-swipe-delete{cursor:pointer}}.inspection-swipe-row .inspection-swipe-delete{position:absolute;right:0;top:0;bottom:0;width:185px;border:0;border-radius:0 14px 14px 0;background:#b42318;color:#fff;font-weight:700;padding:12px;display:flex;align-items:center;justify-content:center;text-align:center}.inspection-swipe-row .inspection-swipe-card{width:100%}.inspection-swipe-row.is-swiped .inspection-swipe-card{transform:translateX(-190px)}@media(hover:hover){.inspection-swipe-row:hover .inspection-swipe-delete{cursor:pointer}}
+.rpc-my-schedule-panel{max-width:1100px;margin:0 auto;padding:22px}
+.rpc-my-schedule-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.rpc-my-schedule-eyebrow{font-size:9px;letter-spacing:2px;color:#a17a3b;font-weight:800}
+.rpc-my-schedule-head h2{font:26px Georgia,serif;margin:5px 0;color:#29251f}
+.rpc-my-schedule-name{font-size:14px;font-weight:800;color:#4b4032}
+.rpc-my-schedule-name span{font-size:10px;color:#918679;margin-left:6px}
+.rpc-my-schedule-nav{display:flex;align-items:center;justify-content:center;gap:18px;margin:18px 0 12px}
+.rpc-my-schedule-nav b{text-transform:capitalize;font:20px Georgia,serif;min-width:180px;text-align:center}
+.rpc-my-schedule-summary{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 14px}
+.rpc-my-schedule-summary span{padding:9px 13px;border-radius:12px;font-size:11px;font-weight:700}
+.rpc-my-summary-work{background:#e5f4e9;color:#28613c;border:1px solid #c5e4ce}
+.rpc-my-summary-off{background:#fde9e7;color:#963d36;border:1px solid #f2cbc6}
+.rpc-my-weekdays,.rpc-my-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.rpc-my-weekdays span{text-align:center;padding:8px 2px;font-size:10px;font-weight:800;color:#817566;text-transform:uppercase}
+.rpc-my-day{min-width:0;min-height:102px;border:1px solid #e7dfd3;border-radius:12px;padding:8px;background:#fffdf9;display:flex;flex-direction:column;gap:5px}
+.rpc-my-day-top{display:flex;align-items:center;justify-content:space-between}
+.rpc-my-day-top b{font:700 17px Georgia,serif}
+.rpc-my-day-top span{font-size:9px;color:#8c8174;text-transform:capitalize}
+.rpc-my-day strong{font-size:9px;letter-spacing:.35px}
+.rpc-my-day small{font-size:9px;line-height:1.25}
+.rpc-my-day.work{background:#e8f5eb;border-color:#c4e4cc;color:#28613c}
+.rpc-my-day.off{background:#fce9e7;border-color:#f0c8c3;color:#963d36}
+.rpc-my-day.holiday{background:#fbf2df;border-color:#ead8ae;color:#866326}
+.rpc-my-day.sick{background:#f7e8e5;border-color:#e8c5bf;color:#994b42}
+.rpc-my-day.unset{background:#f7f4ef;color:#8d857b}
+.rpc-my-day-empty{border:0;background:transparent}
+.rpc-my-day-note{color:inherit;opacity:.8;overflow-wrap:anywhere}
+.rpc-my-schedule-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
+.rpc-my-schedule-legend span{display:flex;align-items:center;gap:6px;font-size:10px;color:#71675b}
+.rpc-my-schedule-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.rpc-my-schedule-legend i.work{background:#4d9b64}.rpc-my-schedule-legend i.off{background:#d65a51}.rpc-my-schedule-legend i.holiday{background:#c79a45}.rpc-my-schedule-legend i.unset{background:#c8c0b4}
+.rpc-my-schedule-foot{font-size:10px;color:#877c6e;margin:13px 0 0}
+@media(max-width:600px){.rpc-my-schedule-panel{padding:12px}.rpc-my-schedule-head h2{font-size:21px}.rpc-my-schedule-nav{margin:13px 0 9px}.rpc-my-schedule-nav b{font-size:17px;min-width:140px}.rpc-my-weekdays,.rpc-my-month-grid{gap:3px}.rpc-my-weekdays span{font-size:8px;padding:6px 0}.rpc-my-day{min-height:79px;padding:5px 4px;border-radius:8px;gap:4px}.rpc-my-day-top b{font-size:14px}.rpc-my-day-top span{font-size:7px}.rpc-my-day strong{font-size:7px;letter-spacing:0}.rpc-my-day small{font-size:7px}.rpc-my-schedule-summary span{font-size:10px;padding:8px 10px}}
+</style></style></style><style id="romano-urgent-cleaning-style">.service-urgent-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:5px 9px;border-radius:999px;background:#fff0ed;color:#a72d20;border:1px solid #efb7ad;font-size:10px;font-weight:800;letter-spacing:.06em}.services-flow{flex-wrap:wrap}.services-flow span{white-space:nowrap}</style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
 /* ROMANO PREMIUM RESPONSIVE SYSTEM — client validation pass */
@@ -1952,15 +1986,39 @@ async function renderMyMonthlySchedule(){
  const y=ref.getFullYear(),m=ref.getMonth(),start=new Date(y,m,1),end=new Date(y,m+1,1);
  const ep=await sb.from("employee_profiles").select("id,full_name,employee_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).eq("active",true).maybeSingle();
  if(ep.error||!ep.data){$("content").innerHTML='<div class="panel"><div class="msg">Não foi possível localizar a sua ficha de funcionário.</div></div>';return}
- const key=d=>d.toISOString().slice(0,10);
+ const key=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
  const q=await sb.from("employee_schedules").select("id,work_date,start_time,end_time,day_type,notes").eq("company_id",currentProfile.company_id).eq("employee_profile_id",ep.data.id).gte("work_date",key(start)).lt("work_date",key(end)).order("work_date");
  if(q.error){$("content").innerHTML='<div class="panel"><div class="msg">Não foi possível carregar a sua escala: '+esc(q.error.message)+'</div></div>';return}
- const map=new Map((q.data||[]).map(x=>[x.work_date,x]));
- const days=Array.from({length:end.getDate()},(_,i)=>{const d=new Date(y,m,i+1),date=key(d),x=map.get(date);return {date,d,x}});
- const label=d=>d.toLocaleDateString("pt-PT",{weekday:"short",day:"2-digit",month:"long"});
- const rows=days.map(({date,d,x})=>{const kind=x?.day_type||"unset",off=kind==="off",vac=["holiday","vacation","vacaciones"].includes(kind),sick=kind==="sick",work=kind==="work";const status=off?"Folga":vac?"Férias":sick?"Ausência":work?"Trabalho":"Sem escala";const color=off?"#777":vac?"#b78b38":sick?"#bd554d":work?"#43865b":"#999";return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #eee5d8"><div><b>'+esc(label(d))+'</b><div class="muted" style="font-size:12px">'+(x?.notes?esc(x.notes):"")+'</div></div><div style="text-align:right"><b style="color:'+color+'">'+status+'</b><div class="muted" style="font-size:13px">'+(work?esc((x.start_time||"—").slice(0,5)+" – "+(x.end_time||"—").slice(0,5)):"")+'</div></div></div>'}).join("");
+ // Realtime is scoped to this employee; RLS remains the authority for row access.
+ if(window.__romanoMyScheduleProfileId!==ep.data.id){
+  if(window.__romanoMyScheduleChannel){try{await sb.removeChannel(window.__romanoMyScheduleChannel)}catch(e){}}
+  window.__romanoMyScheduleProfileId=ep.data.id;
+  window.__romanoMyScheduleChannel=sb.channel("romano-my-schedule-"+ep.data.id)
+   .on("postgres_changes",{event:"*",schema:"public",table:"employee_schedules",filter:"employee_profile_id=eq."+ep.data.id},()=>{
+    if(window.__romanoCurrentPage!=="my_schedule")return;
+    clearTimeout(window.__romanoMyScheduleRefreshTimer);
+    window.__romanoMyScheduleRefreshTimer=setTimeout(()=>{if(window.__romanoCurrentPage==="my_schedule")renderMyMonthlySchedule()},250);
+   }).subscribe();
+ }
+ const map=new Map((q.data||[]).map(x=>[String(x.work_date).slice(0,10),x]));
+ const days=Array.from({length:end.getDate()},(_,i)=>{const d=new Date(y,m,i+1,12),date=key(d);return {date,d,x:map.get(date)}});
+ const weekdayNames=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+ const monthStartOffset=(start.getDay()+6)%7;
+ const cells=Array.from({length:monthStartOffset},()=>'<div class="rpc-my-day rpc-my-day-empty" aria-hidden="true"></div>');
+ const rows=days.map(({date,d,x})=>{
+  const kind=x?.day_type||"unset",off=kind==="off",vac=["holiday","vacation","vacaciones"].includes(kind),sick=kind==="sick",work=kind==="work";
+  const cls=off?"off":vac?"holiday":sick?"sick":work?"work":"unset";
+  const status=off?"FOLGA":vac?"FÉRIAS":sick?"AUSÊNCIA":work?"TRABALHO":"SEM ESCALA";
+  const hours=work?(String(x.start_time||"").slice(0,5)+" – "+String(x.end_time||"").slice(0,5)):"";
+  const weekday=d.toLocaleDateString("pt-PT",{weekday:"short"}).replace(".","");
+  return '<div class="rpc-my-day '+cls+'" aria-label="'+esc(d.toLocaleDateString("pt-PT",{weekday:"long",day:"numeric",month:"long"}))+' · '+status+'"><div class="rpc-my-day-top"><b>'+String(d.getDate()).padStart(2,"0")+'</b><span>'+esc(weekday)+'</span></div><strong>'+status+'</strong>'+(hours?'<small>'+esc(hours)+'</small>':"")+(x?.notes?'<small class="rpc-my-day-note">'+esc(x.notes)+'</small>':"")+'</div>';
+ }).join("");
  const offCount=days.filter(z=>z.x?.day_type==="off").length,workCount=days.filter(z=>z.x?.day_type==="work").length;
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h2 style="font:25px Georgia,serif;margin:0">Minha escala mensal</h2><div class="muted">'+esc(ep.data.full_name)+' · '+esc(ep.data.employee_code||"")+'</div></div><button class="btn" onclick="reloadCurrentPage()">↻ Atualizar</button></div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0"><button class="btn" onclick="window.__romanoMyScheduleMonth=new Date('+y+','+(m-1)+',1).toISOString().slice(0,7);renderMyMonthlySchedule()">‹</button><b>'+esc(ref.toLocaleDateString("pt-PT",{month:"long",year:"numeric"}))+'</b><button class="btn" onclick="window.__romanoMyScheduleMonth=new Date('+y+','+(m+1)+',1).toISOString().slice(0,7);renderMyMonthlySchedule()">›</button></div><div class="two"><div class="notice"><b>'+workCount+'</b> dias de trabalho</div><div class="notice"><b>'+offCount+'</b> dias de folga</div></div><div style="margin-top:12px;border:1px solid #e8ddcc;border-radius:14px;overflow:hidden">'+(rows||'<div class="notice">Sem registos para este mês.</div>')+'</div><p class="muted" style="font-size:12px;margin-top:12px">Consulta pessoal. Só são apresentados os dias e horários da sua própria ficha.</p></div>';
+ const monthLabel=ref.toLocaleDateString("pt-PT",{month:"long",year:"numeric"});
+ const prev=new Date(y,m-1,1),next=new Date(y,m+1,1);
+ const prevKey=prev.getFullYear()+"-"+String(prev.getMonth()+1).padStart(2,"0");
+ const nextKey=next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0");
+ $("content").innerHTML='<div class="panel rpc-my-schedule-panel"><div class="rpc-my-schedule-head"><div><div class="rpc-my-schedule-eyebrow">ROMANO PARTNERS · EQUIPA</div><h2>Minha escala mensal</h2><div class="rpc-my-schedule-name">'+esc(ep.data.full_name)+' <span>'+esc(ep.data.employee_code||"")+'</span></div></div><button class="btn" onclick="renderMyMonthlySchedule()">↻ Atualizar</button></div><div class="rpc-my-schedule-nav"><button class="btn" aria-label="Mês anterior" onclick="window.__romanoMyScheduleMonth=\''+prevKey+'\';renderMyMonthlySchedule()">‹</button><b>'+esc(monthLabel)+'</b><button class="btn" aria-label="Mês seguinte" onclick="window.__romanoMyScheduleMonth=\''+nextKey+'\';renderMyMonthlySchedule()">›</button></div><div class="rpc-my-schedule-summary"><span class="rpc-my-summary-work"><b>'+workCount+'</b> dias de trabalho</span><span class="rpc-my-summary-off"><b>'+offCount+'</b> dias de folga</span></div><div class="rpc-my-weekdays">'+weekdayNames.map(d=>'<span>'+d+'</span>').join("")+'</div><div class="rpc-my-month-grid">'+cells.join("")+rows+'</div><div class="rpc-my-schedule-legend"><span><i class="work"></i> Trabalho</span><span><i class="off"></i> Folga</span><span><i class="holiday"></i> Férias</span><span><i class="unset"></i> Sem escala</span></div><p class="rpc-my-schedule-foot">A escala é atualizada automaticamente quando o Admin ou Supervisor altera os seus dias.</p></div>';
 }
 const pages={dashboard:["Dashboard 360",renderPremiumDashboard],packs_amenities:["Solicitar pack ropa",renderPacksAmenities],operations:["Centro operativo",renderLocationsMaster],services:["Servicios",renderServicesMaster],newservice:["Nuevo servicio",openNewServiceMenu],newservice_cleaning:["Crear servicio de limpieza",newServicePremium],newservice_maintenance:["Crear servicio de mantenimiento",newMaintenanceServicePremium],calendar:["Calendario",renderCalendar],change_requests:["Solicitudes de cambio de horario",renderServiceChangeRequests],emergency:["Emergencia 24H",renderEmergencyPremium],maintenance_catalog:["Catálogo de Mantenimiento",maintenance],maintenance:["Mantenimiento / Proyectos",renderMaintenancePremium],clients:["Clientes",renderClientsPremium],prepostos:["Prepostos / Representantes",renderPrepostosPremium],properties:["Propiedades / Apartamentos",renderPropertiesPremium],units:["Unidades / Áreas",renderUnitsPremium],employees:["Funcionarios",renderEmployeesPremium],teams:["Equipos / Plan mensul",renderTeamsPremium],journey:["Mi Jornada",renderJourneyMaster],my_schedule:["Minha escala mensual",renderMyMonthlySchedule],service_journey:["Jornada de servicios",renderServiceJourneyBoard],locations:["Geolocalización / Radar",renderLocationsMaster],materialsreq:["Solicitudes de materiales",renderMaterialsMaster],stock_inventory:["Stock de productos y materiales",renderStock],stock_catalog:["Catálogo de Materiales",()=>romanoCatalogManager("material")],linen_catalog:["Catálogo de Ropa",()=>romanoCatalogManager("linen")],laundry_catalog:["Catálogo de Lavandería",()=>romanoCatalogManager("laundry")],amenities_catalog:["Catálogo de Amenities",()=>romanoCatalogManager("amenities")],recurring:["Servicios recurrentes",renderRecurringPremium],cleaning_catalog:["Catálogo de Limpieza",renderCleaningCatalog],catalog:["Tipologías y Precios",renderCatalogMaster],quotes:["Presupuestos",renderQuotesPremium],finance:["Finanzas",renderFinancePremium],company_costs:["Custos da empresa",renderCompanyCostsPage],receipts:["Recibos / Comprobantes",renderReceiptsPremium],invoices:["Facturas",renderInvoicesPremium],documents:["Documentos / Contratos",renderDocumentsPremium],employee_documents:["Mis documentos",renderEmployeeDocumentsPage],service_history:["Histórico de servicios",renderServiceHistoryPremium],evidence_archive:["Arquivo de fotos, vídeos e incidências",renderEvidenceArchive],property_inspections:["Inspeção de apartamentos",renderPropertyInspections],chat:["Chat",renderChatPremium],notifications:["Notificaciones",renderNotificationsPremium],search:["Búsqueda global",renderSearchPremium],reports:["Informes",renderReportsPremium],sync:["Sincronización offline",renderSyncPremium],backup:["Backup / Recuperación",renderBackupPremium],ai:["ROMANO IA",renderAIMaster],audit:["Auditoría",renderAuditPremium],privacy:["Privacidad / RGPD",renderPrivacyPremium],security:["Seguridad / MFA",renderSecurity],profile:["Mi perfil",renderProfilePremium]};
 
