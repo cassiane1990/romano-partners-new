@@ -6737,8 +6737,7 @@ async function masterUpdateDiscountSummary(){
   }
  }
  if(request!==__mpDiscountPreviewRequest)return;
- const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
- if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled||isAlehost)cleaningPct=0;
+ if(!__romanoServiceDiscountsEnabled||!clientDiscountsEnabled)cleaningPct=0;
  const clean=masterSelectedCleaning(),items=masterItemRows();
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
@@ -6774,7 +6773,7 @@ async function savePremiumService(){
  const employeeId=$("mpEmployee")?.value||null,internal=["admin","supervisor"].includes(role());
  const discountQuery=demoMode?{data:demoFindClient(clientId)||{},error:null}:await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).single();
  if(discountQuery.error){toast("No se pudieron cargar los descuentos del cliente: "+discountQuery.error.message);return}
- const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",cleaningPct=discountsActive&&!isAlehost?clientCleaningPct:0;
+ const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,cleaningPct=discountsActive?clientCleaningPct:0;
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
  const sofaBedBase=Math.round(masterExtraLinenBase(items,clean.opt?.code)*100)/100;
