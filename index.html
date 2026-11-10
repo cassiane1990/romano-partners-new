@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-10-monthly-employee-calendar-v34">
+<head><meta name="romano-build" content="2026-11-10-monthly-employee-calendar-v35">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -1983,7 +1983,7 @@ async function renderMyMonthlySchedule(){
  if(!["employee","maintenance_technician"].includes(role())){toast("Esta escala é exclusiva do funcionário.");return}
  if(!currentUser?.id||!currentProfile?.company_id){$("content").innerHTML='<div class="panel"><div class="msg">Sessão não identificada.</div></div>';return}
  const ref=window.__romanoMyScheduleMonth?new Date(window.__romanoMyScheduleMonth+"-01T12:00:00"):new Date();
- const y=ref.getFullYear(),m=ref.getMonth(),start=new Date(y,m,1),end=new Date(y,m+1,1);
+ const y=ref.getFullYear(),m=ref.getMonth(),start=new Date(y,m,1),end=new Date(y,m+1,1),daysInMonth=new Date(y,m+1,0).getDate();
  const ep=await sb.from("employee_profiles").select("id,full_name,employee_code").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).eq("active",true).maybeSingle();
  if(ep.error||!ep.data){$("content").innerHTML='<div class="panel"><div class="msg">Não foi possível localizar a sua ficha de funcionário.</div></div>';return}
  const key=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -2001,8 +2001,8 @@ async function renderMyMonthlySchedule(){
    }).subscribe();
  }
  const map=new Map((q.data||[]).map(x=>[String(x.work_date).slice(0,10),x]));
- const days=Array.from({length:end.getDate()},(_,i)=>{const d=new Date(y,m,i+1,12),date=key(d);return {date,d,x:map.get(date)}});
- const weekdayNames=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+ const days=Array.from({length:daysInMonth},(_,i)=>{const d=new Date(y,m,i+1,12),date=key(d);return {date,d,x:map.get(date)}});
+ const weekdayNames=["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
  const monthStartOffset=(start.getDay()+6)%7;
  const cells=Array.from({length:monthStartOffset},()=>'<div class="rpc-my-day rpc-my-day-empty" aria-hidden="true"></div>');
  const rows=days.map(({date,d,x})=>{
