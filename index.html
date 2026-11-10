@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-10-employee-visibility-auto-update-v31">
+<head><meta name="romano-build" content="2026-11-10-journey-all-active-employees-auto-update-v32">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -1469,13 +1469,7 @@ async function renderJourneyMaster(){
 
  const ep=await sb.from("employee_profiles").select("id,profile_id,employee_code,full_name,function_title,active").eq("company_id",currentProfile.company_id).eq("active",true).order("full_name",{ascending:true});
  if(ep.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(ep.error.message)+'</div></div>';return}
- const pids=(ep.data||[]).map(x=>x.profile_id).filter(Boolean);
  let employees=ep.data||[];
- if(pids.length){
-   const pr=await sb.from("profiles").select("id,role,active").in("id",pids).eq("active",true);
-   const roleMap=new Map((pr.data||[]).map(x=>[x.id,x.role]));
-   employees=employees.filter(x=>!x.profile_id||!roleMap.has(x.profile_id)||["employee","maintenance_technician"].includes(roleMap.get(x.profile_id)));
- }
  if(employeeFilter)employees=employees.filter(x=>x.profile_id===employeeFilter||x.id===employeeFilter);
  if(nameFilter)employees=employees.filter(x=>String(x.full_name||"").toLowerCase().includes(nameFilter.toLowerCase())||String(x.employee_code||"").toLowerCase().includes(nameFilter.toLowerCase()));
 
