@@ -6511,10 +6511,11 @@ function masterExtraLinenBase(items,typologyCode){
 }
 function masterLinenRows(){
  const rows=[],isAlehost=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a";
- // ALEHOST: a roupa normal por tipologia já está incluída no preço integral comercial. Não adicionar nem descontar outra vez.
- const isAlehostT1=isAlehost&&String($("mpCleaning")?.value||"")==="T1-1B";
- if(isAlehostT1){const king=masterSelectedQty("LINEN_KING");if(king)rows.push({category:"ropa",code:"KING",name:"Pack de roupa · IVA incluído",quantity:king,unit_price:20.41,tax:true,detail:"Preço do pack separado"});}
- else if(!isAlehost){
+ const code=String($("mpCleaning")?.value||"");
+ if(isAlehost){
+  const count=code.startsWith("T3-")?3:code.startsWith("T2-")?2:code==="T1-1B"?1:0;
+  if(count)rows.push({category:"ropa",code:"KING",name:"Pack de roupa · IVA incluído",quantity:count,unit_price:20.41,tax:true,detail:"Quantidade fixa por tipologia ALEHOST"});
+ }else{
   const single=masterSelectedQty("LINEN_SINGLE"),king=masterSelectedQty("LINEN_KING");
   if(single)rows.push({category:"ropa",code:"SINGLE",name:"Pack cama individual 90×200",quantity:single,unit_price:15.57,tax:false});
   if(king)rows.push({category:"ropa",code:"KING",name:"Pack cama doble / King 180×200",quantity:king,unit_price:16.87,tax:false});
@@ -6527,18 +6528,17 @@ const MAINTENANCE_RATES={normal:{label:"Normal · tarifa progresiva",type:"progr
 const MAINTENANCE_TYPES=[["none","No"],["preventive","Preventivo"],["corrective","Correctivo"],["silicone","Silicone"],["painting","Pintura"],["assembly","Montaje"],["installation","Instalación"],["hydraulic","Hidráulica"],["electric","Eléctrica"],["other","Otros"]];
 function masterMaintenanceOptions(){const rows=[],type=$("mpMaintenance")?.value||"none";if(type==="none")return rows;const rateKey=$("mpMaintenanceRate")?.value||"normal",rate=MAINTENANCE_RATES[rateKey]||MAINTENANCE_RATES.normal,hours=Math.max(1,Number($("mpMaintenanceHours")?.value||1));let gross=0,detail="";if(type==="other"){gross=Math.max(0,Number($("mpMaintenanceOtherValue")?.value||0));detail="Valor personalizado · IVA incluido"}else if(rate.type==="progressive"){if(hours>rate.rates.length)return[{category:"maintenance",code:type,name:$("mpMaintenance").selectedOptions[0]?.textContent||type,quantity:1,unit_price:0,tax:true,invalid:true,detail:"Más de 7 horas: solicitar tarifa adicional."}];gross=rate.rates.slice(0,hours).reduce((a,b)=>a+b,0);detail=rate.rates.slice(0,hours).map((v,i)=>(i+1)+"ª hora "+masterMoney(v)).join(" + ")}else if(rate.type==="flat"){gross=rate.rate*hours;detail=hours+" h × "+masterMoney(rate.rate)+"/h"}else{gross=rate.rate;detail="1 servicio"}rows.push({category:"maintenance",code:type+"-"+rateKey,name:($("mpMaintenance").selectedOptions[0]?.textContent||type)+" · "+(type==="other"?"Valor personalizado":rate.label),quantity:1,unit_price:gross,tax:true,detail,observation:$("mpMaintenanceNote")?.value.trim()||null,rate_key:rateKey,hours});return rows}
 
-function masterItemRows(){const rows=[...masterLinenRows()];[["KITCHEN","Kit cocina · 2,50 € IVA incluido",2.5],["SHAMPOO","Kit amenities · shampoo + jabón · 1,50 € IVA incluido",1.5]].forEach(d=>{const q=masterSelectedQty(d[0]);if(q){const specialAlehostT1=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a"&&String($("mpCleaning")?.value||"")==="T1-1B",included=specialAlehostT1?0:1,billable=Math.max(0,q-included);rows.push({category:"amenities",code:d[0],name:d[1],quantity:q,billable_quantity:billable,unit_price:d[2],tax:true,detail:specialAlehostT1?"Preço individual · IVA incluído":"1 kit incluido por tipología; se cobran solo los adicionales"})}});rows.push(...masterMaintenanceOptions());document.querySelectorAll(".mpAdditionalRow").forEach(row=>{const name=row.querySelector(".mpAdditionalName")?.value.trim(),value=Math.max(0,Number(row.querySelector(".mpAdditionalValue")?.value||0));if(name)rows.push({category:"additional",code:"ADDITIONAL",name,quantity:1,unit_price:value,tax:false,custom_value:true})});return rows}
+function masterItemRows(){const rows=[...masterLinenRows()];[["KITCHEN","Kit cocina · 2,50 € IVA incluido",2.5],["SHAMPOO","Kit amenities · shampoo + jabón · 1,50 € IVA incluido",1.5]].forEach(d=>{const q=masterSelectedQty(d[0]);if(q){const specialAlehost=($("mpClient")?.value||"")==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",included=specialAlehost?0:1,billable=Math.max(0,q-included);rows.push({category:"amenities",code:d[0],name:d[1],quantity:q,billable_quantity:billable,unit_price:d[2],tax:true,detail:specialAlehost?"Kit contabilizado separadamente · IVA incluído":"1 kit incluido por tipología; se cobran solo los adicionales"})}});rows.push(...masterMaintenanceOptions());document.querySelectorAll(".mpAdditionalRow").forEach(row=>{const name=row.querySelector(".mpAdditionalName")?.value.trim(),value=Math.max(0,Number(row.querySelector(".mpAdditionalValue")?.value||0));if(name)rows.push({category:"additional",code:"ADDITIONAL",name,quantity:1,unit_price:value,tax:false,custom_value:true})});return rows}
 function masterClientCleaningOptions(){
  const clientId=$("mpClient")?.value||"";
  if(clientId!=="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a")return null;
- // Tarifas comerciais ALEHOST previamente aprovadas. T2/T3 já incluem IVA e o desconto de 7%:
- // não voltar a aplicar desconto nem somar roupa/amenities incluídos nesses pacotes.
+ // ALEHOST: a seta mostra apenas a limpeza base do catálogo; extras e desconto são calculados abaixo.
  return[
-  {code:"T1-1B",name:"ALEHOST · T1 · limpeza base €24,00 (sem IVA)",price:24,tax:false},
-  {code:"T2-1B",name:"ALEHOST · T2 · 1 baño · serviço integral €73,20 (IVA incluído; desconto de 7% já aplicado)",price:73.20,tax:true},
-  {code:"T2-2B",name:"ALEHOST · T2 · 2 baños · serviço integral €75,45 (IVA incluído; desconto de 7% já aplicado)",price:75.45,tax:true},
-  {code:"T3-2B",name:"ALEHOST · T3 · serviço integral €98,93 (IVA incluído; desconto de 7% já aplicado)",price:98.93,tax:true},
-  {code:"T3-3B",name:"ALEHOST · T3 · 3 baños · serviço integral €98,93 (IVA incluído; desconto de 7% já aplicado)",price:98.93,tax:true},
+  {code:"T1-1B",name:"ALEHOST · T1 · limpieza base €24,00 (sem IVA)",price:24,tax:false},
+  {code:"T2-1B",name:"ALEHOST · T2 · 1 baño · limpieza base €26,00 (sem IVA)",price:26,tax:false},
+  {code:"T2-2B",name:"ALEHOST · T2 · 2 baños · limpieza base €28,00 (sem IVA)",price:28,tax:false},
+  {code:"T3-2B",name:"ALEHOST · T3 · 2 baños · limpieza base €34,00 (sem IVA)",price:34,tax:false},
+  {code:"T3-3B",name:"ALEHOST · T3 · 3 baños · limpieza base €36,00 (sem IVA)",price:36,tax:false},
   ...MASTER_PRICES.cleaning.filter(p=>/^T4|^T5/.test(p.code))
  ];
 }
@@ -6745,8 +6745,14 @@ async function masterUpdateDiscountSummary(){
  const clean=masterSelectedCleaning(),items=masterItemRows();
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
- const specialAlehostT1=isAlehost&&clean.opt?.code==="T1-1B";
- if(specialAlehostT1){const vatRate=Number($("mpVat")?.value||21)/100,discountGross=Math.round(originalTotal*0.07*100)/100,discountNet=Math.round(discountGross/(1+vatRate)*100)/100,discountTax=Math.round((discountGross-discountNet)*100)/100,finalTotal=Math.max(0,Math.round((originalTotal-discountGross)*100)/100),finalSub=Math.max(0,Math.round((originalSub-discountNet)*100)/100),finalTax=Math.max(0,Math.round((originalTax-discountTax)*100)/100);box.innerHTML="<div class='panel-head'><h3>Valores separados · ALEHOST T1</h3><span class='pill'>Desconto de 7%</span></div>"+[["Limpeza base · sem IVA",24],["IVA da limpeza ("+Math.round(vatRate*100)+"%)",24*vatRate],["Pack de roupa · IVA incluído",20.41],["Amenities · IVA incluído",1.5],["Kit cozinha · IVA incluído",2.5],["Subtotal antes do desconto",originalSub],["IVA total",originalTax],["Desconto (7%)",-discountGross],["Subtotal após desconto",finalSub],["IVA após desconto",finalTax],["TOTAL FINAL COM IVA",finalTotal]].map((x,i)=>"<div class='line-item'><span>"+(i===10?"<strong>"+x[0]+"</strong>":x[0])+"</span><b>"+(i===7?"− ":"")+masterMoney(Math.abs(x[1]))+"</b></div>").join("");return;}
+ const specialAlehost=isAlehost&&/^T[1-3]-/.test(clean.opt?.code||"");
+ if(specialAlehost){
+  const active=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,discountGross=active?Math.floor(originalTotal*0.07*100)/100:0,finalTotal=Math.max(0,Math.round((originalTotal-discountGross)*100)/100),vatAfter=Math.max(0,Math.round((originalTax-(discountGross-Math.floor(discountGross/(1+vatRate)*100)/100))*100)/100),subAfter=Math.max(0,Math.round((finalTotal-vatAfter)*100)/100);
+  const code=clean.opt.code,base=Number(clean.price||0),linen=code.startsWith("T3-")?3:code.startsWith("T2-")?2:1;
+  const rows=[["Limpeza base · sem IVA",base],["IVA da limpeza ("+Math.round(vatRate*100)+"%)",base*vatRate],["Packs de roupa · "+linen+" × 20,41 € · IVA incluído",linen*20.41],["Amenities · 1 kit · IVA incluído",1.5],["Kit cozinha · 1 kit · IVA incluído",2.5],["Total antes do desconto · IVA incluído",originalTotal],["Desconto de 7% sobre o total com IVA",-discountGross],["TOTAL FINAL COM IVA",finalTotal]];
+  box.innerHTML="<div class='panel-head'><h3>Valores separados · ALEHOST "+esc(code.slice(0,2))+"</h3><span class='pill'>"+(active?"Desconto de 7%":"Descontos desativados")+"</span></div>"+rows.map((x,i)=>"<div class='line-item'><span>"+(i===7?"<strong>"+x[0]+"</strong>":x[0])+"</span><b>"+(i===6?"− ":"")+masterMoney(Math.abs(x[1]))+"</b></div>").join("");
+  return;
+ }
  const laundryBase=masterExtraLinenBase(items,clean.opt?.code);
  const extraGross=Math.round(laundryBase*100)/100;
  const cleaningBase=Math.round(Number(clean.price||0)*Number(clean.qty||1)*100)/100;
@@ -6778,17 +6784,31 @@ async function savePremiumService(){
  const employeeId=$("mpEmployee")?.value||null,internal=["admin","supervisor"].includes(role());
  const discountQuery=demoMode?{data:demoFindClient(clientId)||{},error:null}:await sb.from("clients").select("cleaning_discount_percent,laundry_discount_percent,discounts_enabled").eq("id",clientId).eq("company_id",currentProfile.company_id).single();
  if(discountQuery.error){toast("No se pudieron cargar los descuentos del cliente: "+discountQuery.error.message);return}
- const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled,cleaningPct=discountsActive?clientCleaningPct:0;
+ const clientDiscountsEnabled=discountQuery.data?.discounts_enabled!==false,discountsActive=__romanoServiceDiscountsEnabled&&clientDiscountsEnabled;
  const originalSub=Number($("mpSub")?.dataset?.v||0),originalTax=Number($("mpTax")?.dataset?.v||0),originalTotal=Number($("mpTotal")?.dataset?.v||0);
  const vatRate=Number($("mpVat")?.value||21)/100;
  const sofaBedBase=Math.round(masterExtraLinenBase(items,clean.opt?.code)*100)/100;
  const cleaningBase=Math.round(Number(clean.price||0)*Number(clean.qty||1)*100)/100;
- const cleaningDiscountAmount=Math.round(cleaningBase*cleaningPct)/100,sofaBedDiscountAmount=Math.round(sofaBedBase*(discountsActive?3:0))/100,discountAmount=Math.round((cleaningDiscountAmount+sofaBedDiscountAmount)*100)/100;
- const discountWithVat=Math.round((cleaningDiscountAmount*(1+vatRate)+sofaBedDiscountAmount)*100)/100;
- const discountedTotal=Math.max(0,Math.round((originalTotal-discountWithVat)*100)/100);
- const discountedSub=Math.max(0,Math.round((originalSub-discountAmount)*100)/100);
- const discountedTax=Math.max(0,Math.round((originalTax-Math.round(cleaningDiscountAmount*vatRate*100)/100)*100)/100);
- const discountDetails={enabled:discountsActive,cleaning_percent:cleaningPct,cleaning_original:Math.round(cleaningBase*100)/100,cleaning_discount:Math.round(cleaningDiscountAmount*100)/100,laundry_percent:3,laundry_original:sofaBedBase,laundry_discount:Math.round(sofaBedDiscountAmount*100)/100,discount_total:discountAmount,subtotal_original:originalSub,subtotal_discounted:discountedSub,tax_original:originalTax,tax_discounted:discountedTax,total_original:originalTotal,total_discounted:discountedTotal,sofa_bed_discount_percent:discountsActive?3:0,sofa_bed_discount_amount:Math.round(sofaBedDiscountAmount*100)/100};
+ const isAlehost=clientId==="9ea22348-9d61-47dc-89b0-c0dfbd5fc56a",specialAlehost=isAlehost&&/^T[1-3]-/.test(clean.opt?.code||"");
+ let discountAmount=0,discountWithVat=0,discountedTotal=originalTotal,discountedSub=originalSub,discountedTax=originalTax,cleaningDiscountAmount=0,sofaBedDiscountAmount=0;
+ if(specialAlehost){
+  discountWithVat=discountsActive?Math.floor(originalTotal*0.07*100)/100:0;
+  const discountNet=Math.floor((discountWithVat/(1+vatRate))*100)/100;
+  discountAmount=discountNet;
+  discountedTotal=Math.max(0,Math.round((originalTotal-discountWithVat)*100)/100);
+  discountedTax=Math.max(0,Math.round((discountedTotal-(originalSub-discountNet))*100)/100);
+  discountedSub=Math.max(0,Math.round((discountedTotal-discountedTax)*100)/100);
+ }else{
+  const clientCleaningPct=Math.max(0,Math.min(100,Number(discountQuery.data?.cleaning_discount_percent||0))),cleaningPct=discountsActive?clientCleaningPct:0;
+  cleaningDiscountAmount=Math.round(cleaningBase*cleaningPct)/100;
+  sofaBedDiscountAmount=Math.round(sofaBedBase*(discountsActive?3:0))/100;
+  discountAmount=Math.round((cleaningDiscountAmount+sofaBedDiscountAmount)*100)/100;
+  discountWithVat=Math.round((cleaningDiscountAmount*(1+vatRate)+sofaBedDiscountAmount)*100)/100;
+  discountedTotal=Math.max(0,Math.round((originalTotal-discountWithVat)*100)/100);
+  discountedSub=Math.max(0,Math.round((originalSub-discountAmount)*100)/100);
+  discountedTax=Math.max(0,Math.round((originalTax-Math.round(cleaningDiscountAmount*vatRate*100)/100)*100)/100);
+ }
+ const discountDetails={enabled:discountsActive,cleaning_percent:specialAlehost?(discountsActive?7:0):Number(discountQuery.data?.cleaning_discount_percent||0),cleaning_original:Math.round(cleaningBase*100)/100,cleaning_discount:Math.round(cleaningDiscountAmount*100)/100,laundry_percent:specialAlehost?0:3,laundry_original:sofaBedBase,laundry_discount:Math.round(sofaBedDiscountAmount*100)/100,discount_total:discountAmount,discount_including_vat:discountWithVat,subtotal_original:originalSub,subtotal_discounted:discountedSub,tax_original:originalTax,tax_discounted:discountedTax,total_original:originalTotal,total_discounted:discountedTotal,sofa_bed_discount_percent:discountsActive&&!specialAlehost?3:0,sofa_bed_discount_amount:Math.round(sofaBedDiscountAmount*100)/100};
  const payload={company_id:currentProfile.company_id,client_id:clientId,property_id:prop,code,service_type:clean.type,typology:clean.opt?.code||null,pricing_code:clean.opt?.code||null,agreed_amount:discountedSub,discount_details:discountDetails,priority:$("mpPriority").value,scheduled_at:requestedSchedule.toISOString(),status:internal?"scheduled":"requested",supervisor_approved_at:internal?new Date().toISOString():null,requested_items:items.filter(x=>x.category!=="additional"),instructions:$("mpNotes").value.trim()||null,notes:null,tax_country:$("mpVat").value==="23"?"PT":"ES",laundry:true,additional_items:additional,created_by:currentUser.id,updated_by:currentUser.id,created_by_at:new Date().toISOString(),updated_by_at:new Date().toISOString(),pricing:{cleaning_original:clean.price,cleaning_tax_included:!!clean.opt?.tax,cleaning_quantity:clean.qty,urgent_cleaning:$("mpPriority").value==="urgent",cleaning_basis:clean.cat.basis,subtotal:discountedSub,tax:discountedTax,total:discountedTotal,discount_details:discountDetails,sofa_type:$("mpSofaType").value,sofa_quantity:masterSelectedQty("SOFA_BED")}};
  if(demoMode){const sub=Number($("mpSub").dataset.v||0),tax=Number($("mpTax").dataset.v||0),total=Number($("mpTotal").dataset.v||0);DEMO_SERVICES.unshift({id:"demo-"+code.toLowerCase(),...payload,subtotal:sub,tax_amount:tax,total,employee_name:null});closeModal();toast("Servicio limpieza ficticio creado · "+code);renderServicesMaster();return}
  const created=await sb.from("services").insert(payload).select("id").single();if(created.error){toast("No se pudo crear el servicio: "+created.error.message);return}
