@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-10-official-cleaning-catalog-and-client-discounts-v37">
+<head><meta name="romano-build" content="2026-11-11-stable-no-auto-reload-v38">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -4680,17 +4680,17 @@ async function checkRomanoProductionUpdate(){
  if(__romanoUpdateCheckBusy||document.visibilityState==="hidden")return;
  __romanoUpdateCheckBusy=true;
  try{
-  // Check a tiny version file instead of downloading the 800+ KB application document.
   const response=await fetch("/version.json?check="+Date.now(),{method:"GET",cache:"no-store",credentials:"same-origin",headers:{"Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"}});
   if(!response.ok)return;
   const data=await response.json();
-  const revision=data?.build;
+  const revision=String(data?.build||"");
   if(!revision)return;
   if(__romanoPageETag===null){__romanoPageETag=revision;return}
   if(revision!==__romanoPageETag){
-   __romanoPageETag=revision;
+   // Never reload automatically: avoid interrupting forms and prevent reload loops.
    window.__romanoUpdatePending=true;
-   romanoApplyPendingUpdate();
+   const b=$("refreshAppBtn");
+   if(b&&!b.disabled)b.title="Hay una actualización disponible. Toque para actualizar.";
   }
  }catch(e){console.warn("ROMANO update check:",e)}finally{__romanoUpdateCheckBusy=false}
 }
