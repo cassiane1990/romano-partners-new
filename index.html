@@ -4809,7 +4809,8 @@ $("resetBtn").onclick=async()=>{
 };
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
-sb.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));$("recovery").classList.remove("hidden");return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED"){setTimeout(()=>{enterAppFromSession(session).catch(err=>console.error("Auth session restore failed",err))},0)}});
+const ROMANO_RECOVERY_REQUESTED=new URLSearchParams(location.search).get("recovery")==="1"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).has("code");
+sb.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"||ROMANO_RECOVERY_REQUESTED){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;showRomanoRecovery();return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;if(ROMANO_RECOVERY_REQUESTED){showRomanoRecovery("O link foi aberto, mas a sessão de recuperação ainda não foi validada. Aguarde alguns segundos ou solicite um novo link.");return}showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED"){setTimeout(()=>{if(ROMANO_RECOVERY_REQUESTED){showRomanoRecovery();return}enterAppFromSession(session).catch(err=>console.error("Auth session restore failed",err))},0)}});
 function showRomanoRecovery(message=""){
  document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));
  $("recovery").classList.remove("hidden");
@@ -4832,10 +4833,11 @@ $("recoveryBtn").onclick=async()=>{
  }catch(err){msg("Erro ao alterar a senha: "+(err?.message||String(err)))}
  finally{btn.disabled=false;btn.textContent="Guardar nueva contraseña"}
 };
-if(new URLSearchParams(location.search).get("recovery")==="1"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"){
- setTimeout(async()=>{const {data:{session}}=await sb.auth.getSession();if(session)showRomanoRecovery();},500);
+if(ROMANO_RECOVERY_REQUESTED){
+ showRomanoRecovery("Validando o link de recuperação…");
+ setTimeout(async()=>{try{const {data:{session},error}=await sb.auth.getSession();if(error)showRomanoRecovery("Não foi possível validar o link: "+error.message);else if(session)showRomanoRecovery();else showRomanoRecovery("O link não foi validado ou expirou. Solicite uma nova recuperação e abra o link recebido no mesmo navegador.");}catch(err){showRomanoRecovery("Erro ao validar o link: "+(err?.message||String(err))) }},1200);
 }
-(async()=>{const q=await sb.auth.getSession();if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
+(async()=>{const q=await sb.auth.getSession();if(ROMANO_RECOVERY_REQUESTED){if(q.data?.session)showRomanoRecovery();return}if(q.error){showLogin(q.error.message);return}if(q.data.session)await enterAppFromSession(q.data.session);else showLogin()})();
 
 async function renderClientsPremium(){return renderClients()}
 async function renderPropertiesPremium(){return renderProperties()}
