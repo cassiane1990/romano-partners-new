@@ -4810,7 +4810,7 @@ $("resetBtn").onclick=async()=>{
 };
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
-const ROMANO_RECOVERY_REQUESTED=location.pathname.replace(/\\/+$/,"")===ROMANO_RECOVERY_PATH||new URLSearchParams(location.search).get("recovery")==="1"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).has("code")||new URLSearchParams(location.search).has("token_hash");
+const ROMANO_RECOVERY_REQUESTED=location.pathname.replace(/\/+$/,"")===ROMANO_RECOVERY_PATH||new URLSearchParams(location.search).get("recovery")==="1"||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).has("code")||new URLSearchParams(location.search).has("token_hash");
 sb.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"||ROMANO_RECOVERY_REQUESTED){currentUser=session?.user||null;currentProfile=null;__authReadyId=null;showRomanoRecovery();return}if(event==="SIGNED_OUT"||!session){currentUser=null;currentProfile=null;__authReadyId=null;if(ROMANO_RECOVERY_REQUESTED){showRomanoRecovery("O link foi aberto, mas a sessão de recuperação ainda não foi validada. Aguarde alguns segundos ou solicite um novo link.");return}showLogin();return}if(event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED"){setTimeout(()=>{if(ROMANO_RECOVERY_REQUESTED){showRomanoRecovery();return}enterAppFromSession(session).catch(err=>console.error("Auth session restore failed",err))},0)}});
 function showRomanoRecovery(message=""){
  document.querySelectorAll(".login").forEach(x=>x.classList.add("hidden"));
