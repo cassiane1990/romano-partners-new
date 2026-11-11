@@ -4804,8 +4804,8 @@ $("signupBtn").onclick=async()=>{
 };
 $("resetBtn").onclick=async()=>{
  const email=$("email").value.trim();if(!email){toast("Informe o email.");return}
- const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:ROMANO_AUTH_REDIRECT});
- if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
+ const r=await sendExistingAccessRecovery(email);
+ if(r.error){console.error("Password recovery request failed:",r.error);toast("No fue possível enviar a recuperação. Verifique a configuração de URL do Supabase e tente novamente.");}else toast("Enlace de recuperação enviado. Abra-o no mesmo navegador onde utiliza o ROMANO PARTNERS.");
 };
 
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
