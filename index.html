@@ -7107,11 +7107,10 @@ async function sendChatPremium(e){
 if("serviceWorker" in navigator){
   registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
 }
-</script><script src="/install-helper.js" defer>
 /* ROMANO invoice editor v2: editable line items and service import */
 function invoiceLineRow(x={},idx=0){
  const q=Number(x.quantity??1),price=Number(x.unit_price??x.price??0),disc=Number(x.discount_percent||0),rate=Number(x.tax_rate??0);
- return '<tr class="inv-line-row"><td><input class="inv-desc" value="'+esc(x.description||"")+'" placeholder="Descrição do serviço ou produto"></td><td><input class="inv-qty" type="number" min="0" step="0.001" value="'+q+'"></td><td><input class="inv-unit" value="'+esc(x.unit_label||"unidade")+'" placeholder="unidade, hora, limpeza..."></td><td><input class="inv-price" type="number" min="0" step="0.0001" value="'+price+'"></td><td><input class="inv-disc" type="number" min="0" max="100" step="0.01" value="'+disc+'"></td><td><select class="inv-tax"><option value="0" '+(rate===0?"selected":"")+'>0% · isento/autoliquidação</option><option value="6" '+(rate===6?"selected":"")+'>6%</option><option value="10" '+(rate===10?"selected":"")+'>10%</option><option value="21" '+(rate===21?"selected":"")+'>21%</option></select></td><td class="inv-line-total">0,00 €</td><td><button class="btn" type="button" onclick="this.closest(\'tr\').remove();recalcInvoiceLines()">×</button></td></tr>';
+ return '<tr class="inv-line-row"><td><input class="inv-desc" oninput="recalcInvoiceLines()" value="'+esc(x.description||"")+'" placeholder="Descrição do serviço ou produto"></td><td><input class="inv-qty" oninput="recalcInvoiceLines()" type="number" min="0" step="0.001" value="'+q+'"></td><td><input class="inv-unit" value="'+esc(x.unit_label||"unidade")+'" placeholder="unidade, hora, limpeza..."></td><td><input class="inv-price" oninput="recalcInvoiceLines()" type="number" min="0" step="0.0001" value="'+price+'"></td><td><input class="inv-disc" oninput="recalcInvoiceLines()" type="number" min="0" max="100" step="0.01" value="'+disc+'"></td><td><select class="inv-tax" onchange="recalcInvoiceLines()"><option value="0" '+(rate===0?"selected":"")+'>0% · isento/autoliquidação</option><option value="6" '+(rate===6?"selected":"")+'>6%</option><option value="10" '+(rate===10?"selected":"")+'>10%</option><option value="21" '+(rate===21?"selected":"")+'>21%</option></select></td><td class="inv-line-total">0,00 €</td><td><button class="btn" type="button" onclick="this.closest(\'tr\').remove();recalcInvoiceLines()">×</button></td></tr>';
 }
 function invoiceModalHtml(x={}){
  const rows=x.items?.length?x.items:[{description:"",quantity:1,unit_label:"unidad",unit_price:0,discount_percent:0,tax_rate:0}];
@@ -7202,4 +7201,5 @@ async function viewInvoice(id){
   openModal("Ficha da fatura",body);
  }catch(e){toast("Não foi possível abrir a fatura: "+(e.message||e))}
 }
-</script></body></html>
+
+</script><script src="/install-helper.js" defer></script></body></html>
