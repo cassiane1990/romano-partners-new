@@ -7107,4 +7107,95 @@ async function sendChatPremium(e){
 if("serviceWorker" in navigator){
   registerRomanoServiceWorker().then(reg=>{if(reg)reg.update().catch(()=>{});});
 }
+/* ROMANO invoice editor v2: editable line items and service import */
+function invoiceLineRow(x={},idx=0){
+ const q=Number(x.quantity??1),price=Number(x.unit_price??x.price??0),disc=Number(x.discount_percent||0),rate=Number(x.tax_rate??0);
+ return '<tr class="inv-line-row" data-service-id="'+esc(x.service_id||"")+'"><td><input class="inv-desc" oninput="recalcInvoiceLines()" value="'+esc(x.description||"")+'" placeholder="Descrição do serviço ou produto"></td><td><input class="inv-qty" oninput="recalcInvoiceLines()" type="number" min="0" step="0.001" value="'+q+'"></td><td><input class="inv-unit" value="'+esc(x.unit_label||"unidade")+'" placeholder="unidade, hora, limpeza..."></td><td><input class="inv-price" oninput="recalcInvoiceLines()" type="number" min="0" step="0.0001" value="'+price+'"></td><td><input class="inv-disc" oninput="recalcInvoiceLines()" type="number" min="0" max="100" step="0.01" value="'+disc+'"></td><td><select class="inv-tax" onchange="recalcInvoiceLines()"><option value="0" '+(rate===0?"selected":"")+'>0% · isento/autoliquidação</option><option value="6" '+(rate===6?"selected":"")+'>6%</option><option value="10" '+(rate===10?"selected":"")+'>10%</option><option value="21" '+(rate===21?"selected":"")+'>21%</option></select></td><td class="inv-line-total">0,00 €</td><td><button class="btn" type="button" onclick="this.closest(\'tr\').remove();recalcInvoiceLines()">×</button></td></tr>';
+}
+function invoiceModalHtml(x={}){
+ const rows=x.items?.length?x.items:[{description:"",quantity:1,unit_label:"unidad",unit_price:0,discount_percent:0,tax_rate:0}];
+ const locked=x.id&&x.status!=="draft";
+ return '<form id="invoiceEditorForm" onsubmit="saveInvoiceForm(event,'+(x.id?JSON.stringify(x.id):'null')+')">'+
+ '<div class="two"><div class="field"><label>Cliente</label><select id="invClient"><option value="">— Seleccionar —</option>'+x.clientOptions+'</select></div><div class="field"><label>Nº factura</label><input id="invNumber" value="'+esc(x.number||"")+'" placeholder="Se genera automáticamente" '+(x.id?'':'readonly')+'></div></div>'+
+ '<div class="two"><div class="field"><label>Estado</label><select id="invStatus"><option value="draft" '+(x.status==="draft"?"selected":"")+'>Borrador</option><option value="sent" '+(x.status==="sent"?"selected":"")+'>Enviada</option><option value="paid" '+(x.status==="paid"?"selected":"")+'>Pagada</option><option value="overdue" '+(x.status==="overdue"?"selected":"")+'>Vencida</option></select></div><div class="field"><label>Vencimiento</label><input id="invDue" type="date" value="'+esc(x.due_at?new Date(x.due_at).toISOString().slice(0,10):"")+'"></div></div>'+
+ '<div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>Linhas da fatura</h3><div class="muted">Descrição, quantidade, unidade, preço, desconto e IVA por linha.</div></div><div class="actions">'+(!locked?'<button class="btn" type="button" onclick="addInvoiceLine()">＋ Adicionar linha</button><button class="btn" type="button" onclick="importInvoiceService()">Importar serviço concluído</button>':'<span class="pill">Fatura emitida · linhas bloqueadas</span>')+'</div></div>'+
+ '<div style="overflow:auto"><table class="table" style="min-width:900px"><thead><tr><th>Descrição</th><th>Qtd.</th><th>Unidade</th><th>Preço unit.</th><th>Desc. %</th><th>IVA</th><th>Total linha</th><th></th></tr></thead><tbody id="invoiceLinesBody">'+rows.map(invoiceLineRow).join("")+'</tbody></table></div>'+
+ '<div class="two" style="margin-top:12px"><div class="field"><label>Observações / referência</label><textarea id="invNotes" rows="2">'+esc(x.notes||"")+'</textarea></div><div class="panel"><div class="line-item"><span>Base tributável</span><b id="invSubtotalLive">0,00 €</b></div><div class="line-item"><span>IVA total</span><b id="invTaxLive">0,00 €</b></div><div class="line-item"><strong>Total a pagar</strong><strong id="invTotalLive">0,00 €</strong></div></div></div></div>'+
+ '<div class="actions" style="margin-top:12px"><button class="btn gold" type="submit">Guardar fatura</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>';
+}
+function addInvoiceLine(x={}){const b=$("invoiceLinesBody");if(!b)return;b.insertAdjacentHTML("beforeend",invoiceLineRow(x,b.children.length));recalcInvoiceLines()}
+function recalcInvoiceLines(){
+ const body=$("invoiceLinesBody");if(!body)return;
+ let base=0,tax=0,total=0;
+ [...body.querySelectorAll("tr")].forEach(tr=>{
+  const q=Math.max(0,Number(tr.querySelector(".inv-qty")?.value||0)),p=Math.max(0,Number(tr.querySelector(".inv-price")?.value||0)),d=Math.min(100,Math.max(0,Number(tr.querySelector(".inv-disc")?.value||0))),r=Math.max(0,Number(tr.querySelector(".inv-tax")?.value||0));
+  const net=Math.round(q*p*(1-d/100)*100)/100,vat=Math.round(net*r)/100,line=net+vat;base+=net;tax+=vat;total+=line;
+  const cell=tr.querySelector(".inv-line-total");if(cell)cell.textContent=line.toFixed(2)+" €";
+ });
+ const set=(id,v)=>{const el=$(id);if(el)el.textContent=v.toFixed(2)+" €"};
+ set("invSubtotalLive",base);set("invTaxLive",tax);set("invTotalLive",total);
+}
+async function importInvoiceService(){
+ if(demoMode){toast("A importação de serviços exige ligação de produção.");return}
+ try{
+  const q=await sb.from("services").select("id,code,service_type,typology,agreed_amount,finished_at,status").eq("company_id",currentProfile.company_id).in("status",["finished","supervised","completed"]).order("finished_at",{ascending:false}).limit(200);
+  if(q.error)throw q.error;
+  const list=q.data||[];if(!list.length){toast("Não há serviços concluídos disponíveis para importar.");return}
+  const choices=list.map((x,i)=>(i+1)+". "+(x.code||x.id)+" · "+(x.service_type||"Serviço")+" · "+(x.typology||"")+" · "+Number(x.agreed_amount||0).toFixed(2)+" €").join("\n");
+  const answer=window.prompt("Escolha o número do serviço a importar:\n\n"+choices,"1");
+  if(answer===null)return;
+  const selected=list[Number(answer)-1];if(!selected){toast("Número de serviço inválido.");return}
+  addInvoiceLine({service_id:selected.id,description:[selected.code,selected.service_type,selected.typology].filter(Boolean).join(" · "),quantity:1,unit_label:"serviço",unit_price:Number(selected.agreed_amount||0),discount_percent:0,tax_rate:0});
+ }catch(e){toast("Não foi possível carregar serviços: "+(e.message||e))}
+}
+async function saveInvoiceForm(e,id){
+ e.preventDefault();
+ const lines=[...($("invoiceLinesBody")?.querySelectorAll("tr")||[])].map((tr,i)=>{
+  const quantity=Number(tr.querySelector(".inv-qty").value),unit_price=Number(tr.querySelector(".inv-price").value),discount_percent=Number(tr.querySelector(".inv-disc").value||0),tax_rate=Number(tr.querySelector(".inv-tax").value||0),description=tr.querySelector(".inv-desc").value.trim(),unit_label=tr.querySelector(".inv-unit").value.trim()||"unidad";
+  const taxable_base=Math.round(quantity*unit_price*(1-discount_percent/100)*100)/100,tax_amount=Math.round(taxable_base*tax_rate)/100;
+  return {description,quantity,unit_label,unit_price,discount_percent,tax_rate,taxable_base,tax_amount,line_total:Math.round((taxable_base+tax_amount)*100)/100,sort_order:i,service_id:tr.dataset.serviceId||null};
+ });
+ if(!lines.length||lines.some(x=>!x.description||![x.quantity,x.unit_price,x.discount_percent,x.tax_rate].every(Number.isFinite)||x.quantity<0||x.unit_price<0||x.discount_percent<0||x.discount_percent>100)){toast("Verifique as linhas: descrição, quantidade e preço são obrigatórios.");return}
+ const subtotal=Math.round(lines.reduce((a,x)=>a+x.taxable_base,0)*100)/100,tax_amount=Math.round(lines.reduce((a,x)=>a+x.tax_amount,0)*100)/100,total=Math.round((subtotal+tax_amount)*100)/100;
+ const data={client_id:$("invClient").value||null,number:$("invNumber").value.trim()||nextInvoiceNumber(),status:$("invStatus").value,subtotal,tax_rate:subtotal?Math.round(tax_amount/subtotal*10000)/100:0,tax_amount,total,due_at:$("invDue").value?new Date($("invDue").value+"T23:59:59").toISOString():null};
+ if(demoMode){if(id){const x=DEMO_INVOICES.find(v=>v.id===id);if(x)Object.assign(x,data,{items:lines})}else DEMO_INVOICES.unshift({id:"demo-inv-"+Date.now(),created_at:new Date().toISOString(),paid_at:null,...data,items:lines});closeModal();await renderInvoicesPremium();toast("Fatura guardada");return}
+ let q=id?await sb.from("invoices").update(data).eq("id",id).eq("company_id",currentProfile.company_id).eq("status","draft").select("id").single():await sb.from("invoices").insert({...data,company_id:currentProfile.company_id}).select("id").single();
+ if(q.error){toast("Não foi possível guardar a fatura: "+q.error.message);return}
+ const invoiceId=q.data?.id||id;if(!invoiceId){toast("A fatura não foi confirmada.");return}
+ const old=await sb.from("invoice_items").delete().eq("invoice_id",invoiceId).eq("company_id",currentProfile.company_id);
+ if(old.error){toast("Cabeçalho guardado, mas não foi possível atualizar as linhas: "+old.error.message);return}
+ const rows=lines.map(x=>({...x,company_id:currentProfile.company_id,invoice_id:invoiceId}));
+ const ins=await sb.from("invoice_items").insert(rows);
+ if(ins.error){toast("Fatura guardada, mas falhou a gravação das linhas: "+ins.error.message);return}
+ closeModal();await renderInvoicesPremium();toast(id?"Fatura atualizada com linhas detalhadas.":"Fatura criada com linhas detalhadas.");
+}
+async function newInvoice(){
+ if(!canManage()){toast("Só Admin/Supervisor pode criar faturas.");return}
+ try{const opts=await financeClientsOptions("");openModal("Nova fatura manual",invoiceModalHtml({clientOptions:opts,status:"draft"}));recalcInvoiceLines()}catch(e){toast(e.message)}
+}
+async function editInvoice(id){
+ if(!canManage()){await viewInvoice(id);return}
+ try{
+  const key=String(id);let x=__invoiceCache[key]||null;
+  if(!x&&!demoMode){const q=await sb.from("invoices").select("*").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();if(q.error)throw q.error;x=q.data}
+  if(!x){toast("Fatura não encontrada.");return}
+  if(x.status!=="draft"){toast("A fatura já foi emitida. Para corrigir valores fiscais, utilize uma fatura retificativa/nota de crédito; não altere diretamente o documento emitido.");return}
+  let items=x.items||[];
+  if(!demoMode){const q=await sb.from("invoice_items").select("*").eq("invoice_id",id).eq("company_id",currentProfile.company_id).order("sort_order");if(q.error)throw q.error;items=q.data||[]}
+  const opts=await financeClientsOptions(x.client_id||"");openModal("Editar fatura · linhas detalhadas",invoiceModalHtml({...x,items,clientOptions:opts}));recalcInvoiceLines();
+ }catch(e){toast("Não foi possível editar a fatura: "+(e.message||e))}
+}
+async function viewInvoice(id){
+ try{
+  const key=String(id);let x=__invoiceCache[key]||null;
+  if(!x&&!demoMode){const q=await sb.from("invoices").select("*").eq("id",id).eq("company_id",currentProfile.company_id).maybeSingle();if(q.error)throw q.error;x=q.data}
+  if(!x){toast("Fatura não encontrada.");return}
+  let items=x.items||[];
+  if(!demoMode){const q=await sb.from("invoice_items").select("*").eq("invoice_id",id).eq("company_id",currentProfile.company_id).order("sort_order");if(q.error)throw q.error;items=q.data||[]}
+  const lines=items.map(v=>'<tr><td>'+esc(v.description)+'</td><td>'+Number(v.quantity).toLocaleString("es-ES")+' '+esc(v.unit_label||"")+'</td><td>'+Number(v.unit_price).toFixed(2)+' €</td><td>'+Number(v.discount_percent||0).toFixed(2)+'%</td><td>'+Number(v.tax_rate||0).toFixed(2)+'%</td><td><b>'+Number(v.line_total||0).toFixed(2)+' €</b></td></tr>').join("");
+  const body='<div class="panel"><div class="two"><div><b>Nº fatura</b><div>'+esc(x.number||"—")+'</div></div><div><b>Estado</b><div>'+esc(x.status||"—")+'</div></div><div><b>Cliente</b><div>'+esc(x.client_id||"—")+'</div></div><div><b>Base</b><div>'+Number(x.subtotal||0).toFixed(2)+' €</div></div><div><b>IVA</b><div>'+Number(x.tax_amount||0).toFixed(2)+' €</div></div><div><b>Total</b><div><strong>'+Number(x.total||0).toFixed(2)+' €</strong></div></div><div><b>Vencimento</b><div>'+esc(x.due_at?new Date(x.due_at).toLocaleDateString("es-ES"):"—")+'</div></div><div><b>Pagamento</b><div>'+esc(x.paid_at?new Date(x.paid_at).toLocaleDateString("es-ES"):"Pendente")+'</div></div></div><h3>Linhas detalhadas</h3><div style="overflow:auto"><table class="table"><thead><tr><th>Descrição</th><th>Quantidade</th><th>Preço unit.</th><th>Desc.</th><th>IVA</th><th>Total</th></tr></thead><tbody>'+lines+'</tbody></table></div></div><div class="actions">'+(canManage()&&x.status==="draft"?'<button class="btn gold" type="button" onclick="editInvoice('+JSON.stringify(key)+')">Editar</button>':'')+'<button class="btn" type="button" onclick="closeModal()">Fechar</button></div>';
+  openModal("Ficha da fatura",body);
+ }catch(e){toast("Não foi possível abrir a fatura: "+(e.message||e))}
+}
+
 </script><script src="/install-helper.js" defer></script></body></html>
