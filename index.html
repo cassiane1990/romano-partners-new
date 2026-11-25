@@ -1010,7 +1010,7 @@ function renderLiveSimulator(){
 
 /* Full-screen operational simulator for visual acceptance testing. */
 async function renderSimulation360(){
- if(!demoMode){demoMode=true;window.__romanoDemoRole=role()==="supervisor"?"supervisor":"admin";}
+ if(!demoMode){$("content").innerHTML='<div class="panel"><div class="panel-head"><h3>Simulação 360</h3><span class="pill">Ambiente isolado</span></div><div class="notice">A simulação utiliza apenas dados fictícios e não pode ser ativada dentro da sessão de produção. Os seus dados reais permanecem protegidos.</div><button class="btn" onclick="openPage(\'dashboard\')">Voltar ao painel</button></div>';return;}
  const z=window.ROMANO_LIVE_SIM;
  const active=DEMO_SERVICES.filter(x=>x.status!=="completed").slice(0,6);
  const cards=active.map(s=>{
@@ -1076,10 +1076,10 @@ async function reviewCheckin(id,approve){const r=await sb.from("service_change_r
 function demoApproveCheckin(id){const x=DEMO_CHECKIN_REQUESTS.find(q=>q.id===id);if(!x)return;const s=DEMO_SERVICES.find(q=>q.id===x.service_id);if(s)s.scheduled_at=x.requested_for;x.status="approved";romanoBeep();toast("Check-in antecipado aceite.");renderCheckinRequests()}
 function demoRejectCheckin(id){const x=DEMO_CHECKIN_REQUESTS.find(q=>q.id===id);if(!x)return;x.status="rejected";romanoBeep();toast("Solicitação rejeitada.");renderCheckinRequests()}
 const __renderServicesMasterBase2=renderServicesMaster;
-async function renderServicesMaster(){await __renderServicesMasterBase2();if(role()!=="client")return;document.querySelectorAll("#content button").forEach(b=>{const m=(b.getAttribute("onclick")||"").match(/viewService\\('([^']+)'\\)/);if(m){const row=b.closest("tr"),cell=row?.lastElementChild;if(cell&&!cell.querySelector(".checkin-quick")){const btn=document.createElement("button");btn.className="btn checkin-quick";btn.textContent="↗ Check-in";btn.onclick=()=>openCheckinAdvance(m[1]);cell.appendChild(btn)}}})}
+renderServicesMaster=async function(){await __renderServicesMasterBase2();if(role()!=="client")return;document.querySelectorAll("#content button").forEach(b=>{const m=(b.getAttribute("onclick")||"").match(/viewService\\('([^']+)'\\)/);if(m){const row=b.closest("tr"),cell=row?.lastElementChild;if(cell&&!cell.querySelector(".checkin-quick")){const btn=document.createElement("button");btn.className="btn checkin-quick";btn.textContent="↗ Check-in";btn.onclick=()=>openCheckinAdvance(m[1]);cell.appendChild(btn)}}})}
 function demoClientQuickActions(){if(role()!=="client")return;const n=document.createElement("div");n.className="client-action-grid";n.innerHTML='<button class="client-action" onclick="newServicePremium()"><span class="ca-icon">＋</span><strong>Pedir um serviço</strong><small>Escolha apartamento, limpeza, manutenção ou roupas.</small></button><button class="client-action" onclick="openClientEmergency()"><span class="ca-icon">⚠</span><strong>Emergência 24H</strong><small>Alerta imediato para a operação.</small></button><button class="client-action" onclick="openPage(\'properties\')"><span class="ca-icon">⌂</span><strong>Meus apartamentos</strong><small>Endereço, fotos, mapa e acesso direto.</small></button>';$("content")?.prepend(n)}
 const __renderDashboardReferenceBase2=renderDashboardReference;
-async function renderDashboardReference(){await __renderDashboardReferenceBase2();if(role()==="client")demoClientQuickActions()}
+renderDashboardReference=async function(){await __renderDashboardReferenceBase2();if(role()==="client"&&demoMode)demoClientQuickActions()}
 renderClientsPremium=renderClientsRich;
 renderEmployeesPremium=renderEmployeesRich;
 
