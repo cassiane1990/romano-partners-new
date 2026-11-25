@@ -62,6 +62,17 @@
 .checkin-card{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #eee7dc}.checkin-card b{font-size:10px}.checkin-card small{display:block;color:#867b70;font-size:8px;margin-top:3px}
 .emergency-box{background:linear-gradient(135deg,#fff3ef,#fffaf8);border:1px solid #edc7c0;border-radius:18px;padding:16px}.emergency-box h3{color:#8c4037}
 @media(max-width:900px){.profile-grid{grid-template-columns:1fr}.profile-hero{grid-template-columns:auto 1fr}.profile-actions{grid-column:1/-1;justify-content:flex-start}.client-action-grid{grid-template-columns:1fr}.profile-kpis{grid-template-columns:repeat(2,1fr)}}
+
+/* ROMANO · atribuição de serviço — acabamento discreto */
+.team-members-panel{margin:10px 0 14px;padding:14px 15px;border:1px solid #e9dfd0;border-radius:14px;background:#fcfaf6}
+.team-members-title{font-weight:700;color:#4b4032;font-size:14px;margin-bottom:10px}
+.team-members-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 10px;max-height:220px;overflow:auto}
+.team-person{display:flex;align-items:center;gap:9px;min-width:0;padding:9px 10px;border:1px solid #eee5d8;border-radius:10px;background:#fff;cursor:pointer;color:#39332b;font-size:13px}
+.team-person input{accent-color:#b98a42;width:16px;height:16px;flex:0 0 auto}
+.team-person span{min-width:0;font-weight:600;line-height:1.25}
+.team-person small{display:block;color:#8a8176;font-size:11px;font-weight:400;margin-top:3px}
+#mpTeam,#mpEmployee,#mpAssignMode{border-color:#e4d8c6;background:#fff;border-radius:11px;min-height:46px}
+@media(max-width:700px){.team-members-list{grid-template-columns:1fr}}
 </style></head>
 <body>
 <div id="login" class="login"><div class="card login-card">
