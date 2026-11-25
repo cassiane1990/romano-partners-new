@@ -1,17 +1,18 @@
--- ROMANO PARTNERS · Gestão de equipas por serviço
+-- ROMANO PARTNERS: service team assignments
 create table if not exists public.service_team_assignments (
   id uuid primary key default gen_random_uuid(),
-  company_id uuid not null,
+  company_id uuid not null references public.companies(id) on delete cascade,
   service_id uuid not null references public.services(id) on delete cascade,
   employee_profile_id uuid not null references public.employee_profiles(id) on delete cascade,
   team_name text not null check (team_name in ('ÁGUIA','ALFA','BRAVO','DELTA')),
-  created_by uuid not null default auth.uid(),
+  created_by uuid not null default auth.uid() references public.profiles(id),
   created_at timestamptz not null default now(),
   constraint service_team_assignments_service_employee_key unique (service_id, employee_profile_id)
 );
 create index if not exists service_team_assignments_company_service_idx
   on public.service_team_assignments(company_id, service_id);
 alter table public.service_team_assignments enable row level security;
+grant select, insert, update, delete on public.service_team_assignments to authenticated;
 drop policy if exists service_team_assignments_management on public.service_team_assignments;
 create policy service_team_assignments_management on public.service_team_assignments
 for all to authenticated
@@ -24,7 +25,7 @@ create or replace function public.set_service_team_assignments(
   p_employee_profile_ids uuid[]
 ) returns void
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $function$
 declare
@@ -57,7 +58,8 @@ begin
   if v_found <> v_expected then
     raise exception 'Um ou mais funcionários não estão ativos ou não pertencem à empresa';
   end if;
-  delete from public.service_team_assignments where service_id = p_service_id and company_id = v_company;
+  delete from public.service_team_assignments
+    where service_id = p_service_id and company_id = v_company;
   if v_expected > 0 then
     insert into public.service_team_assignments(company_id,service_id,employee_profile_id,team_name,created_by)
     select v_company,p_service_id,ep.id,p_team_name,auth.uid()
@@ -67,5 +69,5 @@ begin
   end if;
 end
 $function$;
-revoke all on function public.set_service_team_assignments(uuid,text,uuid[]) from public;
+revoke all on function public.set_service_team_assignments(uuid,text,uuid[]) from public, anon;
 grant execute on function public.set_service_team_assignments(uuid,text,uuid[]) to authenticated;
