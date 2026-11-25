@@ -2815,8 +2815,22 @@ async function viewProperty(id){
  }
  const r=await sb.from("properties").select("*").eq("id",id).single();
  if(r.error){toast(r.error.message);return}
- const x=r.data; const photo=x.photo_url?(await sb.storage.from("property-media").createSignedUrl(x.photo_url,900)).data?.signedUrl||"":"";
- openModal("Ficha de propiedad",'<div style="margin-bottom:14px">'+photoBox(photo,x.name,false)+'</div><div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Nombre</small><p>'+esc(x.name)+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.property_type||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(x.status||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Dirección</small><p>'+esc([x.address,x.city,x.country].filter(Boolean).join(", ")||"—")+'</p></div></div>')
+ const x=r.data,photo=x.photo_url?(await sb.storage.from("property-media").createSignedUrl(x.photo_url,900)).data?.signedUrl||"":"";
+ const canAdd=["admin","supervisor","employee","maintenance_technician"].includes(role());
+ let observations=[];
+ const oq=await sb.from("property_observations").select("id,observation,created_at,created_by").eq("property_id",id).order("created_at",{ascending:false}).limit(100);
+ if(!oq.error)observations=oq.data||[];
+ const observationsHtml='<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>📝 Observações do apartamento</h3><div class="muted">Registos da equipa associados a este imóvel.</div></div><span class="pill">'+observations.length+' registo(s)</span></div>'+(observations.length?observations.map(o=>'<div class="line" style="align-items:flex-start"><div><div style="white-space:pre-wrap">'+esc(o.observation)+'</div><small class="muted">'+esc(formatMadridDateTime(o.created_at))+'</small></div></div>').join(""):'<div class="empty">Ainda não há observações registadas.</div>')+(canAdd?'<div class="field" style="margin-top:12px"><label>Adicionar observação</label><textarea id="propertyObservationInput" rows="3" maxlength="4000" placeholder="Ex.: lâmpada fundida, material em falta, dano encontrado, instrução importante..."></textarea></div><button type="button" class="btn gold" onclick="savePropertyObservation(\''+esc(id)+'\')">Guardar observação</button>':'')+'</div>';
+ openModal("Ficha de propiedad",'<div style="margin-bottom:14px">'+photoBox(photo,x.name,false)+'</div><div class="two"><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Nombre</small><p>'+esc(x.name)+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.property_type||"—")+'</p></div><div><small class="muted">Estado</small><p>'+esc(x.status||"—")+'</p></div><div style="grid-column:1/-1"><small class="muted">Dirección</small><p>'+esc([x.address,x.city,x.country].filter(Boolean).join(", ")||"—")+'</p></div></div>'+observationsHtml)
+}
+async function savePropertyObservation(id){
+ const input=$("propertyObservationInput"),observation=String(input?.value||"").trim();
+ if(observation.length<2){toast("Escreva uma observação antes de guardar.");return}
+ if(!["admin","supervisor","employee","maintenance_technician"].includes(role())){toast("Sem permissão para adicionar observações.");return}
+ const r=await sb.from("property_observations").insert({company_id:currentProfile.company_id,property_id:id,created_by:currentUser.id,observation});
+ if(r.error){toast("Não foi possível guardar: "+r.error.message);return}
+ toast("Observação guardada no apartamento.");
+ await viewProperty(id);
 }
 function renderServiceItemsPremium(items,hideFinance=false){
  const rows=(items||[]).filter(x=>x&&x.name).map(x=>{
