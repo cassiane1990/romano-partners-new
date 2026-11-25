@@ -3012,7 +3012,7 @@ function renderClientCleaningApproval(service,media,approval){
 
 function renderCleaningFlow(service,checklist,media){
  if(!isCleaningServiceType(service.service_type))return "";
- const own=role()==="employee"&&service.assigned_employee_id===currentUser.id;
+ const own=role()==="employee"&&(service.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true);
  const reviewer=["admin","supervisor"].includes(role());
  const photos=media.filter(m=>m.media_type==="photo");
  const reviewed=photos.filter(m=>m.review_opened_at).length;
@@ -3193,14 +3193,16 @@ async function viewService(id){
  const canEditService=["admin","supervisor","client"].includes(role())&&["requested","scheduled"].includes(x.status);
  const editServiceButton=canEditService?'<div class="actions" style="margin-top:12px"><button class="btn gold" type="button" onclick="openEditService(\''+x.id+'\')">✎ Editar serviço</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
- const approvalQ=await sb.from('service_client_approvals').select('approved_at,approved_by').eq('service_id',id).maybeSingle(); const clientApprovalHtml=renderClientCleaningApproval(x,media.data||[],approvalQ.data||null); const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
+ 
+const timerPanelHtml=await renderCleaningTimerPanel(x,id);
+const approvalQ=await sb.from('service_client_approvals').select('approved_at,approved_by').eq('service_id',id).maybeSingle(); const clientApprovalHtml=renderClientCleaningApproval(x,media.data||[],approvalQ.data||null); const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
  const invoiceHtml=await Promise.all(invoiceDocs.map(async m=>{const u=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
  const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
   '<div class="two"><div><small class="muted">Cliente</small><p><strong>'+esc(client?.name||"—")+'</strong></p></div><div><small class="muted">Propriedade / apartamento</small><p>'+esc(prop?.name||"—")+(prop?.code?" · "+esc(prop.code):"")+'</p></div><div><small class="muted">Código</small><p><strong>'+esc(x.code)+'</strong></p></div><div><small class="muted">Tipo de serviço</small><p>'+esc(x.service_type||"—")+'</p></div><div><small class="muted">Tipología</small><p>'+esc(x.typology||"—")+'</p></div><div><small class="muted">Prioridade</small><p>'+esc(x.priority||"—")+'</p></div><div><small class="muted">Data / hora</small><p>'+esc(x.scheduled_at?new Date(x.scheduled_at).toLocaleString("es-ES"):"—")+'</p></div><div><small class="muted">Estado</small><p><span class="status">'+esc(statusNames[x.status]||x.status||"—")+'</span></p></div></div>'+
   (prop?renderServicePropertyAccessHtml(prop):"")+'<div class="field"><label>Descrição / observações</label><textarea id="serviceInstructionsEdit" '+((["maintenance_technician","supervisor","admin"].includes(role())&&(role()!=="maintenance_technician"||x.assigned_employee_id===currentUser.id)&&!["completed","cancelled","approved","supervised"].includes(x.status))?"":"readonly")+' placeholder="Escreva o trabalho realizado, observações ou problemas encontrados">'+esc(x.instructions||"")+'</textarea>'+((["maintenance_technician","supervisor","admin"].includes(role())&&(role()!=="maintenance_technician"||x.assigned_employee_id===currentUser.id)&&!["completed","cancelled","approved","supervised"].includes(x.status))?'<button type="button" class="btn gold" style="margin-top:8px" onclick="saveMaintenanceObservation(\''+x.id+'\')">Guardar observações</button>':"")+'</div>'+
-  (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+editServiceButton+adminDirectAssignmentButton+clientAdvanceButton+cleaningFlowHtml+maintenanceFlowHtml+
+  (isPendingAdmin?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\');closeModal()">✓ ACEITAR PEDIDO</button><button class="btn" onclick="rejectServiceRequest(\''+x.id+'\');closeModal()">✕ RECUSAR</button></div>':"")+editServiceButton+adminDirectAssignmentButton+clientAdvanceButton+timerPanelHtml+cleaningFlowHtml+maintenanceFlowHtml+
   '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Pedido y adicionales</h3></div><div id="serviceItemsPremium">'+renderServiceItemsPremium([...(x.requested_items||[]),...(x.additional_items||[])],["employee","maintenance_technician"].includes(role()))+'</div></div>'+
   (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"&&isCleaningServiceType(x.service_type)?'<div class="actions" style="margin-top:12px"><button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\');closeModal()">✓ ACEPTAR SERVICIO</button></div>':"")+
  renderServiceStatusActions(x)+clientApprovalHtml+
@@ -3320,7 +3322,7 @@ async function setServiceStatusPremium(id,status){
    clearServiceActionError();
    let finalState=null;
    if(role()==="employee" && isCleaningServiceType(sr.data.service_type) && currentStatus==="on_the_way" && status==="in_progress"){
-     const start=await sb.rpc("employee_start_cleaning_service",{p_service_id:id});
+     const start=await sb.rpc("start_cleaning_service_timer",{p_service_id:id});
      if(start.error){
        const detail=[start.error.message,start.error.code,start.error.details,start.error.hint].filter(Boolean).join(" · ");
        serviceActionError("No se pudo iniciar la limpieza: "+detail);
@@ -3387,6 +3389,69 @@ async function romanoOptimizePhoto(file){
   }finally{URL.revokeObjectURL(url)}
  }catch(_){return file}
 }
+
+async function renderCleaningTimerPanel(service,id){
+ if(!isCleaningServiceType(service.service_type))return "";
+ const results=await Promise.all([
+  sb.from("cleaning_service_timers").select("*").eq("service_id",id).maybeSingle(),
+  sb.from("service_team_assignments").select("employee_profile_id").eq("service_id",id),
+  sb.from("employee_profiles").select("id").eq("profile_id",currentUser.id).eq("active",true).maybeSingle(),
+  sb.from("cleaning_timer_extension_requests").select("id,minutes,reason,status").eq("service_id",id).order("created_at",{ascending:false})
+ ]);
+ const timer=results[0].data, ownProfile=results[2].data;
+ const teamMember=!!ownProfile&&(results[1].data||[]).some(a=>a.employee_profile_id===ownProfile.id);
+ const worker=role()==="employee"&&(service.assigned_employee_id===currentUser.id||teamMember);
+ window.__romanoCleaningTeamMember=worker;
+ const manager=["admin","supervisor"].includes(role());
+ if(!worker&&!manager)return "";
+ const requests=results[3].data||[];
+ let html='<div class="panel" style="margin-top:12px;border:1px solid #d8c6a5"><div class="panel-head"><div><h3>⏱ Cronómetro compartido</h3><div class="muted">Un único tiempo para todo el equipo</div></div></div>';
+ if(timer){
+  html+='<div id="romanoCleaningTimerDisplay" style="font-size:38px;font-weight:800;text-align:center;padding:14px;color:#9b7436;font-variant-numeric:tabular-nums">--:--</div><div class="muted">'+Number(timer.base_minutes)+' min base + '+Number(timer.extra_minutes||0)+' min adicionales aprobados · '+(timer.status==="finished"?"Finalizado":"En marcha")+'</div>';
+  if(timer.status==="running"&&worker)html+='<div class="actions"><button class="btn gold" onclick="finishCleaningTimer(\''+id+'\')">FINALIZAR TEMPO</button><button class="btn" onclick="requestCleaningExtension(\''+id+'\',5)">+5 min</button><button class="btn" onclick="requestCleaningExtension(\''+id+'\',10)">+10 min</button><button class="btn" onclick="requestCleaningExtension(\''+id+'\',15)">+15 min</button></div>';
+  if(timer.status==="finished"&&worker&&service.status!=="supervision_pending")html+='<div class="actions"><button class="btn gold" onclick="requestCleaningSupervision(\''+id+'\')">SOLICITAR SUPERVISIÓN</button></div>';
+  startCleaningTimerTicker(timer);
+ }else{
+  html+='<div class="notice">T1: 35 min (1 persona) / 25 min (2 o más). T2: 45 / 30 min. T3: 60 / 40 min.</div>';
+  if(worker&&["on_the_way","in_progress"].includes(service.status))html+='<div class="actions"><button class="btn gold" onclick="startCleaningTimer(\''+id+'\')">INICIAR CRONÓMETRO</button></div>';
+ }
+ if(requests.length){
+  html+='<div style="margin-top:10px"><b>Solicitudes de tiempo adicional</b>';
+  requests.forEach(r=>{html+='<div class="line"><span>+'+Number(r.minutes)+' min · '+esc(r.reason||"Sin motivo")+' · '+esc(r.status)+'</span>';
+   if(manager&&r.status==="pending")html+='<span><button class="btn gold" onclick="reviewCleaningExtension(\''+r.id+'\',true,\''+id+'\')">Aprobar</button> <button class="btn" onclick="reviewCleaningExtension(\''+r.id+'\',false,\''+id+'\')">Rechazar</button></span>';
+   html+='</div>';});
+  html+='</div>';
+ }
+ return html+'</div>';
+}
+function cleaningTimerBeep(isEnd){
+ try{
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+  const ctx=new C(),notes=isEnd?[660,880,660,880]:[880,660];let at=ctx.currentTime;
+  notes.forEach(freq=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.frequency.value=freq;gain.gain.setValueAtTime(.001,at);gain.gain.exponentialRampToValueAtTime(.14,at+.03);gain.gain.exponentialRampToValueAtTime(.001,at+.18);osc.connect(gain);gain.connect(ctx.destination);osc.start(at);osc.stop(at+.2);at+=.24;});
+  setTimeout(()=>ctx.close(),1500);
+ }catch(_){}
+}
+function startCleaningTimerTicker(timer){
+ if(window.__romanoTimerInterval)clearInterval(window.__romanoTimerInterval);
+ if(!timer||timer.status!=="running")return;
+ const tick=()=>{
+  const end=new Date(timer.started_at).getTime()+(Number(timer.base_minutes||0)+Number(timer.extra_minutes||0))*60000;
+  const seconds=Math.max(0,Math.ceil((end-Date.now())/1000));
+  const el=document.getElementById("romanoCleaningTimerDisplay");
+  if(el)el.textContent=Math.floor(seconds/60).toString().padStart(2,"0")+":"+Math.floor(seconds%60).toString().padStart(2,"0");
+  window.__romanoTimerAlarms=window.__romanoTimerAlarms||{};
+  const key=timer.service_id||timer.id;
+  if(seconds>0&&seconds<=300&&!window.__romanoTimerAlarms[key+"_5"]){window.__romanoTimerAlarms[key+"_5"]=true;cleaningTimerBeep(false);}
+  if(seconds===0&&!window.__romanoTimerAlarms[key+"_0"]){window.__romanoTimerAlarms[key+"_0"]=true;cleaningTimerBeep(true);}
+ };
+ tick();window.__romanoTimerInterval=setInterval(tick,1000);
+}
+async function startCleaningTimer(id){const r=await sb.rpc("start_cleaning_service_timer",{p_service_id:id});if(r.error){toast(r.error.message);return;}toast("Cronómetro compartido iniciado para todo el equipo.");await viewService(id);}
+async function requestCleaningExtension(id,minutes){const reason=prompt("Motivo (opcional):")||"";const r=await sb.rpc("request_cleaning_timer_extension",{p_service_id:id,p_minutes:minutes,p_reason:reason});if(r.error){toast(r.error.message);return;}toast("Solicitud de extensión enviada.");await viewService(id);}
+async function reviewCleaningExtension(requestId,approve,serviceId){const r=await sb.rpc("review_cleaning_timer_extension",{p_request_id:requestId,p_approve:approve});if(r.error){toast(r.error.message);return;}toast(approve?"Extensión aprobada.":"Extensión rechazada.");await viewService(serviceId);}
+async function finishCleaningTimer(id){const r=await sb.rpc("finish_cleaning_service_timer",{p_service_id:id});if(r.error){toast(r.error.message);return;}toast("Tiempo finalizado. Ya puede solicitar supervisión.");await viewService(id);}
+
 async function uploadServiceMedia(serviceId){
  const input=$("serviceMediaFile"),files=Array.from(input?.files||[]);
  if(!files.length)return;
