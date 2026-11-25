@@ -3434,18 +3434,20 @@ function cleaningTimerBeep(isEnd){
 }
 function startCleaningTimerTicker(timer){
  if(window.__romanoTimerInterval)clearInterval(window.__romanoTimerInterval);
+ if(window.__romanoTimerSync)clearInterval(window.__romanoTimerSync);
  if(!timer||timer.status!=="running")return;
+ let activeTimer=timer;
  const tick=()=>{
-  const end=new Date(timer.started_at).getTime()+(Number(timer.base_minutes||0)+Number(timer.extra_minutes||0))*60000;
+  const end=new Date(activeTimer.started_at).getTime()+(Number(activeTimer.base_minutes||0)+Number(activeTimer.extra_minutes||0))*60000;
   const seconds=Math.max(0,Math.ceil((end-Date.now())/1000));
   const el=document.getElementById("romanoCleaningTimerDisplay");
   if(el)el.textContent=Math.floor(seconds/60).toString().padStart(2,"0")+":"+Math.floor(seconds%60).toString().padStart(2,"0");
   window.__romanoTimerAlarms=window.__romanoTimerAlarms||{};
-  const key=timer.service_id||timer.id;
+  const key=activeTimer.service_id||activeTimer.id;
   if(seconds>0&&seconds<=300&&!window.__romanoTimerAlarms[key+"_5"]){window.__romanoTimerAlarms[key+"_5"]=true;cleaningTimerBeep(false);}
   if(seconds===0&&!window.__romanoTimerAlarms[key+"_0"]){window.__romanoTimerAlarms[key+"_0"]=true;cleaningTimerBeep(true);}
  };
- tick();window.__romanoTimerInterval=setInterval(tick,1000);
+ tick();window.__romanoTimerInterval=setInterval(tick,1000);window.__romanoTimerSync=setInterval(async()=>{const q=await sb.from("cleaning_service_timers").select("*").eq("service_id",activeTimer.service_id).maybeSingle();if(q.data){activeTimer=q.data;if(activeTimer.status!=="running"){clearInterval(window.__romanoTimerInterval);clearInterval(window.__romanoTimerSync);}tick();}},12000);
 }
 async function startCleaningTimer(id){const r=await sb.rpc("start_cleaning_service_timer",{p_service_id:id});if(r.error){toast(r.error.message);return;}toast("Cronómetro compartido iniciado para todo el equipo.");await viewService(id);}
 async function requestCleaningExtension(id,minutes){const reason=prompt("Motivo (opcional):")||"";const r=await sb.rpc("request_cleaning_timer_extension",{p_service_id:id,p_minutes:minutes,p_reason:reason});if(r.error){toast(r.error.message);return;}toast("Solicitud de extensión enviada.");await viewService(id);}
