@@ -79,7 +79,7 @@
 <div class="brand"><div class="logo">R</div><h1>ROMANO PARTNERS</h1><p>PROPERTY CARE · MANAGEMENT</p></div>
 <form id="loginForm"><div class="field"><label>Correo electrónico</label><input id="email" type="email" autocomplete="username" required></div>
 <div class="field"><label>Contraseña</label><input id="password" type="password" autocomplete="current-password" required></div>
-<button class="primary">Entrar al sistema</button><button type="button" class="btn gold" id="demoLoginBtn" style="width:100%;margin-top:8px">✦ Ver experiencia completa · DEMOSTRACIÓN</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
+<button class="primary">Entrar al sistema</button><div class="actions" style="justify-content:center;margin-top:10px"><button type="button" class="btn" id="signupBtn">Crear primer acceso</button><button type="button" class="btn" id="resetBtn">Recuperar contraseña</button></div><div id="loginMsg" class="msg hidden"></div></form>
 </div></div>
 
 <div id="mfa" class="login hidden"><div class="card login-card"><div class="brand"><div class="logo">R</div><h1>VERIFICACIÓN</h1><p>SEGURIDAD ROMANO PARTNERS</p></div>
@@ -587,7 +587,6 @@ $("resetBtn").onclick=async()=>{
  const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
  if(r.error)toast(r.error.message);else toast("Enlace de recuperación enviado.");
 };
-$("demoBtn").onclick=()=>{demoMode=!demoMode;$("demoBtn").textContent=demoMode?"DEMO ACTIVO":"DEMONSTRACIÓN";$("demoBtn").classList.toggle("gold",demoMode);toast(demoMode?"Modo demostración activado · datos ficticios, sin escritura en producción":"Modo producción activado");openPage("dashboard")};
 document.querySelectorAll(".nav button[data-page]").forEach(b=>b.onclick=()=>openPage(b.dataset.page));
 sb.auth.onAuthStateChange(async(_event,session)=>{if(!session){currentUser=null;currentProfile=null;showLogin();return}if(currentUser?.id===session.user.id)return;currentUser=session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}});
 (async()=>{const s=await sb.auth.getSession();if(s.data.session){currentUser=s.data.session.user;try{await profileLoad();if(await ensureMFA())showApp()}catch(e){await sb.auth.signOut();showLogin(e.message)}}})();
@@ -935,24 +934,6 @@ async function renderDashboardReference(){
  $("dashSearch").onkeydown=e=>{if(e.key==="Enter")openPage("search")};$("dashBell").onclick=()=>openPage("notifications");
  if(window.L){const m=L.map("dashMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);[[40.425,-3.695,"Ana Silva · A camino"],[40.415,-3.69,"Pedro Costa · En servicio"],[40.405,-3.72,"Laura Mendes · Supervisado"],[40.43,-3.68,"Apartamento · DEMO"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));}
 }
-function selectDemoRoleFromHeader(){if(!demoMode){demoMode=true;window.__romanoDemoRole="admin";$("demoBtn").textContent="DEMO ACTIVO";$("demoBtn").classList.add("gold");buildMasterNav();renderProfileVisual();}showDemoRolePicker();}
-setTimeout(()=>{
- const b=$("demoBtn");
- if(b)b.onclick=()=>selectDemoRoleFromHeader();
- const sf=document.querySelector(".side-footer");
- if(sf&&!document.getElementById("profileQuick")){const q=document.createElement("div");q.id="profileQuick";q.className="sf-logout";q.textContent="◉ Mi perfil";q.onclick=()=>openMyProfile();sf.insertBefore(q,sf.lastElementChild);}
-},0);
-
-/* Demo entry point: isolated fictitious operation, no auth and no database writes. */
-function enterDemoExperience(){
- demoMode=true;window.__romanoDemoRole="admin";
- $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");
- $("userEmail").textContent="modo demostración · datos ficticios";
- $("demoBtn").textContent="DEMO ACTIVO";$("demoBtn").classList.add("gold");
- buildMasterNav();renderProfileVisual();openPage("dashboard");
- toast("Experiência DEMONSTRAÇÃO iniciada · nenhum dado real será alterado.");
-}
-setTimeout(()=>{const b=$("demoLoginBtn");if(b)b.onclick=enterDemoExperience},0);
 
 /* Continuous fictitious operation: isolated in browser memory. */
 window.ROMANO_LIVE_SIM={running:false,timer:null,minutes:0,events:[]};
