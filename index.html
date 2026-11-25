@@ -585,6 +585,59 @@ async function renderClientsPremium(){return renderClients()}
 async function renderPropertiesPremium(){return renderProperties()}
 async function renderEmployeesPremium(){return renderEmployees()}
 async function renderUnitsPremium(){return units()}
+
+const ROMANO_TEAM_NAMES=["ÁGUIA","ALFA","BRAVO","DELTA"];
+async function teams(){
+ if(!["admin","supervisor"].includes(role())){$("content").innerHTML='<div class="panel"><div class="msg">Acesso reservado ao Administrador e Supervisor.</div></div>';return}
+ const companyId=currentProfile?.company_id;
+ if(!companyId){$("content").innerHTML='<div class="panel"><div class="msg">Não foi possível identificar a empresa da sessão.</div></div>';return}
+ const [empQ,svcQ,assignQ]=await Promise.all([
+  sb.from("employee_profiles").select("id,employee_code,full_name,function_title,active,profile_id").eq("company_id",companyId).eq("active",true).order("full_name"),
+  sb.from("services").select("id,code,service_type,status,scheduled_at,property_id,assigned_employee_id").eq("company_id",companyId).order("scheduled_at",{ascending:false}).limit(100),
+  sb.from("service_team_assignments").select("id,service_id,employee_profile_id,team_name").eq("company_id",companyId)
+ ]);
+ const schemaError=assignQ.error;
+ if(schemaError){$("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Gestão de equipas</h3><div class="muted">ÁGUIA · ALFA · BRAVO · DELTA</div></div></div><div class="notice">A estrutura segura de equipas ainda não está instalada na base de dados. A migração SQL precisa ser aplicada no Supabase antes de ativar esta função.</div><div class="muted" style="margin-top:8px">'+esc(schemaError.message||"Tabela de equipas indisponível")+'</div></div>';return}
+ if(empQ.error||svcQ.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(empQ.error?.message||svcQ.error?.message||"Não foi possível carregar os dados.")+'</div></div>';return}
+ const employees=empQ.data||[],services=svcQ.data||[],assignments=assignQ.data||[];
+ const propIds=[...new Set(services.map(x=>x.property_id).filter(Boolean))];
+ const propQ=propIds.length?await sb.from("properties").select("id,name,code").eq("company_id",companyId).in("id",propIds):{data:[],error:null};
+ const propMap=new Map((propQ.data||[]).map(x=>[x.id,x]));
+ const employeeMap=new Map(employees.map(x=>[x.id,x]));
+ const counts=Object.fromEntries(ROMANO_TEAM_NAMES.map(n=>[n,assignments.filter(a=>a.team_name===n).length]));
+ const cards=ROMANO_TEAM_NAMES.map(n=>'<div class="panel" style="padding:16px;min-width:0"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><strong style="font:20px Georgia,serif;color:#8d682f">'+n+'</strong><span class="pill">'+counts[n]+' atribuições</span></div><p class="muted" style="margin:8px 0 0">Composição definida individualmente em cada serviço.</p></div>').join("");
+ const rows=services.map(s=>{
+  const members=assignments.filter(a=>a.service_id===s.id);
+  const team=members[0]?.team_name||"—";
+  const names=members.map(a=>employeeMap.get(a.employee_profile_id)?.full_name||"Funcionário").join(", ");
+  const property=propMap.get(s.property_id);
+  const when=s.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"}):"Sem data";
+  return '<tr><td><b>'+esc(s.code||String(s.id).slice(0,8))+'</b><small class="muted" style="display:block">'+esc(property?.name||"Propriedade")+'</small></td><td>'+esc(s.service_type||"Serviço")+'</td><td>'+esc(when)+'</td><td><b>'+esc(team)+'</b><small class="muted" style="display:block">'+esc(names||"Sem equipa atribuída")+'</small></td><td><button class="btn gold" type="button" onclick="openTeamAssignment('+JSON.stringify(s.id)+')">Gerir equipa</button></td></tr>';
+ }).join("");
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Gestão de equipas</h3><div class="muted">Atribua uma equipa e escolha os funcionários para cada serviço. A composição pode mudar de serviço para serviço.</div></div><span class="pill">'+employees.length+' funcionários ativos</span></div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0">'+cards+'</div><div class="notice">As quatro equipas são fixas por nome; os funcionários não ficam presos a uma equipa. O Administrador ou Supervisor escolhe a composição em cada serviço.</div></div><div class="panel" style="margin-top:14px"><div class="panel-head"><div><h3>Serviços e equipas atribuídas</h3><div class="muted">Últimos 100 serviços da empresa</div></div><button class="btn" type="button" onclick="openPage(\'services\')">Ver serviços</button></div><div style="overflow:auto"><table class="table"><thead><tr><th>Serviço / propriedade</th><th>Tipo</th><th>Data</th><th>Equipa / funcionários</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="5"><div class="empty">Não existem serviços registados.</div></td></tr>')+'</tbody></table></div></div>';
+}
+async function openTeamAssignment(serviceId){
+ const companyId=currentProfile?.company_id;
+ const [serviceQ,empQ,assignQ]=await Promise.all([
+  sb.from("services").select("id,code,service_type,scheduled_at,property_id").eq("id",serviceId).eq("company_id",companyId).single(),
+  sb.from("employee_profiles").select("id,employee_code,full_name,function_title,active").eq("company_id",companyId).eq("active",true).order("full_name"),
+  sb.from("service_team_assignments").select("employee_profile_id,team_name").eq("service_id",serviceId).eq("company_id",companyId)
+ ]);
+ if(serviceQ.error||empQ.error||assignQ.error){toast(serviceQ.error?.message||empQ.error?.message||assignQ.error?.message||"Não foi possível abrir a equipa.");return}
+ const s=serviceQ.data,existing=assignQ.data||[],team=existing[0]?.team_name||"ÁGUIA",selected=new Set(existing.map(x=>x.employee_profile_id));
+ const property=s.property_id?(await sb.from("properties").select("name,code").eq("id",s.property_id).eq("company_id",companyId).maybeSingle()).data:null;
+ const checks=(empQ.data||[]).map(e=>'<label style="display:flex;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid #eee6da"><input type="checkbox" name="teamEmployee" value="'+esc(e.id)+'" '+(selected.has(e.id)?"checked":"")+'><span><b>'+esc(e.full_name||e.employee_code)+'</b><small class="muted" style="display:block">'+esc(e.function_title||"Funcionário")+' · '+esc(e.employee_code||"")+'</small></span></label>').join("");
+ openModal("Atribuir equipa ao serviço",'<form onsubmit="saveTeamAssignment(event,'+JSON.stringify(s.id)+')"><div class="notice" style="margin-bottom:12px"><b>'+esc(s.code||"Serviço")+'</b> · '+esc(property?.name||"Propriedade")+'<br>'+esc(s.service_type||"")+' · '+esc(s.scheduled_at?new Date(s.scheduled_at).toLocaleString("es-ES"):"Sem data")+'</div><div class="field"><label>Equipa</label><select id="teamAssignmentName">'+ROMANO_TEAM_NAMES.map(n=>'<option value="'+n+'" '+(n===team?"selected":"")+'>'+n+'</option>').join("")+'</select></div><div class="field"><label>Funcionários deste serviço</label><div style="max-height:300px;overflow:auto;border:1px solid #e5dac8;border-radius:12px;padding:6px">'+(checks||'<div class="empty">Não existem funcionários ativos.</div>')+'</div></div><div class="actions"><button class="primary" type="submit">Guardar equipa</button><button class="btn" type="button" onclick="closeModal()">Cancelar</button></div></form>');
+}
+async function saveTeamAssignment(event,serviceId){
+ event.preventDefault();
+ const teamName=$("teamAssignmentName")?.value;
+ const employeeIds=[...document.querySelectorAll('input[name="teamEmployee"]:checked')].map(x=>x.value);
+ const q=await sb.rpc("set_service_team_assignments",{p_service_id:serviceId,p_team_name:teamName,p_employee_profile_ids:employeeIds});
+ if(q.error){toast("Não foi possível guardar: "+q.error.message);return}
+ closeModal();toast("Equipa guardada para este serviço.");await teams();
+}
+
 async function renderTeamsPremium(){return teams()}
 async function renderStockPremium(){return renderStock()}
 async function renderLinenPremium(){return linen()}
