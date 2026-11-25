@@ -3420,12 +3420,12 @@ async function renderCleaningTimerPanel(service,id){
  }
  return html+'</div>';
 }
+function prepareCleaningTimerAudio(){try{const C=window.AudioContext||window.webkitAudioContext;if(C){window.__romanoTimerAudio=window.__romanoTimerAudio||new C();if(window.__romanoTimerAudio.state==="suspended")window.__romanoTimerAudio.resume();}}catch(_){}}
 function cleaningTimerBeep(isEnd){
  try{
-  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-  const ctx=new C(),notes=isEnd?[660,880,660,880]:[880,660];let at=ctx.currentTime;
+  prepareCleaningTimerAudio();const ctx=window.__romanoTimerAudio;if(!ctx)return;
+  const notes=isEnd?[660,880,660,880]:[880,660];let at=ctx.currentTime;
   notes.forEach(freq=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.frequency.value=freq;gain.gain.setValueAtTime(.001,at);gain.gain.exponentialRampToValueAtTime(.14,at+.03);gain.gain.exponentialRampToValueAtTime(.001,at+.18);osc.connect(gain);gain.connect(ctx.destination);osc.start(at);osc.stop(at+.2);at+=.24;});
-  setTimeout(()=>ctx.close(),1500);
  }catch(_){}
 }
 function startCleaningTimerTicker(timer){
@@ -3445,7 +3445,7 @@ function startCleaningTimerTicker(timer){
  };
  tick();window.__romanoTimerInterval=setInterval(tick,1000);window.__romanoTimerSync=setInterval(async()=>{const q=await sb.from("cleaning_service_timers").select("*").eq("service_id",activeTimer.service_id).maybeSingle();if(q.data){activeTimer=q.data;if(activeTimer.status!=="running"){clearInterval(window.__romanoTimerInterval);clearInterval(window.__romanoTimerSync);}tick();}},12000);
 }
-async function startCleaningTimer(id){const r=await sb.rpc("start_cleaning_service_timer",{p_service_id:id});if(r.error){toast(r.error.message);return;}toast("Cronómetro compartido iniciado para todo el equipo.");await viewService(id);}
+async function startCleaningTimer(id){prepareCleaningTimerAudio();const r=await sb.rpc("start_cleaning_service_timer",{p_service_id:id});if(r.error){toast(r.error.message);return;}toast("Cronómetro compartido iniciado para todo el equipo.");await viewService(id);}
 async function requestCleaningExtension(id,minutes){const reason=prompt("Motivo (opcional):")||"";const r=await sb.rpc("request_cleaning_timer_extension",{p_service_id:id,p_minutes:minutes,p_reason:reason});if(r.error){toast(r.error.message);return;}toast("Solicitud de extensión enviada.");await viewService(id);}
 async function reviewCleaningExtension(requestId,approve,serviceId){const r=await sb.rpc("review_cleaning_timer_extension",{p_request_id:requestId,p_approve:approve});if(r.error){toast(r.error.message);return;}toast(approve?"Extensión aprobada.":"Extensión rechazada.");await viewService(serviceId);}
 async function finishCleaningTimer(id){const r=await sb.rpc("finish_cleaning_service_timer",{p_service_id:id});if(r.error){toast(r.error.message);return;}toast("Tiempo finalizado. Ya puede solicitar supervisión.");await viewService(id);}
