@@ -1223,9 +1223,26 @@ async function renderServicesMaster(){
      clientsMap=Object.fromEntries((cq.data||[]).map(c=>[c.id,c]));
    }
  }
+ let teamAssignmentsMap={};
+ if(rows.length&&!demoMode){
+   const serviceIds=rows.map(x=>x.id);
+   const tq=await sb.from("service_team_assignments").select("service_id,employee_profile_id,team_name").in("service_id",serviceIds).eq("company_id",currentProfile.company_id);
+   if(tq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(tq.error.message)+'</div></div>';return}
+   const assignments=tq.data||[];
+   const employeeProfileIds=[...new Set(assignments.map(a=>a.employee_profile_id).filter(Boolean))];
+   let employeeNames={};
+   if(employeeProfileIds.length){
+     const eq=await sb.from("employee_profiles").select("id,full_name").in("id",employeeProfileIds).eq("company_id",currentProfile.company_id);
+     if(eq.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(eq.error.message)+'</div></div>';return}
+     employeeNames=Object.fromEntries((eq.data||[]).map(e=>[e.id,e.full_name||"Funcionário"]));
+   }
+   assignments.forEach(a=>{(teamAssignmentsMap[a.service_id]||(teamAssignmentsMap[a.service_id]=[])).push({team_name:a.team_name||"Equipa",full_name:employeeNames[a.employee_profile_id]||"Funcionário"});});
+ }
  const clientName=role()==="client"?(currentProfile?.full_name||"Cliente"):"";
  const cards=rows.length?rows.map(x=>{
    const p=propertiesMap[x.property_id]||null;
+   const assignedTeamMembers=teamAssignmentsMap[x.id]||[];
+   const hasTeamAssignment=assignedTeamMembers.length>0;
    const c=clientsMap[x.client_id]||null;
    const fallbackClient=p?.client_id?clientsMap[p.client_id]:null;
    const visibleClient=role()==="client"?clientName:(c?.name||fallbackClient?.name||"—");
@@ -1233,12 +1250,12 @@ async function renderServicesMaster(){
    const visibleAddress=[p?.address,p?.city].filter(Boolean).join(" · ")||"—";
    const actions='<button class="btn" onclick="'+(x.__relatedCleaning?"viewRelatedCleaning":"viewService")+'(\''+x.id+'\')">Ver '+(x.__relatedCleaning?"seguimiento":"detalle")+'</button>'+ (canManage()?' <button class="btn" onclick="deleteService(\''+x.id+'\')">Eliminar</button>':'')+
      (["employee","maintenance_technician"].includes(role())&&x.assigned_employee_id===currentUser.id&&x.status==="scheduled"?' <button class="btn gold" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':
-      role()==="supervisor"&&x.status==="requested"&&!x.assigned_employee_id?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
-      role()==="supervisor"&&x.status==="scheduled"&&!x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
-      role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':
-      role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':
-      role()==="admin"&&x.status==="scheduled"&&!!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Alterar funcionário</button>':
-      role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!!x.assigned_employee_id?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Alterar funcionário</button>':'');
+      role()==="supervisor"&&x.status==="requested"&&!x.assigned_employee_id&&!hasTeamAssignment?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
+      role()==="supervisor"&&x.status==="scheduled"&&!x.supervisor_approved_at&&!x.assigned_employee_id&&!hasTeamAssignment?' <button class="btn gold" onclick="acceptServiceRequest(\''+x.id+'\')">Aceptar solicitud</button>':
+      role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id&&!hasTeamAssignment?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':
+      role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!x.assigned_employee_id&&!hasTeamAssignment?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Designar funcionario</button>':
+      role()==="admin"&&x.status==="scheduled"&&!!x.assigned_employee_id&&!hasTeamAssignment?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Alterar funcionário</button>':
+      role()==="supervisor"&&x.status==="scheduled"&&x.supervisor_approved_at&&!!x.assigned_employee_id&&!hasTeamAssignment?' <button class="btn gold" onclick="openServiceAssignment(\''+x.id+'\')">Alterar funcionário</button>':'');
    const f=fin[x.id];
    const serviceContext='<div class="service-card-context"><div><small>Cliente</small><strong>'+esc(visibleClient)+'</strong></div><div><small>Apartamento</small><strong>'+esc(visibleProperty)+'</strong></div><div><small>Dirección</small><strong>'+esc(visibleAddress)+'</strong></div></div>';
    return '<article class="service-card">'+
@@ -1250,7 +1267,7 @@ async function renderServicesMaster(){
        '<div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div>'+
      '</div>'+
      (canSeeFinance()?'<div class="service-card-finance"><div><small>Sin IVA</small><b>'+masterMoney(f?.subtotal||0)+'</b></div><div><small>IVA</small><b>'+masterMoney(f?.tax_amount||0)+'</b></div><div><small>Total</small><b>'+masterMoney(f?.total||0)+'</b></div></div>':'')+
-     (x.assigned_employee_id?'<div class="service-assigned">Funcionario designado · pendiente de aceptación</div>':'')+
+     (hasTeamAssignment?'<div class="service-assigned"><strong>Equipa '+esc(assignedTeamMembers[0].team_name)+'</strong> · '+assignedTeamMembers.map(m=>esc(m.full_name)).join(' · ')+'</div>':(x.assigned_employee_id?'<div class="service-assigned">Funcionario designado · pendiente de aceptación</div>':''))+
      '<div class="service-card-actions">'+actions+'</div>'+
    '</article>';
  }).join(""):'<div class="empty service-empty">No hay servicios registrados.</div>';
