@@ -2637,6 +2637,43 @@ async function capturePropertyGPS(prefix){
 }
 function propertyGpsLink(lat,lon,label="Abrir GPS"){if(lat==null||lon==null||lat===""||lon==="")return "";const url="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(lat+","+lon);return '<a class="btn" href="'+url+'" target="_blank" rel="noopener">📍 '+esc(label)+'</a>'}
 
+async function renderPropertyProximity(radiusKm){
+ if(radiusKm!==undefined)window.__romanoProximityRadius=Number(radiusKm)||1;
+ const radius=Number(window.__romanoProximityRadius||1);
+ const box=$("content");
+ box.innerHTML='<div class="panel"><div class="panel-head"><div><h3>📍 Apartamentos próximos</h3><div class="muted">Agrupamento por distância real entre as coordenadas GPS guardadas nas propriedades.</div></div><div class="actions"><button class="btn" onclick="openPage(\'properties\')">← Voltar às propriedades</button></div></div><div class="actions" style="align-items:center;margin:12px 0 16px"><label for="proximityRadius" class="muted">Considerar próximos até:</label><select id="proximityRadius" class="btn" style="min-width:130px" onchange="renderPropertyProximity(this.value)"><option value="0.5" '+(radius===0.5?'selected':'')+'>500 metros</option><option value="1" '+(radius===1?'selected':'')+'>1 km</option><option value="2" '+(radius===2?'selected':'')+'>2 km</option><option value="5" '+(radius===5?'selected':'')+'>5 km</option></select><span class="pill">Distância em linha reta</span></div><div id="proximitySummary" class="muted">A carregar propriedades…</div><div id="proximityMap" class="master-map" style="height:380px;min-height:300px;margin:14px 0;border-radius:16px;overflow:hidden"></div><div id="proximityGroups"></div></div>';
+ let result;
+ if(demoMode)result={data:DEMO_PROPERTIES||[],error:null};
+ else result=await sb.from("properties").select("id,code,name,property_type,address,city,country,latitude,longitude,client_id").eq("company_id",currentProfile.company_id).order("name");
+ if(result.error){$("proximitySummary").innerHTML='<div class="msg">'+esc(result.error.message)+'</div>';return}
+ const all=result.data||[];
+ const located=all.filter(p=>Number.isFinite(Number(p.latitude))&&Number.isFinite(Number(p.longitude))&&p.latitude!==null&&p.longitude!==null&&Math.abs(Number(p.latitude))<=90&&Math.abs(Number(p.longitude))<=180).map(p=>({...p,latitude:Number(p.latitude),longitude:Number(p.longitude)}));
+ const missing=all.length-located.length;
+ const rad=v=>v*Math.PI/180;
+ const distance=(a,b)=>{const R=6371,lat1=rad(a.latitude),lat2=rad(b.latitude),dLat=lat2-lat1,dLon=rad(b.longitude-a.longitude),h=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+ const pairs=[];
+ for(let i=0;i<located.length;i++)for(let j=i+1;j<located.length;j++){const km=distance(located[i],located[j]);if(km<=radius)pairs.push({a:located[i],b:located[j],km})}
+ pairs.sort((a,b)=>a.km-b.km);
+ const adjacency=new Map(located.map(p=>[p.id,[]]));
+ pairs.forEach(pair=>{adjacency.get(pair.a.id).push({property:pair.b,km:pair.km});adjacency.get(pair.b.id).push({property:pair.a,km:pair.km})});
+ const visited=new Set(),groups=[];
+ located.forEach(p=>{if(visited.has(p.id)||!adjacency.get(p.id).length)return;const stack=[p],items=[];visited.add(p.id);while(stack.length){const current=stack.pop();items.push(current);(adjacency.get(current.id)||[]).forEach(n=>{if(!visited.has(n.property.id)){visited.add(n.property.id);stack.push(n.property)}})}groups.push(items)});
+ groups.sort((a,b)=>b.length-a.length);
+ $("proximitySummary").innerHTML='<b>'+all.length+'</b> propriedades · <b>'+located.length+'</b> com GPS · <b>'+groups.length+'</b> grupos próximos · raio de <b>'+((radius*1000).toLocaleString("es-ES"))+' m</b>'+(missing?' · <span style="color:#9a6a25">'+missing+' sem coordenadas GPS</span>':'');
+ let html='';
+ if(!groups.length)html='<div class="empty">Não foram encontrados apartamentos dentro de '+(radius*1000)+' metros. Aumente o raio ou confirme as coordenadas GPS das propriedades.</div>';
+ else html=groups.map((items,index)=>{const names=items.map(p=>p.name||p.code||"Apartamento").join(" · ");const rows=items.map(p=>{const near=(adjacency.get(p.id)||[]).slice().sort((a,b)=>a.km-b.km)[0];return '<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #eee7dc"><span><b>'+esc(p.name||p.code||"Apartamento")+'</b><small class="muted" style="display:block">'+esc([p.code,p.address,p.city].filter(Boolean).join(" · ")||"Sem endereço")+'</small></span><span class="pill">'+(near?(near.km<1?Math.round(near.km*1000)+' m':near.km.toFixed(2)+' km')+' do mais próximo':'—')+'</span></div>'}).join("");return '<section class="panel" style="margin:12px 0"><div class="panel-head"><div><h3>Grupo '+(index+1)+' · '+items.length+' apartamentos</h3><div class="muted">'+esc(names)+'</div></div><span class="pill">'+items.length+' imóveis</span></div>'+rows+'</section>'}).join("");
+ if(missing)html+='<div class="notice" style="margin-top:12px">Para incluir os apartamentos sem GPS, abra cada propriedade, confirme o código postal e a cidade para procurar a localização, ou use “Usar GPS actual” quando estiver no local. Confirme sempre o ponto antes de guardar.</div>';
+ $("proximityGroups").innerHTML=html;
+ if(window.L&&$("proximityMap")){
+  const center=located.length?[located.reduce((n,p)=>n+p.latitude,0)/located.length,located.reduce((n,p)=>n+p.longitude,0)/located.length]:[40.4168,-3.7038];
+  const map=L.map("proximityMap").setView(center,located.length?12:6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+  located.forEach(p=>{const near=(adjacency.get(p.id)||[]).slice().sort((a,b)=>a.km-b.km)[0];const label=(p.name||p.code||"Apartamento");const detail=[p.address,p.city,p.country].filter(Boolean).join(", ");L.marker([p.latitude,p.longitude]).addTo(map).bindPopup("<b>"+esc(label)+"</b><br>"+esc(detail||"Sem endereço")+(near?"<br>Mais próximo: "+esc(near.property.name||near.property.code||"Apartamento")+" · "+(near.km<1?Math.round(near.km*1000)+" m":near.km.toFixed(2)+" km"):"<br>Sem vizinho dentro do raio"))});
+  if(located.length>1)map.fitBounds(L.latLngBounds(located.map(p=>[p.latitude,p.longitude])).pad(0.15));
+  setTimeout(()=>map.invalidateSize(),120);
+ }else $("proximityMap").innerHTML='<div class="empty">O mapa não está disponível neste momento. A lista de proximidade continua disponível abaixo.</div>';
+}
 async function renderProperties(){
  const r=demoMode?{data:DEMO_PROPERTIES,error:null}:{data:null,error:null};
  let clients=[];
@@ -2652,7 +2689,7 @@ async function renderProperties(){
  const row=x=>'<tr><td>'+photoBox(demoMode?demoPropertyPhotoData(x.id):x._photoUrl||"",x.name,true)+'</td><td>'+esc(x.code||"—")+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.property_type||"—")+'</td><td>'+esc([x.city,x.country].filter(Boolean).join(", ")||x.address||"—")+'</td><td>'+esc(x.status||"Activo")+'</td><td><div class="actions"><button class="btn" onclick="viewProperty(\''+x.id+'\')">Ver</button><button class="btn" onclick="editProperty(\''+x.id+'\')">Editar</button><button class="btn" onclick="deleteProperty(\''+x.id+'\')">Eliminar</button></div></td></tr>';
  const groups=clients.map(c=>({client:c,items:(r.data||[]).filter(p=>p.client_id===c.id)})).filter(g=>g.items.length);
  const unassigned=(r.data||[]).filter(p=>!p.client_id||!clients.some(c=>c.id===p.client_id));
- let h='<div class="panel"><div class="panel-head"><div><h3>Propiedades por cliente</h3><div class="muted">Cada inmueble aparece dentro del cliente al que pertenece.</div></div><div class="actions"><button class="btn" onclick="reloadCurrentPage()">Actualizar</button><button class="btn gold" onclick="newProperty()">+ Nueva propiedad</button></div></div>';
+ let h='<div class="panel"><div class="panel-head"><div><h3>Propiedades por cliente</h3><div class="muted">Cada inmueble aparece dentro del cliente al que pertenece.</div></div><div class="actions"><button class="btn" onclick="reloadCurrentPage()">Actualizar</button><button class="btn" onclick="renderPropertyProximity()">📍 Apartamentos próximos</button><button class="btn gold" onclick="newProperty()">+ Nueva propiedad</button></div></div>';
  if(r.error)h+='<div class="msg">'+esc(r.error.message)+'</div>';
  else if(!(r.data||[]).length)h+='<div class="empty">No hay propiedades.</div>';
  else{
