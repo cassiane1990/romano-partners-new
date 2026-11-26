@@ -7055,7 +7055,7 @@ function masterFilterProperties(){
  const cid=$("mpClient")?.value,sel=$("mpProperty");if(!sel)return;
  const props=demoMode?DEMO_PROPERTIES:(window.__mpProps||[]);
  const own=cid?props.filter(x=>x.client_id===cid):[];
- sel.innerHTML=own.length?own.map(x=>"<option value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option value=''>"+(cid?"Este cliente não tem apartamentos registados":"Selecione primeiro um cliente")+"</option>";
+ sel.setAttribute("translate","no");sel.innerHTML=own.length?own.map(x=>"<option translate='no' value='"+x.id+"'>"+esc(x.code)+" · "+esc(x.name)+" · "+esc(x.property_type||"")+"</option>").join(""):"<option translate='no' value=''>"+(cid?"Este cliente não tem apartamentos registados":"Selecione primeiro um cliente")+"</option>";
  if(own.length)sel.value=own[0].id;
  masterLoadPropertyBeds();
 }
