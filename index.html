@@ -1760,7 +1760,7 @@ const $=id=>document.getElementById(id); let currentUser=null,currentProfile=nul
 const roleNames={admin:"Administrador",supervisor:"Supervisor",employee:"Funcionario de Limpieza",maintenance_technician:"Técnico de Mantenimiento",client:"Cliente"};
 /* ROMANO PROFILE MASTER · one interface model per role, shared by every user of that role. */
 const ROMANO_PROFILE_MASTER=Object.freeze({
- admin:Object.freeze({key:"admin",label:"Administrador",allowed:["company_costs","packs_amenities","stock_inventory","property_inspections","evidence_archive","dashboard","service_journey","operations","services","newservice","newservice_cleaning","newservice_maintenance","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
+ admin:Object.freeze({key:"admin",label:"Administrador",allowed:["packs_amenities","stock_inventory","property_inspections","evidence_archive","dashboard","service_journey","operations","services","newservice","newservice_cleaning","newservice_maintenance","calendar","change_requests","emergency","maintenance_catalog","cleaning_catalog","clients","properties","units","prepostos","employees","teams","journey","locations","materialsreq","stock_catalog","linen_catalog","laundry_catalog","amenities_catalog","recurring","catalog","quotes","finance","receipts","invoices","documents","service_history","chat","notifications","search","reports","sync","backup","ai","audit","privacy","security","profile"]}),
  supervisor:Object.freeze({key:"supervisor",label:"Supervisor",allowed:["packs_amenities","stock_inventory","property_inspections","evidence_archive","dashboard","service_journey","operations","services","newservice","newservice_cleaning","newservice_maintenance","calendar","change_requests","emergency","clients","properties","units","employees","teams","journey","locations","materialsreq","recurring","quotes","documents","service_history","chat","notifications","search","reports","sync","ai","audit","privacy","security","profile"]}),
  employee:Object.freeze({key:"employee",label:"Funcionario de Limpieza",allowed:["packs_amenities","dashboard","service_journey","services","calendar","journey","my_schedule","materialsreq","locations","chat","documents","employee_documents","notifications","sync","profile","security"]}),
  maintenance_technician:Object.freeze({key:"maintenance_technician",label:"Técnico de Mantenimiento",allowed:["packs_amenities","property_inspections","evidence_archive","dashboard","service_journey","operations","services","newservice","newservice_maintenance","calendar","journey","locations","materialsreq","emergency","chat","notifications","employee_documents","sync","profile","security"]}),
@@ -4070,7 +4070,7 @@ async function renderFinance(){
  }
  $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Financeiro · ROMANO PROPERTY CARE</h3><div class="muted">Registo mensal de receitas, vendas, custos e despesas.</div></div><div class="actions"><input id="financeMonth" type="month" value="'+esc(month)+'" style="max-width:165px"><button class="btn gold" type="button" onclick="renderFinance()">Atualizar</button></div></div><div class="empty">A carregar os valores do mês...</div></div>';
  const [sv,sc,fe,iv,pay,pr,cc]=await Promise.all([
-  sb.from("services").select("id,client_id,property_id,typology,service_type,status,agreed_amount,finished_at,scheduled_at,pricing,tax_country,requested_items,laundry").eq("company_id",currentProfile.company_id).in("status",["completed","approved","supervised"]).gte("finished_at",from).lt("finished_at",to),
+  sb.from("services").select("id,client_id,property_id,typology,service_type,status,agreed_amount,finished_at,scheduled_at,pricing,tax_country").eq("company_id",currentProfile.company_id).in("status",["completed","approved","supervised"]).gte("finished_at",from).lt("finished_at",to),
   sb.from("service_costs").select("id,service_id,category,description,amount,incurred_at").eq("company_id",currentProfile.company_id).gte("incurred_at",from).lt("incurred_at",to),
   sb.from("finance_entries").select("id,entry_type,category,description,typology,quantity,unit_amount,amount,entry_date,created_at,property_id").eq("company_id",currentProfile.company_id).gte("entry_date",month+"-01").lt("entry_date",new Date(yy,mm,1).toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})).order("entry_date",{ascending:false}),
   sb.from("invoices").select("id,total,status,created_at").eq("company_id",currentProfile.company_id).gte("created_at",from).lt("created_at",to),
@@ -4086,33 +4086,38 @@ async function renderFinance(){
  if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal,tax_amount").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
  const costByKey={};costCatalog.filter(c=>c.is_active).forEach(c=>costByKey[c.cost_key]=Number(c.unit_cost||0));
  const costValue=(key,fallback)=>costByKey[key]??fallback;
+
  const typologies=["T1","T2","T3","T4","T5"];
  const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,gross:0,tax:0,cost:0});
  const isCleaningService=x=>{const v=String(x.service_type||"").toLowerCase();return !!String(x.typology||"").toUpperCase().match(/T[1-5]/)&&!/manuten|maintenance|repar|electric|fontan|plumb|pintur|paint|montagem|assembly/.test(v)};
  const completedServices=services.filter(x=>["completed","approved","supervised"].includes(String(x.status||"").toLowerCase())&&x.finished_at);
- const serviceCosts={},serviceCostCategories={};
- costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
- const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
+ // Custos automáticos por limpeza: usar valores reais já definidos pela empresa.
+ const laundryCostByTypology={T1:8.74,T2:16.96,T3:25.18};
+ const amenitiesCostByTypology={T1:0.86,T2:1.72,T3:2.58};
  const autoCostsByService={};
  let autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
  completedServices.forEach(x=>{
   if(!isCleaningService(x))return;
+  const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]||"";
   const cats=serviceCostCategories[x.id]||[];
   const hasLaundry=cats.some(v=>/lavand|laundry|roupa|linen/.test(v));
   const hasAmenities=cats.some(v=>/amenit/.test(v));
   const hasKitchen=cats.some(v=>/kit.*cozinha|cozinha.*kit|kitchen/.test(v));
   const items=Array.isArray(x.requested_items)?x.requested_items:[];
-  const itemQty=code=>items.filter(i=>String(i.code||"").toUpperCase()===code).reduce((n,i)=>n+Math.max(0,Number(i.quantity||1)),0);
-  const p=propertyBy[x.property_id]||{};
-  const bedCount=Number(p.beds_single||0)+Number(p.beds_double||0);
-  const laundryQty=itemQty("KING")||((x.laundry)?bedCount:0);
+  const codes=items.map(i=>String(i.code||"").toUpperCase());
   let laundry=0,amenities=0,kitchen=0;
-  if(x.laundry&&!hasLaundry) laundry=laundryQty*costValue("laundry_bed",6);
-  if(itemQty("SHAMPOO")>0&&!hasAmenities) amenities=costValue("amenities",0.95);
-  if(itemQty("KITCHEN")>0&&!hasKitchen) kitchen=costValue("kitchen_kit",0.86);
+  if(x.laundry&&!hasLaundry){
+   laundry=laundryCostByTypology[t]??(Number(propertyBy[x.property_id]?.beds_single||0)+Number(propertyBy[x.property_id]?.beds_double||0))*costValue("laundry_bed",0);
+  }
+  if(codes.includes("SHAMPOO")&&!hasAmenities) amenities=amenitiesCostByTypology[t]??costValue("amenities",0);
+  if(codes.includes("KITCHEN")&&!hasKitchen) kitchen=costValue("kitchen_kit",0);
   autoCostsByService[x.id]={laundry,amenities,kitchen,total:laundry+amenities+kitchen};
   autoLaundryCost+=laundry;autoAmenitiesCost+=amenities;autoKitchenCost+=kitchen;
  });
+ const serviceCosts={},serviceCostCategories={};
+ costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
+ const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
+
  const dayKey=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})};
  const serviceSeen=new Set();
  const cleaningServices=completedServices.filter(x=>{if(!isCleaningService(x))return false;const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0],key=x.property_id?dayKey(x.finished_at)+"|"+x.property_id+"|"+t:"service:"+x.id;if(serviceSeen.has(key))return false;serviceSeen.add(key);return true});
@@ -4141,15 +4146,13 @@ async function renderFinance(){
  const transportEntries=entries.filter(x=>x.entry_type==="expense"&&/transport|combust[ií]vel|desloca/i.test(String(x.category||"")+" "+String(x.description||"")));
  const transportRecorded=transportEntries.reduce((a,x)=>a+Number(x.amount||0),0);
  const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",0);
- const garage=costValue("monthly_garage",0);
- const cleaningProducts=costValue("cleaning_products_monthly",0);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0);
  const autoServiceExpense=autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
- const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+autoServiceExpense+manualExpense+payroll+transport+garage+cleaningProducts,operating=totalRevenue-totalExpense;
+ const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+autoServiceExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
  const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
- const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense)+garage+cleaningProducts;
+ const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense);
  const monthlyCleaningCount=countedCleaningQty;
- const fixedPerService=monthlyCleaningCount?(payroll+transport+garage+cleaningProducts+sharedOther)/monthlyCleaningCount:0;
+ const fixedPerService=monthlyCleaningCount?(payroll+transport+sharedOther)/monthlyCleaningCount:0;
  const entriesByProperty={};entries.forEach(e=>{if(e.property_id)(entriesByProperty[e.property_id]??=[]).push(e)});
  const propertyDetailRows=cleaningServices.map(x=>{
   const p=propertyBy[x.property_id]||{},typ=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]||"—";
@@ -4163,7 +4166,7 @@ async function renderFinance(){
  const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense")].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
  if(autoLaundryCost)categoryTotals["Lavandaria automática"]=(categoryTotals["Lavandaria automática"]||0)+autoLaundryCost;
  if(autoAmenitiesCost)categoryTotals["Amenities automáticos"]=(categoryTotals["Amenities automáticos"]||0)+autoAmenitiesCost;
- if(autoKitchenCost)categoryTotals["Kit cozinha automático"]=(categoryTotals["Kit cozinha automático"]||0)+autoKitchenCost;\n if(garage)categoryTotals["Garagem"]=(categoryTotals["Garagem"]||0)+garage;\n if(cleaningProducts)categoryTotals["Produtos de limpeza"]=(categoryTotals["Produtos de limpeza"]||0)+cleaningProducts;
+ if(autoKitchenCost)categoryTotals["Kit cozinha automático"]=(categoryTotals["Kit cozinha automático"]||0)+autoKitchenCost;
  const typRows=typologies.map(t=>'<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].gross)+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].tax)+'</td><td>'+fmt(typ[t].cost)+'</td><td><b>'+fmt(typ[t].revenue-typ[t].cost)+'</b></td></tr>').join("");
  const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
  window.__financeEntriesById=Object.fromEntries(entries.map(x=>[x.id,x]));
@@ -4193,7 +4196,7 @@ async function renderCompanyCostsPage(){
  const r=await sb.from("company_cost_catalog").select("id,cost_key,name,unit,unit_cost,is_active").eq("company_id",currentProfile.company_id).order("name");
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
  const rows=(r.data||[]).map(x=>'<tr><td>'+esc(x.name)+(x.is_active?'':' <span class="pill">Inativo</span>')+'</td><td>'+esc(x.unit)+'</td><td><input type="number" min="0" step="0.01" id="cost_'+x.id+'" value="'+Number(x.unit_cost||0).toFixed(2)+'" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost(\''+x.id+'\')">Guardar</button> <button class="btn" type="button" onclick="toggleCompanyCost(\''+x.id+'\','+(!x.is_active)+')">'+(x.is_active?'Desativar':'Reativar')+'</button> <button class="btn" type="button" onclick="deleteCompanyCost(\''+x.id+'\')">Excluir</button></td></tr>').join("");
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Custos da empresa</h3><div class="muted">Valores editáveis pelo Administrador; custos mensais fixos e custos unitários dos serviços entram automaticamente nos cálculos futuros.</div></div><button class="btn" type="button" onclick="openPage(\'finance\')">Voltar ao financeiro</button></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Custo</th><th>Unidade</th><th>Valor (€)</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="muted">As alterações afetam os cálculos futuros. Os registos financeiros já guardados não são reescritos.</div></div>';
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Custos da empresa</h3><div class="muted">Tabela de referência de custos unitários. Não são despesas mensais: só entram no resultado quando forem lançadas manualmente.</div></div><button class="btn" type="button" onclick="openPage(\'finance\')">Voltar ao financeiro</button></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Custo</th><th>Unidade</th><th>Valor (€)</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="muted">Estes valores são referências para consulta; não serão contabilizados como despesas sem um lançamento manual.</div></div>';
 }
 async function saveCompanyCost(id){
  if(role()!=="admin"){toast("Apenas o Administrador pode alterar custos.");return}
