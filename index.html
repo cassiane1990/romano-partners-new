@@ -4245,6 +4245,7 @@ async function renderFinance(){
  '<div class="panel"><div class="muted"><b>Nota:</b> as faturas e os pagamentos são apresentados separadamente para não somar duas vezes a mesma receita. Despesas sem tipologia entram no resultado mensal, mas não são distribuídas artificialmente pelas margens T1–T5.</div></div>';
 }
 async function renderCompanyCostsPage(){
+ const fmt=v=>Number(v||0).toLocaleString("es-ES",{style:"currency",currency:"EUR"});
  if(role()!=="admin"){$("content").innerHTML='<div class="panel"><div class="msg">Apenas o Administrador pode gerir os custos da empresa.</div></div>';return}
  const r=await sb.from("company_cost_catalog").select("id,cost_key,name,unit,unit_cost,is_active").eq("company_id",currentProfile.company_id).order("name");
  if(r.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(r.error.message)+'</div></div>';return}
