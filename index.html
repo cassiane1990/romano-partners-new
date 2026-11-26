@@ -4086,9 +4086,6 @@ async function renderFinance(){
  if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal,tax_amount").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
  const costByKey={};costCatalog.filter(c=>c.is_active).forEach(c=>costByKey[c.cost_key]=Number(c.unit_cost||0));
  const costValue=(key,fallback)=>costByKey[key]??fallback;
- const serviceCosts={},serviceCostCategories={};
- costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
- const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
  // Custos automáticos por limpeza: usar valores reais já definidos pela empresa.
  const laundryCostByTypology={T1:8.74,T2:16.96,T3:25.18};
  const amenitiesCostByTypology={T1:0.86,T2:1.72,T3:2.58};
@@ -4111,6 +4108,10 @@ async function renderFinance(){
   autoCostsByService[x.id]={laundry,amenities,kitchen,total:laundry+amenities+kitchen};
   autoLaundryCost+=laundry;autoAmenitiesCost+=amenities;autoKitchenCost+=kitchen;
  });
+ const serviceCosts={},serviceCostCategories={};
+ costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
+ const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
+
  const typologies=["T1","T2","T3","T4","T5"];
  const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,gross:0,tax:0,cost:0});
  const isCleaningService=x=>{const v=String(x.service_type||"").toLowerCase();return !!String(x.typology||"").toUpperCase().match(/T[1-5]/)&&!/manuten|maintenance|repar|electric|fontan|plumb|pintur|paint|montagem|assembly/.test(v)};
