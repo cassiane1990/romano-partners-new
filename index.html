@@ -2352,9 +2352,11 @@ async function generateRomanoBackup(){
  try{
   const r=await sb.functions.invoke("romano-backup",{body:{scope:"company"}});
   if(r.error||r.data?.ok===false)throw new Error(r.data?.error||r.error?.message||"Não foi possível gerar o backup.");
-  if(r.data?.signed_url)window.open(r.data.signed_url,"_blank","noopener");
-  if(!r.data?.export_id)throw new Error("Backup dos dados concluído, mas falta o identificador para copiar os ficheiros.");
-  toast("Dados guardados. A iniciar cópia de fotos, vídeos e documentos…");await processRomanoBackupFiles(r.data.export_id);
+  const exportId=String(r.data?.export_id||"").trim();
+  if(!exportId)throw new Error("Backup lógico recebido sem identificador. A cópia dos ficheiros não foi iniciada.");
+  toast("Dados guardados. A iniciar cópia de fotos, vídeos e documentos…");
+  await processRomanoBackupFiles(exportId);
+  if(r.data?.signed_url)toast("Backup criado. Use o histórico para descarregar o ficheiro lógico.");
  }catch(e){toast("Backup: "+(e.message||e))}
  await renderBackupPremium();
 }
