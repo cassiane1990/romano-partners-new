@@ -2330,23 +2330,43 @@ async function showSyncCenter(){
  openModal("Sincronización offline","<div class='panel' style='margin:0'><div class='master-kpis' style='grid-template-columns:repeat(3,1fr)'><div class='master-kpi'><small>Pendientes</small><strong>"+pending+"</strong></div><div class='master-kpi'><small>Conflictos</small><strong>"+conflicts+"</strong></div><div class='master-kpi'><small>Errores</small><strong>"+failed+"</strong></div></div><div class='notice'>La cola offline guarda únicamente operaciones pendientes en IndexedDB. No sustituye PostgreSQL, RLS ni la sesión de Supabase.</div><div class='actions' style='margin-top:12px'><button class='btn gold' onclick='syncOfflineQueue();setTimeout(showSyncCenter,900)'>⇄ Sincronizar ahora</button><button class='btn' onclick='closeModal()'>Cerrar</button></div><div style='margin-top:14px'>"+(all.length?all.map(x=>"<div class='line-item'><span><b>"+esc(x.mutationType)+"</b><br><small>"+esc(new Date(x.createdAt).toLocaleString("es-ES"))+"</small></span><span class='pill'>"+esc(x.localStatus)+(x.lastError?" · "+esc(x.lastError.slice(0,80)):"")+"</span></div>").join(""):"<div class='empty'>No hay operaciones offline registradas.</div>")+"</div></div>");
 }
 
+async function processRomanoBackupFiles(exportId){
+ const init=await sb.functions.invoke("romano-backup-files",{body:{export_id:exportId,action:"init"}});
+ if(init.error||init.data?.ok===false)throw new Error(init.data?.error||init.error?.message||"Não foi possível iniciar a cópia.");
+ let result=null;
+ for(let i=0;i<12;i++){
+  const p=await sb.functions.invoke("romano-backup-files",{body:{export_id:exportId,action:"process"}});
+  if(p.error||p.data?.ok===false)throw new Error(p.data?.error||p.error?.message||"Falha ao copiar ficheiros.");
+  result=p.data;if(result.status==="completed"||result.status==="failed")break;
+ }
+ await renderBackupPremium();
+ if(result?.status==="completed")toast("Backup dos dados e ficheiros concluído: "+result.copied_files+"/"+result.total_files+".");
+ else if(result?.status==="failed")toast("Cópia parcial: "+result.copied_files+" copiados; "+result.failed_files+" falharam.");
+ else toast("Cópia em andamento: "+result?.copied_files+"/"+result?.total_files+". Carregue em Continuar cópia.");
+}
+async function continueRomanoBackupFiles(exportId){try{toast("A continuar cópia…");await processRomanoBackupFiles(exportId)}catch(e){toast("Erro na cópia: "+(e.message||e))}}
 async function generateRomanoBackup(){
  if(role()!=="admin"){toast("Solo administración puede generar backups.");return}
  if(!navigator.onLine){toast("Necesita conexión para generar el backup.");return}
  toast("Generando backup lógico seguro…");
- const r=await sb.functions.invoke("romano-backup",{body:{scope:"company"}});
- if(r.error){toast(r.error.message||"No fue posible generar el backup.");return}
- if(r.data?.signed_url)window.open(r.data.signed_url,"_blank","noopener");
- toast("Backup generado y guardado en almacenamiento privado.");
- renderBackupPremium();
+ try{
+  const r=await sb.functions.invoke("romano-backup",{body:{scope:"company"}});
+  if(r.error||r.data?.ok===false)throw new Error(r.data?.error||r.error?.message||"Não foi possível gerar o backup.");
+  if(r.data?.signed_url)window.open(r.data.signed_url,"_blank","noopener");
+  if(!r.data?.export_id)throw new Error("Backup dos dados concluído, mas falta o identificador para copiar os ficheiros.");
+  toast("Dados guardados. A iniciar cópia de fotos, vídeos e documentos…");await processRomanoBackupFiles(r.data.export_id);
+ }catch(e){toast("Backup: "+(e.message||e))}
+ await renderBackupPremium();
 }
 async function renderBackupPremium(){
  if(role()!=="admin"){$("content").innerHTML='<div class="panel"><div class="msg">El centro de backup está restringido a Administración.</div></div>';return}
- const r=await sb.from("backup_exports").select("id,status,storage_path,row_counts,bytes,created_at,completed_at,error_message").order("created_at",{ascending:false}).limit(20);
- const rows=r.data||[];
- const last=rows.find(x=>x.status==="completed");
+ const r=await sb.from("backup_exports").select("id,status,storage_path,row_counts,bytes,created_at,completed_at,error_message,storage_backup_status,storage_files_total,storage_files_copied,storage_bytes_total,storage_bytes_copied").order("created_at",{ascending:false}).limit(20);
+ const rows=r.data||[],last=rows.find(x=>x.status==="completed");
  const totalRows=last?.row_counts?Object.values(last.row_counts).reduce((a,b)=>a+Number(b||0),0):0;
- $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Backup / Recuperación</h3><div class="muted">Copia lógica de los datos de ROMANO PARTNERS · acceso exclusivo de Administración</div></div><button class="btn gold" onclick="generateRomanoBackup()">＋ Generar backup ahora</button></div><div class="master-kpis" style="grid-template-columns:repeat(4,1fr)"><div class="master-kpi"><small>Último backup</small><strong>'+(last?esc(new Date(last.created_at).toLocaleDateString("es-ES")):"—")+'</strong></div><div class="master-kpi"><small>Estado</small><strong>'+(last?esc(last.status):"—")+'</strong></div><div class="master-kpi"><small>Registros</small><strong>'+totalRows+'</strong></div><div class="master-kpi"><small>Tamaño</small><strong>'+(last?.bytes?Math.round(last.bytes/1024)+" KB":"—")+'</strong></div></div><div class="notice"><b>Recuperación:</b> el backup lógico de esta aplicación queda en un bucket privado y puede descargarse. Para una recuperación completa del proyecto, Supabase mantiene sus mecanismos de backup de base de datos; Storage y configuraciones requieren tratamiento separado. La restauración destructiva no se ejecuta desde la interfaz.</div></div><div class="panel"><div class="panel-head"><h3>Historial de backups</h3><span class="pill">20 últimos</span></div>'+(rows.length?rows.map(x=>'<div class="line-item"><span><b>'+esc(x.status)+'</b><br><small>'+esc(romanoMadridLabel(x.created_at))+' · '+esc(x.storage_path)+'</small></span><span class="pill">'+(x.bytes?Math.round(x.bytes/1024)+" KB":"—")+'</span></div>').join(""):'<div class="empty">Todavía no hay backups lógicos generados desde ROMANO PARTNERS.</div>')+'</div><div class="panel"><div class="panel-head"><h3>Plan de recuperación</h3></div><div class="line-item"><span>1 · Base de datos</span><b>Backup / PITR de Supabase</b></div><div class="line-item"><span>2 · Archivos</span><b>Storage privado + copia externa pendiente</b></div><div class="line-item"><span>3 · Aplicación</span><b>GitHub · ROMANO PARTNERS</b></div><div class="line-item"><span>4 · Prueba</span><b>Restaurar en proyecto independiente y validar</b></div></div>';
+ let job=null;if(last){const j=await sb.from("backup_file_jobs").select("status,total_files,copied_files,total_bytes,copied_bytes").eq("export_id",last.id).maybeSingle();job=j.data||null}
+ const status=job?.status||last?.storage_backup_status||"pendente",files=job?.total_files??last?.storage_files_total??0,copied=job?.copied_files??last?.storage_files_copied??0;
+ const resume=job&&job.status!=="completed"?'<button class="btn gold" onclick="continueRomanoBackupFiles(\''+last.id+'\')">Continuar cópia</button>':"";
+ $("content").innerHTML='<div class="panel"><div class="panel-head"><div><h3>Backup / Recuperación</h3><div class="muted">Cópia dos dados e ficheiros · acesso exclusivo de Administração</div></div><div class="actions"><button class="btn gold" onclick="generateRomanoBackup()">＋ Gerar backup agora</button>'+resume+'</div></div><div class="master-kpis" style="grid-template-columns:repeat(4,1fr)"><div class="master-kpi"><small>Último backup</small><strong>'+(last?esc(new Date(last.created_at).toLocaleDateString("es-ES")):"—")+'</strong></div><div class="master-kpi"><small>Estado dos dados</small><strong>'+(last?esc(last.status):"—")+'</strong></div><div class="master-kpi"><small>Registos</small><strong>'+totalRows+'</strong></div><div class="master-kpi"><small>Tamanho</small><strong>'+(last?.bytes?Math.round(last.bytes/1024)+" KB":"—")+'</strong></div></div><div class="notice"><b>Ficheiros:</b> '+esc(status)+' · '+copied+'/'+files+' copiados'+(job?.total_bytes?' · '+Math.round(job.copied_bytes/1024)+' / '+Math.round(job.total_bytes/1024)+' KB':'')+'.</div><div class="notice"><b>Recuperação:</b> os ficheiros são guardados no armazenamento privado. A restauração completa ainda exige um teste controlado num projeto separado; nenhuma restauração destrutiva é executada aqui.</div></div><div class="panel"><div class="panel-head"><h3>Historial de backups</h3><span class="pill">20 últimos</span></div>'+(rows.length?rows.map(x=>'<div class="line-item"><span><b>'+esc(x.status)+' · '+esc(x.storage_backup_status||"ficheiros pendentes")+'</b><br><small>'+esc(romanoMadridLabel(x.created_at))+' · '+esc(x.storage_path)+'</small></span><span class="pill">'+(x.bytes?Math.round(x.bytes/1024)+" KB":"—")+'</span></div>').join(""):'<div class="empty">Todavía no hay backups lógicos generados desde ROMANO PARTNERS.</div>')+'</div><div class="panel"><div class="panel-head"><h3>Plan de recuperación</h3></div><div class="line-item"><span>1 · Base de datos</span><b>Backup lógico privado</b></div><div class="line-item"><span>2 · Archivos</span><b>Cópia privada por lotes</b></div><div class="line-item"><span>3 · Aplicação</span><b>GitHub · ROMANO PARTNERS</b></div><div class="line-item"><span>4 · Prova</span><b>Restaurar em projeto independente e validar</b></div></div>';
 }
 
 async function renderSyncPremium(){
