@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-11-password-recovery-route-v39">
+<head><meta name="romano-build" content="2026-11-26-smart-update-v44">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1c1c19">
@@ -2481,7 +2481,7 @@ function startRomanoMadridClock(){
 }
 async function refreshRomanoApp(){
  if(__romanoRefreshBusy)return;
- if(!$("modal")?.classList.contains("hidden")){toast("Cierre la ventana abierta antes de actualizar.");return}
+ if(romanoHasUnsafeWorkInProgress()){window.__romanoUpdatePending=true;toast("Hay una actualización disponible. Guarde los cambios y cierre la ventana antes de actualizar.");return}
  __romanoRefreshBusy=true;
  const b=$("refreshAppBtn"),old=b?.textContent;
  if(b){b.disabled=true;b.textContent="↻ Buscando actualización…";}
