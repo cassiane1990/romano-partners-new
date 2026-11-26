@@ -4140,7 +4140,9 @@ async function renderFinance(){
  const manualExpense=entries.filter(x=>x.entry_type==="expense"&&!/^(salários|salarios)$/i.test(String(x.category||""))&&!/transport|combust[ií]vel|desloca/i.test(String(x.category||"")+" "+String(x.description||""))).reduce((a,x)=>a+Number(x.amount||0),0);
  const transportEntries=entries.filter(x=>x.entry_type==="expense"&&/transport|combust[ií]vel|desloca/i.test(String(x.category||"")+" "+String(x.description||"")));
  const transportRecorded=transportEntries.reduce((a,x)=>a+Number(x.amount||0),0);
- const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",0);\n const garage=costValue("monthly_garage",0);\n const cleaningProducts=costValue("cleaning_products_monthly",0);
+ const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",0);
+ const garage=costValue("monthly_garage",0);
+ const cleaningProducts=costValue("cleaning_products_monthly",0);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0);
  const autoServiceExpense=autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
  const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+autoServiceExpense+manualExpense+payroll+transport+garage+cleaningProducts,operating=totalRevenue-totalExpense;
