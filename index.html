@@ -1670,34 +1670,59 @@ async function renderEmployeeWorkPanel(){
  return '<div class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3>Mis trabajos</h3><div class="muted">Mantenimiento asignado y, para funcionarios de mantenimiento, el estado de la limpieza relacionada.</div></div><span class="pill">'+rows.length+'</span></div>'+body+'</div>';
 }
 async function renderLocationsMaster(){
- const r=role();
- const work=["employee","maintenance_technician"].includes(r)?await renderEmployeeWorkPanel():"";
- const mapIntro=r==="client"?"Mapa de sus propiedades autorizadas.":(["employee","maintenance_technician"].includes(r)?"Su ubicación actual.":"Geolocalización / Radar operativo.");
- const side=r==="client"
-   ? '<div class="notice">Solo se muestran las propiedades de su propia cuenta.</div>'
-   : '<div class="panel"><h3>Dispatch</h3><p class="muted">Proximidad real + disponibilidad + conflictos + escopo + elegibilidad.</p><div class="notice">La visibilidad se limita automáticamente según el perfil.</div></div>';
- $("content").innerHTML=work+'<div class="master-cols"><div class="panel"><div class="panel-head"><div><h3>Geolocalización / Mapa</h3><div class="muted">'+mapIntro+'</div></div><button class="btn" onclick="openPage(\'locations\')">Actualizar</button></div><div id="radarMap" class="master-map"></div></div>'+side+'</div>';
- if(!window.L)return;
- const m=L.map("radarMap").setView([40.4168,-3.7038],12);
- L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
- if(demoMode){
-   [[40.4168,-3.7038,"👩🏻‍🧹 Limpieza · Demo"],[40.421,-3.69,"👨🏻‍🔧 Mantenimiento · Demo"],[40.405,-3.72,"👩🏻‍💼 Supervisión · Demo"]].forEach(p=>L.marker([p[0],p[1]]).addTo(m).bindPopup(p[2]));
-   return;
- }
+ const r=role(),isStaff=["employee","maintenance_technician"].includes(r),isManager=["admin","supervisor"].includes(r);
+ const work=isStaff?await renderEmployeeWorkPanel():"";
+ const mapIntro=r==="client"?"Mapa de sus propiedades autorizadas.":(isStaff?"Su ubicación GPS durante los servicios.":"Seguimiento del equipo en tiempo real · ubicación compartida durante los servicios.");
+ $("content").innerHTML=work+'<div class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h2 style="margin:0;font:25px Georgia,serif">Centro de Operaciones</h2><div class="muted">'+mapIntro+'</div></div><button class="btn" onclick="openPage(\'operations\')">↻ Actualizar</button></div><div id="rpcOpsKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:9px;margin:14px 0"></div><div class="rpc-ops-layout" style="display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:14px"><section class="panel" style="padding:10px;margin:0"><div class="panel-head"><div><h3 style="margin:0">Mapa del equipo</h3><small class="muted">Avatares con última posición GPS registrada</small></div><span class="pill" id="rpcOpsMapCount">0 localizaciones</span></div><div id="radarMap" class="master-map" style="height:520px;min-height:360px;border-radius:14px;overflow:hidden"></div><div class="muted" style="font-size:11px;margin-top:8px">La posición só aparece quando a funcionária inicia/usa o GPS do serviço e autoriza a localização no telemóvel.</div></section><section class="panel" style="margin:0"><div class="panel-head"><div><h3 style="margin:0">Equipa em serviço</h3><small class="muted">Estado e atividade atual</small></div><span class="pill" id="rpcOpsTeamCount">0</span></div><div id="rpcOpsTeamList"><div class="muted">A carregar equipa…</div></div></section></div></div>';
+ const cssId="rpc-ops-style";if(!document.getElementById(cssId)){const st=document.createElement("style");st.id=cssId;st.textContent=".rpc-ops-kpi{background:var(--soft,#f7f2e9);border:1px solid var(--line,#e8dfd1);border-radius:12px;padding:12px}.rpc-ops-kpi small{display:block;color:var(--muted,#777);font-size:11px}.rpc-ops-kpi b{display:block;font:24px Georgia,serif;margin-top:3px}.rpc-ops-person{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line,#eee5d9)}.rpc-ops-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#e8dcc8;color:#6d5431;font-weight:700;border:2px solid #c6a66a;flex-shrink:0}.rpc-ops-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;background:#aaa}.rpc-ops-marker{width:48px;height:48px;border-radius:50%;background:#fff;border:3px solid #c6a66a;box-shadow:0 2px 12px #0003;display:grid;place-items:center;font-weight:700;color:#6d5431;font-size:13px}.rpc-ops-marker.active{border-color:#3c9b69}.rpc-ops-marker.paused{border-color:#d49a38}@media(max-width:760px){.rpc-ops-layout{grid-template-columns:1fr!important}.rpc-ops-layout #radarMap{height:390px!important}}";document.head.appendChild(st)}
+ if(!window.L){$("rpcOpsTeamList").innerHTML='<div class="notice">O mapa não está disponível neste momento.</div>';return}
+ const m=L.map("radarMap").setView([40.4168,-3.7038],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
+ if(demoMode){$("rpcOpsTeamList").innerHTML='<div class="notice">Modo de demonstração: não são apresentadas localizações reais.</div>';$("rpcOpsKpis").innerHTML='<div class="rpc-ops-kpi"><small>Localizações reais</small><b>0</b></div>';return}
  if(r==="client"){
-   const cr=await sb.from("clients").select("id,name").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
-   if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
-   const pr=await sb.from("properties").select("id,name,code,address,city,latitude,longitude").eq("company_id",currentProfile.company_id).eq("client_id",cr.data.id).not("latitude","is",null).not("longitude","is",null).order("name");
-   (pr.data||[]).forEach(p=>L.marker([Number(p.latitude),Number(p.longitude)]).addTo(m).bindPopup("<b>"+esc(p.name||p.code||"Propiedad")+"</b><br>"+esc([p.address,p.city].filter(Boolean).join(" · ")||"Sin dirección")));
-   return;
+  const cr=await sb.from("clients").select("id,name").eq("profile_id",currentUser.id).eq("company_id",currentProfile.company_id).maybeSingle();
+  if(cr.error||!cr.data){toast(cr.error?.message||"No se encontró el cliente asociado.");return}
+  const pr=await sb.from("properties").select("id,name,code,address,city,latitude,longitude").eq("company_id",currentProfile.company_id).eq("client_id",cr.data.id).not("latitude","is",null).not("longitude","is",null).order("name");
+  (pr.data||[]).forEach(p=>L.marker([Number(p.latitude),Number(p.longitude)]).addTo(m).bindPopup("<b>"+esc(p.name||p.code||"Propiedad")+"</b><br>"+esc([p.address,p.city].filter(Boolean).join(" · ")||"Sin dirección")));
+  $("rpcOpsTeamList").innerHTML='<div class="notice">Solo se muestran las propiedades de su propia cuenta.</div>';$("rpcOpsKpis").innerHTML='<div class="rpc-ops-kpi"><small>Propiedades en mapa</small><b>'+(pr.data||[]).length+'</b></div>';return;
  }
- if(["employee","maintenance_technician"].includes(r)){
-   const loc=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").eq("profile_id",currentUser.id).order("recorded_at",{ascending:false}).limit(1);
-   (loc.data||[]).forEach(x=>L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Mi última ubicación<br>Precisión: "+(x.accuracy_m||"—")+" m"));
-   return;
+ if(isStaff){
+  const loc=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").eq("company_id",currentProfile.company_id).eq("profile_id",currentUser.id).order("recorded_at",{ascending:false}).limit(1);
+  const x=loc.data?.[0];if(x&&Number.isFinite(Number(x.latitude))&&Number.isFinite(Number(x.longitude)))L.marker([Number(x.latitude),Number(x.longitude)]).addTo(m).bindPopup("Minha última posição<br>"+esc(romanoMadridLabel(x.recorded_at)));
+  $("rpcOpsTeamList").innerHTML=x?'<div class="notice">Última posição registada: '+esc(romanoMadridLabel(x.recorded_at))+'</div>':'<div class="empty">Ainda não existe localização GPS registada.</div>';return;
  }
- const loc=await sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at").eq("company_id",currentProfile.company_id).order("recorded_at", {ascending:false}).limit(50);
- const seen={};(loc.data||[]).forEach(x=>{if(seen[x.profile_id])return;seen[x.profile_id]=1;L.marker([x.latitude,x.longitude]).addTo(m).bindPopup("Última actualización: "+romanoMadridLabel(x.recorded_at))});
+ if(!isManager)return;
+ const [ep,lr,sr]=await Promise.all([
+  sb.from("employee_profiles").select("id,profile_id,full_name,employee_code,function_title,active").eq("company_id",currentProfile.company_id).eq("active",true).order("full_name"),
+  sb.from("employee_locations").select("profile_id,latitude,longitude,accuracy_m,recorded_at,service_id").eq("company_id",currentProfile.company_id).order("recorded_at",{ascending:false}).limit(1000),
+  sb.from("services").select("id,code,service_type,typology,status,scheduled_at,assigned_employee_id,property_id").eq("company_id",currentProfile.company_id).order("scheduled_at",{ascending:true}).limit(500)
+ ]);
+ if(ep.error||lr.error||sr.error){$("rpcOpsTeamList").innerHTML='<div class="notice">'+esc(ep.error?.message||lr.error?.message||sr.error?.message||"Erro ao carregar o Centro de Operações")+'</div>';return}
+ const employees=ep.data||[],latest={};(lr.data||[]).forEach(x=>{if(!latest[x.profile_id])latest[x.profile_id]=x});
+ const activeStatuses=["on_the_way","in_progress","paused","supervision_pending","scheduled"],services=sr.data||[];
+ const byEmployee={};services.forEach(x=>{if(x.assigned_employee_id&&activeStatuses.includes(String(x.status||"").toLowerCase()))(byEmployee[x.assigned_employee_id]||(byEmployee[x.assigned_employee_id]=[])).push(x)});
+ const propertyIds=[...new Set(services.map(x=>x.property_id).filter(Boolean))],propertyMap={};
+ if(propertyIds.length){const pr=await sb.from("properties").select("id,name,code,address,city,latitude,longitude").eq("company_id",currentProfile.company_id).in("id",propertyIds);(pr.data||[]).forEach(x=>propertyMap[x.id]=x)}
+ const locEmployees=employees.filter(e=>e.profile_id&&latest[e.profile_id]&&Number.isFinite(Number(latest[e.profile_id].latitude))&&Number.isFinite(Number(latest[e.profile_id].longitude)));
+ const bounds=[];
+ const statusText={on_the_way:"A caminho",in_progress:"Em serviço",paused:"Pausado",supervision_pending:"Aguardando supervisão",scheduled:"Agendado",completed:"Finalizado"};
+ const cards=employees.map(e=>{
+  const sv=(byEmployee[e.profile_id]||[])[0],loc=latest[e.profile_id],prop=sv?propertyMap[sv.property_id]:null,st=sv?.status||"Sem serviço ativo";
+  const initials=String(e.full_name||"R").trim().split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase();
+  const dot=st==="in_progress"?"#3c9b69":st==="paused"?"#d49a38":st==="on_the_way"?"#4c83c5":"#aaa";
+  if(loc&&Number.isFinite(Number(loc.latitude))&&Number.isFinite(Number(loc.longitude))){
+   const ll=[Number(loc.latitude),Number(loc.longitude)];bounds.push(ll);
+   const icon=L.divIcon({className:"",html:'<div class="rpc-ops-marker '+(st==="in_progress"?"active":st==="paused"?"paused":"")+'">'+esc(initials)+'</div>',iconSize:[48,48],iconAnchor:[24,24]});
+   const popup='<b>'+esc(e.full_name||"Funcionária")+'</b><br>'+esc(statusText[st]||st)+'<br>'+esc(prop?.name||prop?.code||"Sem apartamento associado")+'<br><small>GPS: '+esc(romanoMadridLabel(loc.recorded_at))+'</small>';
+   L.marker(ll,{icon}).addTo(m).bindPopup(popup);
+  }
+  return '<div class="rpc-ops-person"><div class="rpc-ops-avatar">'+esc(initials)+'</div><div style="min-width:0;flex:1"><b style="display:block">'+esc(e.full_name||"Funcionária")+'</b><small class="muted">'+esc(e.function_title||e.employee_code||"Equipa")+'</small><div style="font-size:12px;margin-top:4px"><i class="rpc-ops-dot" style="background:'+dot+'"></i>'+esc(statusText[st]||st)+'</div>'+(prop?'<small class="muted">'+esc(prop.name||prop.code||"Apartamento")+'</small>':"")+'</div><small class="muted" style="white-space:nowrap">'+(loc?esc(romanoMadridTimeLabel(loc.recorded_at)):"Sem GPS")+'</small></div>';
+ }).join("");
+ $("rpcOpsTeamList").innerHTML=cards||'<div class="empty">Não existem funcionárias ativas registadas.</div>';
+ $("rpcOpsTeamCount").textContent=employees.length+" funcionárias";
+ $("rpcOpsMapCount").textContent=locEmployees.length+" localizações";
+ const inService=Object.values(byEmployee).filter(a=>a.some(x=>["on_the_way","in_progress","paused"].includes(x.status))).length,paused=services.filter(x=>x.status==="paused").length,done=services.filter(x=>x.status==="completed").length;
+ $("rpcOpsKpis").innerHTML=[["Equipa ativa",employees.length],["Com GPS",locEmployees.length],["Em serviço",inService],["Pausados",paused],["Finalizados",done]].map(x=>'<div class="rpc-ops-kpi"><small>'+x[0]+'</small><b>'+x[1]+'</b></div>').join("");
+ if(bounds.length>1)m.fitBounds(bounds,{padding:[35,35],maxZoom:14});else if(bounds.length===1)m.setView(bounds[0],15);
 }
 async function renderMaterialsMaster(){
  const r=await sb.from("material_requests").select("id,company_id,requested_by,item_name,quantity,unit,status,created_at,notes").eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(200);
