@@ -4089,6 +4089,28 @@ async function renderFinance(){
  const serviceCosts={},serviceCostCategories={};
  costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
  const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
+ // Custos automáticos por limpeza: usar valores reais já definidos pela empresa.
+ const laundryCostByTypology={T1:8.74,T2:16.96,T3:25.18};
+ const amenitiesCostByTypology={T1:0.86,T2:1.72,T3:2.58};
+ const autoCostsByService={};
+ let autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
+ completedServices.forEach(x=>{
+  const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]||"";
+  const cats=serviceCostCategories[x.id]||[];
+  const hasLaundry=cats.some(v=>/lavand|laundry|roupa|linen/.test(v));
+  const hasAmenities=cats.some(v=>/amenit/.test(v));
+  const hasKitchen=cats.some(v=>/kit.*cozinha|cozinha.*kit|kitchen/.test(v));
+  const items=Array.isArray(x.requested_items)?x.requested_items:[];
+  const codes=items.map(i=>String(i.code||"").toUpperCase());
+  let laundry=0,amenities=0,kitchen=0;
+  if(x.laundry&&!hasLaundry){
+   laundry=laundryCostByTypology[t]??(Number(propertyBy[x.property_id]?.beds_single||0)+Number(propertyBy[x.property_id]?.beds_double||0))*costValue("laundry_bed",0);
+  }
+  if(codes.includes("SHAMPOO")&&!hasAmenities) amenities=amenitiesCostByTypology[t]??costValue("amenities",0);
+  if(codes.includes("KITCHEN")&&!hasKitchen) kitchen=costValue("kitchen_kit",0);
+  autoCostsByService[x.id]={laundry,amenities,kitchen,total:laundry+amenities+kitchen};
+  autoLaundryCost+=laundry;autoAmenitiesCost+=amenities;autoKitchenCost+=kitchen;
+ });
  const typologies=["T1","T2","T3","T4","T5"];
  const typ={};typologies.forEach(t=>typ[t]={count:0,revenue:0,gross:0,tax:0,cost:0});
  const isCleaningService=x=>{const v=String(x.service_type||"").toLowerCase();return !!String(x.typology||"").toUpperCase().match(/T[1-5]/)&&!/manuten|maintenance|repar|electric|fontan|plumb|pintur|paint|montagem|assembly/.test(v)};
@@ -4104,14 +4126,11 @@ async function renderFinance(){
  const countedManualCleaning=entries.filter(e=>{if(!isManualCleaning(e))return false;const t=String(e.typology||"").toUpperCase().match(/T[1-5]/)?.[0],key=e.property_id?String(e.entry_date)+"|"+e.property_id+"|"+t:"";if(e.property_id&&serviceCleaningKeys.has(key))return false;if(key&&manualCleaningSeen.has(key))return false;if(key)manualCleaningSeen.add(key);return true});
  const countedManualCleaningIds=new Set(countedManualCleaning.map(e=>e.id));
  const duplicateManualCleaningIds=new Set(entries.filter(e=>isManualCleaning(e)&&!countedManualCleaningIds.has(e.id)).map(e=>e.id));
- let serviceRevenue=0,serviceGrossRevenue=0,serviceVat=0,autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
+ let serviceRevenue=0,serviceGrossRevenue=0,serviceVat=0;
  completedServices.forEach(x=>{
   const m=String(x.typology||"").toUpperCase().match(/T[1-5]/),t=m?m[0]:"";
   const pricing=x.pricing&&typeof x.pricing==="object"?x.pricing:{};const fin=finBy[x.id]||{};const gross=Number(pricing.total??fin.total??x.agreed_amount??0);const net=Number(pricing.subtotal??fin.subtotal??(gross/(1+(x.tax_country==="PT"?.23:.21))));const vat=Number(pricing.tax??fin.tax_amount??Math.max(0,gross-net));serviceRevenue+=net;serviceGrossRevenue+=gross;serviceVat+=vat;if(!typ[t])return;if(isCleaningService(x))typ[t].count++;typ[t].revenue+=net;typ[t].gross+=gross;typ[t].tax+=vat;
-  const p=propertyBy[x.property_id]||{},beds=Math.max(0,Number(p.beds_single||0)+Number(p.beds_double||0));
-  const cats=serviceCostCategories[x.id]||[],hasLaundry=cats.some(c=>/lavand|laundry|roupa|linen/.test(c)),hasAmenities=cats.some(c=>/amenit/.test(c)),hasKitchen=cats.some(c=>/kit.*cozinha|cozinha.*kit|welcome kit/.test(c));
-  // Custos de lavandaria, amenities e cozinha só entram quando forem lançados manualmente em service_costs.
-  typ[t].cost+=(serviceCosts[x.id]||0);
+  typ[t].cost+=(serviceCosts[x.id]||0)+(autoCostsByService[x.id]?.total||0);
  });
  countedManualCleaning.forEach(x=>{const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0];if(!typ[t])return;const q=Math.max(0,Number(x.quantity||1));typ[t].count+=q;typ[t].revenue+=Number(x.amount||0)});
  entries.filter(x=>x.entry_type==="expense").forEach(x=>{const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0];if(typ[t])typ[t].cost+=Number(x.amount||0)});
@@ -4119,13 +4138,14 @@ async function renderFinance(){
  const countedCleaningQty=cleaningServices.length+countedManualCleaning.reduce((a,x)=>a+Math.max(0,Number(x.quantity||1)),0);
  const payrollEntries=entries.filter(x=>x.entry_type==="expense"&&/^(salários|salarios)$/i.test(String(x.category||"")));
  const recordedPayroll=payrollEntries.reduce((a,x)=>a+Number(x.amount||0),0);
- const payroll=recordedPayroll;
+ const payroll=recordedPayroll>0?recordedPayroll:costValue("monthly_payroll",0);
  const manualExpense=entries.filter(x=>x.entry_type==="expense"&&!/^(salários|salarios)$/i.test(String(x.category||""))&&!/transport|combust[ií]vel|desloca/i.test(String(x.category||"")+" "+String(x.description||""))).reduce((a,x)=>a+Number(x.amount||0),0);
  const transportEntries=entries.filter(x=>x.entry_type==="expense"&&/transport|combust[ií]vel|desloca/i.test(String(x.category||"")+" "+String(x.description||"")));
  const transportRecorded=transportEntries.reduce((a,x)=>a+Number(x.amount||0),0);
- const transport=transportRecorded;
+ const transport=transportRecorded>0?transportRecorded:costValue("monthly_transport",0);
  const directExpense=costs.reduce((a,x)=>a+Number(x.amount||0),0);
- const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
+ const autoServiceExpense=autoLaundryCost+autoAmenitiesCost+autoKitchenCost;
+ const totalRevenue=serviceRevenue+extraIncome,totalGrossBilled=serviceGrossRevenue+extraIncome,totalVatBilled=serviceVat,totalExpense=directExpense+autoServiceExpense+manualExpense+payroll+transport,operating=totalRevenue-totalExpense;
  const linkedPropertyExpense=entries.filter(e=>e.entry_type==="expense"&&e.property_id&&!/^(salários|salarios)$/i.test(String(e.category||""))).reduce((a,e)=>a+Number(e.amount||0),0);
  const sharedOther=Math.max(0,manualExpense-linkedPropertyExpense);
  const monthlyCleaningCount=countedCleaningQty;
@@ -4134,13 +4154,16 @@ async function renderFinance(){
  const propertyDetailRows=cleaningServices.map(x=>{
   const p=propertyBy[x.property_id]||{},typ=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]||"—";
   const beds=Number(p.beds_single||0)+Number(p.beds_double||0),cats=serviceCostCategories[x.id]||[];
-  const direct=Number(serviceCosts[x.id]||0);
+  const direct=Number(serviceCosts[x.id]||0)+Number(autoCostsByService[x.id]?.total||0);
   const linked=entriesByProperty[x.property_id]||[],linkedIncome=linked.filter(e=>e.entry_type==="income").reduce((a,e)=>a+Number(e.amount||0),0),linkedExpense=linked.filter(e=>e.entry_type==="expense").reduce((a,e)=>a+Number(e.amount||0),0);
   const px=x.pricing&&typeof x.pricing==="object"?x.pricing:{},fx=finBy[x.id]||{};const revenue=Number(px.subtotal??fx.subtotal??x.agreed_amount??0)+linkedIncome,allDirect=direct+linkedExpense,profit=revenue-allDirect-fixedPerService;
   return '<tr><td>'+esc(p.name||p.code||"Apartamento")+'</td><td>'+typ+'</td><td>'+beds+'</td><td>'+fmt(revenue)+'</td><td>'+fmt(allDirect)+'</td><td>'+fmt(fixedPerService)+'</td><td><b>'+fmt(profit)+'</b></td></tr>';
  }).join("");
  const costCatalogRows=costCatalog.map(c=>`<tr><td>${esc(c.name)}${c.is_active?"":' <span class="pill">Inativo</span>'}</td><td>${esc(c.unit)}</td><td><input type="number" min="0" step="0.01" id="cost_${c.id}" value="${Number(c.unit_cost||0).toFixed(2)}" style="max-width:110px"></td><td><button class="btn" type="button" onclick="saveCompanyCost('${c.id}')">Guardar</button> <button class="btn" type="button" onclick="toggleCompanyCost('${c.id}', ${!c.is_active})">${c.is_active?"Desativar":"Reativar"}</button> <button class="btn" type="button" onclick="deleteCompanyCost('${c.id}')">Excluir</button></td></tr>`).join("");
  const categoryTotals={};[...costs.map(x=>({category:x.category,amount:x.amount})),...entries.filter(x=>x.entry_type==="expense")].forEach(x=>{const k=x.category||"Outros";categoryTotals[k]=(categoryTotals[k]||0)+Number(x.amount||0)});
+ if(autoLaundryCost)categoryTotals["Lavandaria automática"]=(categoryTotals["Lavandaria automática"]||0)+autoLaundryCost;
+ if(autoAmenitiesCost)categoryTotals["Amenities automáticos"]=(categoryTotals["Amenities automáticos"]||0)+autoAmenitiesCost;
+ if(autoKitchenCost)categoryTotals["Kit cozinha automático"]=(categoryTotals["Kit cozinha automático"]||0)+autoKitchenCost;
  const typRows=typologies.map(t=>'<tr><td><b>'+t+'</b></td><td>'+typ[t].count+'</td><td>'+fmt(typ[t].gross)+'</td><td>'+fmt(typ[t].revenue)+'</td><td>'+fmt(typ[t].tax)+'</td><td>'+fmt(typ[t].cost)+'</td><td><b>'+fmt(typ[t].revenue-typ[t].cost)+'</b></td></tr>').join("");
  const expenseRows=Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+fmt(v)+'</td></tr>').join("");
  window.__financeEntriesById=Object.fromEntries(entries.map(x=>[x.id,x]));
