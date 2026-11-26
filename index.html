@@ -4085,6 +4085,9 @@ async function renderFinance(){
  let finBy={};
  if(ids.length){const fr=await sb.from("service_financials").select("service_id,total,subtotal,tax_amount").eq("company_id",currentProfile.company_id).in("service_id",ids);if(fr.error){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(fr.error.message)+'</div></div>';return}(fr.data||[]).forEach(x=>finBy[x.service_id]=x)}
  const costByKey={};costCatalog.filter(c=>c.is_active).forEach(c=>costByKey[c.cost_key]=Number(c.unit_cost||0));
+ const serviceCosts={},serviceCostCategories={};
+ costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
+ const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
  const costValue=(key,fallback)=>costByKey[key]??fallback;
 
  const typologies=["T1","T2","T3","T4","T5"];
@@ -4114,9 +4117,6 @@ async function renderFinance(){
   autoCostsByService[x.id]={laundry,amenities,kitchen,total:laundry+amenities+kitchen};
   autoLaundryCost+=laundry;autoAmenitiesCost+=amenities;autoKitchenCost+=kitchen;
  });
- const serviceCosts={},serviceCostCategories={};
- costs.forEach(x=>{if(x.service_id){serviceCosts[x.service_id]=(serviceCosts[x.service_id]||0)+Number(x.amount||0);(serviceCostCategories[x.service_id]??=[]).push(String(x.category||"").toLowerCase()+" "+String(x.description||"").toLowerCase())}});
- const propertyBy={};properties.forEach(p=>propertyBy[p.id]=p);
 
  const dayKey=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-CA",{timeZone:"Europe/Madrid"})};
  const serviceSeen=new Set();
