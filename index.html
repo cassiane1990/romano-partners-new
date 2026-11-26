@@ -4097,6 +4097,7 @@ async function renderFinance(){
  const autoCostsByService={};
  let autoLaundryCost=0,autoAmenitiesCost=0,autoKitchenCost=0;
  completedServices.forEach(x=>{
+  if(!isCleaningService(x))return;
   const t=String(x.typology||"").toUpperCase().match(/T[1-5]/)?.[0]||"";
   const cats=serviceCostCategories[x.id]||[];
   const hasLaundry=cats.some(v=>/lavand|laundry|roupa|linen/.test(v));
