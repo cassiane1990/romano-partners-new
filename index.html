@@ -1579,6 +1579,10 @@ function romanoIsServiceScheduledToday(service){
  const today=romanoMadridParts();
  return parts.year===today.year&&parts.month===today.month&&parts.day===today.day;
 }
+function renderServicesFirstPaint(rows){
+ const cards=rows.length?rows.map(x=>'<article class="service-card"><div class="service-card-head"><div><span class="service-code">'+esc(x.code||"Servicio")+'</span><h3>'+esc(serviceTypeLabel(x.service_type))+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span></div><div class="service-card-meta"><div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div><div><small>Fecha</small><strong>'+esc(x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar")+'</strong></div><div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div></div><div class="service-card-actions"><button class="btn" type="button" onclick="viewService(\\''+x.id+'\\')">Ver detalle</button></div></article>').join(""):'<div class="empty service-empty">No hay servicios visibles para este perfil.</div>';
+ $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Servicios disponibles para este perfil.</p></div></div><div class="services-flow"><span>Programado</span><i>→</i><span>En camino</span><i>→</i><span>Iniciado</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+cards+'</div></section>';
+}
 async function renderServicesMaster(){
  const isEmployeeView=["employee","maintenance_technician"].includes(role());
  $("content").innerHTML='<div class="panel" style="padding:28px;text-align:center"><div class="muted">A carregar os serviços atribuídos…</div></div>';
@@ -1608,6 +1612,7 @@ async function renderServicesMaster(){
    return;
  }
  const rows=(r.data||[]).filter(x=>{const st=String(x.status||"").toLowerCase();if(st==="supervision_pending")return romanoIsServiceScheduledToday(x);return !["completed","approved","supervised","cancelled","rejected","returned"].includes(st)});
+ if(!["employee","maintenance_technician"].includes(role()))renderServicesFirstPaint(rows);
  // Vista ligera y estable para el equipo: evita consultas y cálculos auxiliares que no son necesarios para abrir Servicios.
  if(["employee","maintenance_technician"].includes(role())){
    renderEmployeeServiceCards(rows,{});
