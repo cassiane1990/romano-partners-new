@@ -3380,7 +3380,7 @@ async function requestCleaningSupervision(serviceId){
  await viewService(serviceId);
 }
 async function deleteServiceMedia(mediaId,path,serviceId){
- if(!["admin","supervisor"].includes(role())){toast("Solo Supervisor o Administrador puede eliminar fotos.");return}
+ if(!["admin","supervisor","employee"].includes(role())){toast("Sem permissão para apagar esta foto.");return}
  if(!confirm("¿Eliminar esta foto?\\n\\nSi no corresponde al servicio, se retirará para que el cliente no pueda verla."))return;
  const r=await sb.rpc("delete_service_media",{p_media_id:mediaId});
  if(r.error){toast(r.error.message);return}
@@ -3701,6 +3701,14 @@ const approvalQ=await sb.from('service_client_approvals').select('approved_at,ap
  await Promise.all(occurrencePhotos.map(async m=>{const q=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);occurrencePhotoUrls[m.id]=q.data?.signedUrl||"";}));
  const canAddOccurrence=["employee","supervisor","admin"].includes(role())&&(role()!=="employee"||x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&!["completed","supervision_pending","supervised","approved","cancelled","rejected"].includes(x.status);
  const occurrenceHistoryHtml=renderServiceOccurrenceHistory(serviceEventRows,occurrencePhotos,occurrencePhotoUrls,x.id,canAddOccurrence);
+ const servicePhotoRows=(media.data||[]).filter(m=>["photo","image","video"].includes(m.media_type));
+ const employeeCanRemovePhotos=role()==="employee"&&(x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&["in_progress","paused"].includes(x.status)&&isCleaningServiceType(x.service_type);
+ const servicePhotoGallery=await Promise.all(servicePhotoRows.map(async m=>{
+  const signed=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600),url=signed.data?.signedUrl||"";
+  const view=m.media_type==="video"?'<video controls playsinline preload="metadata" src="'+esc(url)+'" style="width:100%;height:108px;object-fit:cover;border-radius:9px"></video>':'<img loading="lazy" src="'+esc(url)+'" alt="'+esc(m.file_name||"Foto do serviço")+'" style="width:100%;height:108px;object-fit:cover;border-radius:9px">';
+  const mayDelete=employeeCanRemovePhotos||["admin","supervisor"].includes(role());
+  return '<div style="border:1px solid #e5dac8;border-radius:12px;padding:7px;background:#fff;min-width:0">'+view+'<small style="display:block;overflow-wrap:anywhere;margin:5px 0">'+esc(m.file_name||"Evidência")+'</small>'+(mayDelete?'<button type="button" class="btn danger" style="width:100%;padding:7px" onclick="deleteServiceMedia(\''+m.id+'\',\''+esc(m.storage_path)+'\',\''+x.id+'\')">Apagar foto</button>':"")+'</div>';
+ }));
 
  const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
@@ -3973,6 +3981,10 @@ async function finishCleaningTimer(id){const r=await sb.rpc("finish_cleaning_ser
 async function uploadServiceMedia(serviceId){
  const input=$("serviceMediaFile"),files=Array.from(input?.files||[]);
  if(!files.length)return;
+ const check=await sb.from("services").select("status,assigned_employee_id").eq("id",serviceId).eq("company_id",currentProfile.company_id).single();
+ if(check.error){toast(check.error.message);return}
+ if(["completed","supervision_pending","supervised","approved","cancelled","rejected"].includes(check.data.status)){toast("As fotos ficam bloqueadas depois do pedido de supervisão ou da finalização.");if(input)input.value="";return}
+ if(role()==="employee"&&check.data.assigned_employee_id!==currentUser.id&&!window.__romanoCleaningTeamMember){toast("Só a equipa atribuída pode anexar fotos.");return}
  if(input.dataset.uploading==="1"){toast("Aguarde: já existe um envio em andamento.");return}
  input.dataset.uploading="1";input.disabled=true;
  let status=document.getElementById("serviceMediaUploadStatus");
