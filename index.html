@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-27-romano-app-photo-login-v49">
+<head><meta name="romano-build" content="2026-11-27-romano-app-entry-polish-v51">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c69a4a">
@@ -1110,6 +1110,71 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
  .romano-profile-photo{height:clamp(145px,42vw,210px)}
  .romano-profile-photo .romano-role-photo{object-position:center 20%}
  .romano-logo-real{width:min(100%,250px);height:auto;max-height:145px}
+}
+</style>
+<style id="romano-entry-final-polish-v51">
+/* ROMANO APP — sharper portrait framing and visible luxury-villa backdrop */
+.romano-entry-main{
+ background-image:linear-gradient(180deg,rgba(255,249,239,.34),rgba(255,248,236,.40)),url("https://images.pexels.com/photos/28054849/pexels-photo-28054849.jpeg?auto=compress&cs=tinysrgb&w=2000")!important;
+ background-size:cover!important;
+ background-position:center center!important;
+ background-attachment:scroll!important;
+}
+.romano-entry-main:before{
+ background:linear-gradient(110deg,rgba(255,248,237,.10),rgba(255,250,243,.04) 48%,rgba(246,230,207,.12))!important;
+}
+.romano-profile-card{
+ background:rgba(255,250,242,.86)!important;
+ -webkit-backdrop-filter:blur(5px);
+ backdrop-filter:blur(5px);
+}
+.romano-profile-photo{
+ width:100%!important;
+ max-width:230px!important;
+ height:auto!important;
+ aspect-ratio: .92 / 1!important;
+ margin:0 auto!important;
+ border-radius:20px 20px 14px 14px!important;
+ overflow:hidden!important;
+ background:#d9c3a2!important;
+ display:block!important;
+}
+.romano-profile-photo .romano-role-photo{
+ display:block!important;
+ width:100%!important;
+ height:100%!important;
+ object-fit:cover!important;
+ object-position:center 23%!important;
+ image-rendering:auto!important;
+ transform:none!important;
+ filter:none!important;
+}
+.romano-profile-card:hover .romano-role-photo,
+.romano-profile-card[aria-pressed="true"] .romano-role-photo{
+ transform:scale(1.015)!important;
+}
+.romano-logo-real{
+ width:min(100%,220px)!important;
+ height:auto!important;
+ max-height:149px!important;
+ object-fit:contain!important;
+ object-position:center!important;
+}
+.romano-profile-grid{align-items:stretch}
+.romano-profile-card{min-width:0}
+@media(max-width:1100px){
+ .romano-entry-main{padding-left:clamp(14px,2.2vw,26px)!important;padding-right:clamp(14px,2.2vw,26px)!important}
+ .romano-profile-grid{gap:10px!important}
+ .romano-profile-card{padding-left:8px!important;padding-right:8px!important}
+ .romano-profile-photo{width:100%!important;max-width:190px!important}
+ .romano-profile-card strong{font-size:clamp(14px,1.35vw,18px)!important}
+ .romano-profile-card small{font-size:clamp(11px,1.05vw,14px)!important;line-height:1.35!important}
+}
+@media(max-width:720px){
+ .romano-profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px!important}
+ .romano-profile-photo{max-width:220px!important}
+ .romano-profile-card strong{font-size:16px!important}
+ .romano-profile-card small{font-size:12px!important}
 }
 </style>
 </head>
