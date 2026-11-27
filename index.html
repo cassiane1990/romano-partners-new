@@ -3634,10 +3634,10 @@ function renderServiceOccurrenceHistory(events,photos=[],urls={},serviceId="",ca
  const photoById=Object.fromEntries((photos||[]).map(m=>[m.id,m]));
  const history=rows.map(e=>{
   const md=e.metadata||{},ids=Array.isArray(md.media_ids)?md.media_ids:[];
-  const pics=ids.map(id=>photoById[id]).filter(Boolean).map(m=>'<a href="'+esc(urls[m.id]||"#")+'" target="_blank" rel="noopener"><img src="'+esc(urls[m.id]||"")+'" alt="Foto da ocorrência" style="width:94px;height:78px;object-fit:cover;border-radius:9px"></a>').join("");
+  const pics=ids.map(id=>photoById[id]).filter(Boolean).map(m=>String(m.mime_type||"").startsWith("video/")?'<a href="'+esc(urls[m.id]||"#")+'" target="_blank" rel="noopener"><video muted playsinline preload="metadata" src="'+esc(urls[m.id]||"")+'" style="width:112px;height:82px;object-fit:cover;border-radius:9px"></video></a>':'<a href="'+esc(urls[m.id]||"#")+'" target="_blank" rel="noopener"><img src="'+esc(urls[m.id]||"")+'" alt="Foto da ocorrência" style="width:94px;height:78px;object-fit:cover;border-radius:9px"></a>').join("");
   return '<div class="line-item" style="display:block"><b>'+esc(md.category||String(e.event_type||"Registo").replace(/_/g," "))+'</b><br><small>'+esc(new Date(e.created_at).toLocaleString("pt-PT"))+'</small>'+(md.observation?'<p style="white-space:pre-wrap;margin:7px 0">'+esc(md.observation)+'</p>':"")+(pics?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+pics+'</div>':"")+'</div>';
  }).join("");
- const form=canAdd?'<div class="field" style="margin-top:12px"><label>Tipo de registo</label><select id="serviceOccurrenceCategory"><option value="Roupa danificada">Roupa danificada</option><option value="Ocorrência">Ocorrência</option><option value="Extra solicitado">Extra solicitado</option><option value="Dano no imóvel">Dano no imóvel</option></select></div><div class="field"><label>Observação</label><textarea id="serviceOccurrenceObservation" rows="3" maxlength="4000" placeholder="Descreva o que aconteceu, a peça danificada ou o extra solicitado…"></textarea></div><div class="field"><label>Fotografias da ocorrência / roupa danificada</label><input id="serviceOccurrencePhotos" type="file" accept="image/*" multiple><small class="muted">Pode anexar várias fotografias.</small></div><button type="button" class="btn gold" onclick="saveServiceOccurrence(\''+serviceId+'\')">Guardar ocorrência e fotografias</button>':"";
+ const form=canAdd?'<div class="field" style="margin-top:12px"><label>Tipo de registo</label><select id="serviceOccurrenceCategory"><option value="Roupa danificada">Roupa danificada</option><option value="Ocorrência">Ocorrência</option><option value="Extra solicitado">Extra solicitado</option><option value="Dano no imóvel">Dano no imóvel</option></select></div><div class="field"><label>Observação</label><textarea id="serviceOccurrenceObservation" rows="3" maxlength="4000" placeholder="Descreva o que aconteceu, a peça danificada ou o extra solicitado…"></textarea></div><div class="field"><label>Fotografias da ocorrência / roupa danificada</label><input id="serviceOccurrencePhotos" type="file" accept="image/*,video/*" multiple><small class="muted">Pode anexar várias fotografias.</small></div><button type="button" class="btn gold" onclick="saveServiceOccurrence(\''+serviceId+'\')">Guardar ocorrência e fotografias</button>':"";
  return '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Ocorrências, extras e roupa danificada</h3><span class="pill">'+rows.length+' registo(s)</span></div>'+form+(history||'<div class="empty">Ainda não existem ocorrências ou extras registados neste histórico.</div>')+'</div>';
 }
 async function viewService(id){
@@ -4036,29 +4036,36 @@ async function uploadServiceMedia(serviceId){
 async function saveServiceOccurrence(serviceId){
  const category=$("serviceOccurrenceCategory")?.value||"";
  const observation=String($("serviceOccurrenceObservation")?.value||"").trim();
- const files=Array.from($("serviceOccurrencePhotos")?.files||[]);
- if(!category||(!observation&&!files.length)){toast("Escreva uma observação ou anexe pelo menos uma fotografia.");return}
+ const input=$("serviceOccurrencePhotos"),files=Array.from(input?.files||[]);
+ if(!category||(!observation&&!files.length)){toast("Escreva uma observação ou anexe fotografias/vídeos.");return}
+ if(files.some(f=>!f.type.startsWith("image/")&&!f.type.startsWith("video/"))){toast("Anexe apenas fotografias ou vídeos.");return}
  const button=document.querySelector('#modalBody button[onclick*="saveServiceOccurrence"]');
- if(button){button.disabled=true;button.textContent="A guardar…"}
- const uploaded=[];
- try{
-  for(const file of files){
-   if(!file.type.startsWith("image/"))throw new Error("Anexe apenas fotografias nesta área.");
-   const prepared=await romanoOptimizePhoto(file);
-   const ext=(prepared.name.split(".").pop()||"jpg").toLowerCase();
-   const path=currentProfile.company_id+"/"+serviceId+"/occurrence-"+crypto.randomUUID()+"."+ext;
-   const up=await sb.storage.from("service-media").upload(path,prepared,{upsert:false,contentType:prepared.type||file.type,cacheControl:"31536000"});
-   if(up.error)throw up.error;
-   const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:"occurrence_photo",storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size}).select("id").single();
-   if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
-   uploaded.push(ins.data.id);
+ if(button){button.disabled=true;button.textContent="A enviar ficheiros…"}
+ const uploaded=new Array(files.length);let cursor=0,failed=null;
+ const worker=async()=>{
+  while(cursor<files.length&&!failed){
+   const i=cursor++,file=files[i];let path=null;
+   try{
+    const prepared=file.type.startsWith("image/")?await romanoOptimizePhoto(file):file;
+    const ext=(prepared.name.split(".").pop()||"bin").toLowerCase();
+    path=currentProfile.company_id+"/"+serviceId+"/occurrence-"+crypto.randomUUID()+"."+ext;
+    const up=await sb.storage.from("service-media").upload(path,prepared,{upsert:false,contentType:prepared.type||file.type,cacheControl:"31536000"});
+    if(up.error)throw up.error;
+    const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:"occurrence_photo",storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size}).select("id").single();
+    if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
+    uploaded[i]=ins.data.id;
+   }catch(err){failed=err}
   }
-  const saved=await sb.rpc("record_service_occurrence",{p_service_id:serviceId,p_category:category,p_observation:observation||null,p_media_ids:uploaded});
+ };
+ try{
+  await Promise.all(Array.from({length:Math.min(2,files.length)},()=>worker()));
+  if(failed)throw failed;
+  const saved=await sb.rpc("record_service_occurrence",{p_service_id:serviceId,p_category:category,p_observation:observation||null,p_media_ids:uploaded.filter(Boolean)});
   if(saved.error)throw saved.error;
-  toast("Ocorrência guardada com as fotografias.");
+  toast("Ocorrência guardada · "+files.length+" ficheiro(s) anexado(s).");
   await viewService(serviceId);
  }catch(err){
-  for(const id of uploaded){
+  for(const id of uploaded.filter(Boolean)){
    const q=await sb.from("service_media").select("storage_path").eq("id",id).maybeSingle();
    if(q.data?.storage_path)await sb.storage.from("service-media").remove([q.data.storage_path]);
    await sb.from("service_media").delete().eq("id",id);
