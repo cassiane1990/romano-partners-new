@@ -1236,6 +1236,50 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
 }
 </style>
 
+
+<style id="romano-entry-approved-split-layout-v56">
+/* Restaurar a abertura aprovada: login à esquerda e os quatro perfis à direita.
+   Não altera conteúdo, autenticação, imagens ou painéis internos. */
+@media (min-width:721px) and (max-width:1100px) and (orientation:portrait){
+  .romano-entry{display:block!important;min-height:100svh!important;overflow:auto!important}
+  .romano-entry-shell{
+    display:grid!important;
+    grid-template-columns:minmax(330px,35.5%) minmax(0,1fr)!important;
+    flex-direction:initial!important;
+    min-height:100svh!important;
+    overflow:hidden!important;
+    background:linear-gradient(115deg,#201207 0%,#3c220d 35.4%,#f6e6d0 35.5%,#fff9f0 100%)!important;
+  }
+  .romano-entry-brand{
+    order:0!important;width:auto!important;min-width:0!important;
+    padding:24px 18px!important;border-top:0!important;
+    border-right:2px solid #d7a44d!important;border-bottom:0!important;
+  }
+  .romano-entry-main{
+    order:0!important;width:auto!important;min-width:0!important;
+    padding:28px 22px 20px!important;
+  }
+  .romano-entry-heading{margin-bottom:22px!important}
+  .romano-profile-grid{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:9px!important;max-width:none!important;width:100%!important;
+  }
+  .romano-profile-card{
+    min-width:0!important;min-height:365px!important;
+    padding:0 8px 14px!important;border-radius:17px!important;
+  }
+  .romano-profile-photo{
+    width:calc(100% + 16px)!important;max-width:none!important;
+    height:auto!important;aspect-ratio:580 / 640!important;
+    margin:0 -8px!important;border-radius:17px 17px 13px 13px!important;
+  }
+  .romano-profile-card strong{font-size:clamp(13px,1.55vw,17px)!important}
+  .romano-profile-card small{font-size:clamp(10px,1.12vw,12px)!important;line-height:1.35!important}
+  .romano-entry-features{margin-top:24px!important}
+}
+</style>
+
 </head>
 <body>
 <div id="login" class="login romano-entry">
