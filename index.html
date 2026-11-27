@@ -3710,8 +3710,8 @@ async function viewService(id){
   sb.from("clients").select("id,name,profile_id,phone").eq("id",x.client_id).maybeSingle(),
   sb.from("properties").select("id,name,code,address,postal_code,city,country,latitude,longitude,photo_url,key_location,key_deposit_address,key_deposit_code,exterior_door_code,entry_instructions,beds_single,beds_double").eq("id",x.property_id).maybeSingle(),
   sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30),
-  sb.from("service_events").select("id,event_type,metadata,created_at,actor_id").eq("service_id",id).order("created_at",{ascending:false}).limit(100),
-  sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at,archive_group_id,archive_group_name").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false})
+  sb.from("service_events").select("id,event_type,metadata,created_at,actor_id").eq("service_id",id).order("created_at",{ascending:false}).limit(40),
+  sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at,archive_group_id,archive_group_name").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(40)
  ]);
  const client=clientQ.data,prop=propQ.data;
  const auditRows=auditQ?.data||[];
@@ -3736,9 +3736,11 @@ const timerPanelHtml=await renderCleaningTimerPanel(x,id);
 const approvalQ=await sb.from('service_client_approvals').select('approved_at,approved_by').eq('service_id',id).maybeSingle(); const clientApprovalHtml=renderClientCleaningApproval(x,media.data||[],approvalQ.data||null); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
  const occurrencePhotos=(media.data||[]).filter(m=>m.media_type==="occurrence_photo");
  const servicePhotoRows=(media.data||[]).filter(m=>["photo","image","video"].includes(m.media_type));
- const invoiceUrls=await romanoSignedUrlMap("service-media",invoiceDocs,600);
- const occurrenceUrls=await romanoSignedUrlMap("service-media",occurrencePhotos,600);
- const servicePhotoUrls=await romanoSignedUrlMap("service-media",servicePhotoRows,600);
+ const [invoiceUrls,occurrenceUrls,servicePhotoUrls]=await Promise.all([
+  romanoSignedUrlMap("service-media",invoiceDocs,600),
+  romanoSignedUrlMap("service-media",occurrencePhotos,600),
+  romanoSignedUrlMap("service-media",servicePhotoRows,600)
+ ]);
  const invoiceHtml=invoiceDocs.map(m=>'<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(invoiceUrls[m.storage_path]||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>');
  const occurrencePhotoUrls={};
  occurrencePhotos.forEach(m=>{occurrencePhotoUrls[m.id]=occurrenceUrls[m.storage_path]||"";});
