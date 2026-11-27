@@ -1280,6 +1280,11 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
 }
 </style>
 
+
+<style id="romano-login-exclusive-visibility">
+/* Impede que o painel autenticado apareça por baixo do ecrã de entrada. */
+#login:not(.hidden) ~ #app{display:none!important;visibility:hidden!important;pointer-events:none!important}
+</style>
 </head>
 <body>
 <div id="login" class="login romano-entry">
