@@ -1282,7 +1282,8 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
 
 
 <style id="romano-login-exclusive-visibility">
-/* Impede que o painel autenticado apareça por baixo do ecrã de entrada. */
+/* Mantém apenas um ecrã ativo, mesmo se a sessão for restaurada durante o carregamento. */
+body:has(#login:not(.hidden)) #app{display:none!important;visibility:hidden!important;pointer-events:none!important}
 #login:not(.hidden) ~ #app{display:none!important;visibility:hidden!important;pointer-events:none!important}
 </style>
 </head>
@@ -5441,7 +5442,9 @@ function initRomanoLanguage(){
 
 function showApp(){closeMobileMenu();
  window.__romanoAppReady=true;
- $("login").classList.add("hidden");$("mfa").classList.add("hidden");$("app").classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";
+ const loginScreen=$("login"),appScreen=$("app");
+ loginScreen.style.setProperty("display","none","important");appScreen.style.removeProperty("display");
+ loginScreen.classList.add("hidden");$("mfa").classList.add("hidden");appScreen.classList.remove("hidden");$("userEmail").textContent=currentUser?.email||"";
  const currentRole=role();$("roleBadge").textContent=roleNames[currentRole]||currentRole;
  try{const roleAvatar=roleAvatarUrl(currentRole);const av=$("avatar");if(av){av.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[currentRole]||currentRole)+'">';av.classList.add("has-role-avatar")}const sf=document.querySelector(".sf-avatar");if(sf){sf.innerHTML='<img src="'+roleAvatar+'" alt="Avatar de '+esc(roleNames[currentRole]||currentRole)+'">';sf.classList.add("has-role-avatar")}}catch(e){}
  if($("sideUserName"))$("sideUserName").textContent=currentProfile?.full_name||currentUser?.email||"Usurio";
@@ -5452,7 +5455,10 @@ function showApp(){closeMobileMenu();
  try{startRomanoMadridClock()}catch(e){}
  try{initRomanoPullToRefresh()}catch(e){}
  openPage("dashboard")}
-function showLogin(msg){closeMobileMenu();$("app").classList.add("hidden");$("mfa").classList.add("hidden");$("login").classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
+function showLogin(msg){closeMobileMenu();
+ const loginScreen=$("login"),appScreen=$("app");
+ appScreen.style.setProperty("display","none","important");loginScreen.style.removeProperty("display");
+ appScreen.classList.add("hidden");$("mfa").classList.add("hidden");loginScreen.classList.remove("hidden");if(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden")}}
 async function openPage(key){if(currentProfile&&!romanoProfileCan(key)){toast("Este perfil no tiene acceso a esta área.");return}window.__romanoCurrentPage=key;closeMobileMenu();const p=pages[key];if(!p)return;document.body.classList.toggle("dashboard-page",key==="dashboard");$("pageTitle").textContent=p[0];document.querySelectorAll(".nav button[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===key));try{await p[1]()}catch(e){$("content").innerHTML='<div class="panel"><div class="msg">'+esc(e.message||e)+'</div></div>'}}
 
 // Profile-first login: the selected card is checked against the authenticated Supabase profile.
