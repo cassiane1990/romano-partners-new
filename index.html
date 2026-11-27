@@ -1556,14 +1556,21 @@ function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta"
 async function loadEmployeeOperationalServices(){
  if(!["employee","maintenance_technician"].includes(role()))return [];
  const basePromise=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id,pricing").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
- const relatedPromise=isMaintenanceTechnician()?Promise.resolve({data:[],error:null}):Promise.race([sb.rpc("maintenance_employee_cleaning_context"),new Promise(resolve=>setTimeout(()=>resolve({data:[],error:null,__timedOut:true}),3500))]);
- const [base,related]=await Promise.all([basePromise,relatedPromise]);
+ const timeout=new Promise(resolve=>setTimeout(()=>resolve({data:null,error:{message:"A consulta dos serviços demorou demasiado. Verifique a ligação e tente Atualizar."}}),8000));
+ const base=await Promise.race([basePromise,timeout]);
  if(base.error)throw base.error;
  const own=base.data||[];
- if(isMaintenanceTechnician()) return own.filter(x=>privateMaintenanceServiceType(x.service_type));
- const ownIds=new Set(own.map(x=>x.id));
- const relatedRows=(related.data||[]).filter(x=>!ownIds.has(x.id)).map(x=>({...x,__relatedCleaning:true}));
- return own.concat(relatedRows);
+ return isMaintenanceTechnician()?own.filter(x=>privateMaintenanceServiceType(x.service_type)):own;
+}
+function renderEmployeeServiceCards(rows,propertyMap={}){
+ const employeeCards=rows.length?rows.map(x=>{
+   const p=propertyMap[x.property_id]||{};
+   const title=serviceTypeLabel(x.service_type);
+   const date=x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar";
+   const address=[p.address,p.city].filter(Boolean).join(" · ");
+   return '<article class="service-card"><div class="service-card-head"><div><span class="service-code">'+esc(x.code||"Servicio")+'</span><h3>'+esc(title)+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span></div><div class="service-card-context"><div><small>Apartamento</small><strong>'+esc(p.name||p.code||"—")+'</strong></div><div><small>Dirección</small><strong>'+esc(address||"—")+'</strong></div></div><div class="service-card-meta"><div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div><div><small>Fecha</small><strong>'+esc(date)+'</strong></div><div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div></div><div class="service-card-actions"><button class="btn gold" type="button" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+(x.status==="scheduled"&&x.assigned_employee_id===currentUser.id?'<button class="btn" type="button" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':"")+'</div></article>';
+ }).join(""):'<div class="empty service-empty">No hay servicios asignados en este momento.</div>';
+ $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Seus serviços atribuídos, com acesso rápido aos detalhes.</p></div></div><div class="services-flow"><span>Programado</span><i>→</i><span>En camino</span><i>→</i><span>Iniciado</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+employeeCards+'</div></section>';
 }
 function romanoIsServiceScheduledToday(service){
  const value=service&&service.scheduled_at;
@@ -1603,20 +1610,17 @@ async function renderServicesMaster(){
  const rows=(r.data||[]).filter(x=>{const st=String(x.status||"").toLowerCase();if(st==="supervision_pending")return romanoIsServiceScheduledToday(x);return !["completed","approved","supervised","cancelled","rejected","returned"].includes(st)});
  // Vista ligera y estable para el equipo: evita consultas y cálculos auxiliares que no son necesarios para abrir Servicios.
  if(["employee","maintenance_technician"].includes(role())){
-   let propertyMap={};
+   renderEmployeeServiceCards(rows,{});
    const pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
-   if(pids.length){
-     const pq=await Promise.race([sb.from("properties").select("id,name,code,address,city").in("id",pids).eq("company_id",currentProfile.company_id),new Promise(resolve=>setTimeout(()=>resolve({data:[],error:{message:"Timeout ao carregar os dados dos apartamentos"}}),3500))]);
-     if(!pq.error)propertyMap=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
-   }
-   const employeeCards=rows.length?rows.map(x=>{
-     const p=propertyMap[x.property_id]||{};
-     const title=serviceTypeLabel(x.service_type);
-     const date=x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar";
-     const address=[p.address,p.city].filter(Boolean).join(" · ");
-     return '<article class="service-card"><div class="service-card-head"><div><span class="service-code">'+esc(x.code||"Servicio")+'</span><h3>'+esc(title)+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span></div><div class="service-card-context"><div><small>Apartamento</small><strong>'+esc(p.name||p.code||"—")+'</strong></div><div><small>Dirección</small><strong>'+esc(address||"—")+'</strong></div></div><div class="service-card-meta"><div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div><div><small>Fecha</small><strong>'+esc(date)+'</strong></div><div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div></div><div class="service-card-actions"><button class="btn gold" type="button" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+(x.status==="scheduled"&&x.assigned_employee_id===currentUser.id?'<button class="btn" type="button" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':"")+'</div></article>';
-   }).join(""):'<div class="empty service-empty">No hay servicios asignados en este momento.</div>';
-   $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Seus serviços atribuídos, com acesso rápido aos detalhes.</p></div></div><div class="services-flow"><span>Programado</span><i>→</i><span>En camino</span><i>→</i><span>Iniciado</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+employeeCards+'</div></section>';
+   const propertyPromise=pids.length?Promise.race([sb.from("properties").select("id,name,code,address,city").in("id",pids).eq("company_id",currentProfile.company_id),new Promise(resolve=>setTimeout(()=>resolve({data:[],error:{message:"Timeout ao carregar apartamentos"}}),6000))]):Promise.resolve({data:[],error:null});
+   const relatedPromise=role()==="employee"?Promise.race([sb.rpc("maintenance_employee_cleaning_context"),new Promise(resolve=>setTimeout(()=>resolve({data:[],error:{message:"Timeout ao carregar serviços complementares"}}),6000))]):Promise.resolve({data:[],error:null});
+   Promise.all([propertyPromise,relatedPromise]).then(([pq,related])=>{
+     const propertyMap=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
+     const ownIds=new Set(rows.map(x=>x.id));
+     const extra=(related.data||[]).filter(x=>!ownIds.has(x.id)).map(x=>({...x,__relatedCleaning:true}));
+     const merged=rows.concat(extra).filter(x=>{const st=String(x.status||"").toLowerCase();if(st==="supervision_pending")return romanoIsServiceScheduledToday(x);return !["completed","approved","supervised","cancelled","rejected","returned"].includes(st)});
+     renderEmployeeServiceCards(merged,propertyMap);
+   }).catch(e=>console.warn("Servicios complementarios:",e));
    return;
  }
  let propertiesMap={},clientsMap={};
