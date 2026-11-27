@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-27-role-first-luxury-v47">
+<head><meta name="romano-build" content="2026-11-27-romano-app-original-logo-v48">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c69a4a">
@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ROMANO">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<title>ROMANO PARTNERS · Property Care</title>
+<title>ROMANO APP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
 <style>
 .material-swipe-delete{position:absolute;right:0;top:0;bottom:0;width:88px;border:0;border-radius:10px;background:#b84a3a;color:#fff;font-weight:700;z-index:0}.material-swipe-row.is-swiped .material-swipe-delete{z-index:0} .receipt-swipe-delete{position:absolute;right:0;top:0;bottom:0;width:88px;border:0;border-radius:10px;background:#b84a3a;color:#fff;font-weight:700;z-index:0}.receipt-swipe-row{isolation:isolate} *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f2e9;color:#1c1c19}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
@@ -288,6 +288,21 @@ button[data-action="create"],button[data-action="save"]{
 @media(max-width:720px){.romano-entry{display:block}.romano-entry-shell{display:flex;flex-direction:column;background:#f7ead8}.romano-entry-brand{order:2;border-right:0;border-top:2px solid #d7a44d;padding:28px 22px 36px}.romano-entry-brand:after{display:none}.romano-entry-main{order:1;padding:30px 16px 18px}.romano-entry-heading{margin-bottom:20px}.romano-profile-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.romano-profile-card{min-height:300px;border-radius:20px}.romano-profile-photo{height:128px;border-radius:19px 19px 14px 14px}.romano-profile-photo .romano-portrait{transform:scale(.82);transform-origin:bottom center}.romano-entry-features{grid-template-columns:repeat(3,1fr);row-gap:16px;margin-top:22px}.romano-entry-features div:nth-child(3){border-right:0}.romano-entry-features div:nth-child(4){border-right:1px solid #dfc8a5}.romano-entry-footer{font-size:8px;flex-direction:column;text-align:center}.romano-entry-brand-inner{max-width:430px}}
 @media(max-width:390px){.romano-profile-card{min-height:285px}.romano-profile-photo{height:112px}.romano-profile-card small{font-size:10px}.romano-entry-options{font-size:10px}}
 
+
+/* ROMANO APP — identidade oficial e retratos individuais */
+.romano-entry-logo{display:none!important}
+.romano-entry-brand-name,.romano-entry-brand-sub,.romano-entry-account{display:none!important}
+.romano-logo-sprite{width:200px;height:170px;max-width:100%;margin:0 auto 7px;background-image:url('/assets/romano-login-sprite.webp');background-repeat:no-repeat;background-size:600px 170px;background-position:0 0}
+.romano-app-title{font:600 17px Georgia,serif;letter-spacing:5px;color:#f4d18c;margin:0 auto 22px;text-align:center}
+.romano-entry-rule{margin:18px 0}
+.romano-profile-photo{background-image:url('/assets/romano-login-sprite.webp')!important;background-size:600px 170px!important;background-repeat:no-repeat!important;background-color:#d7b68c!important}
+.romano-profile-photo:after{display:none!important}
+.romano-photo-admin{background-position:-200px center!important}
+.romano-photo-supervisor{background-position:-300px center!important}
+.romano-photo-employee{background-position:-400px center!important}
+.romano-photo-client{background-position:-500px center!important}
+.romano-profile-card:hover .romano-profile-photo,.romano-profile-card[aria-pressed="true"] .romano-profile-photo{filter:saturate(1.08) contrast(1.02)}
+@media(max-width:720px){.romano-logo-sprite{width:200px;height:170px}.romano-app-title{margin-bottom:16px}}
 </style></style></style><style id="romano-urgent-cleaning-style">.service-urgent-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:5px 9px;border-radius:999px;background:#fff0ed;color:#a72d20;border:1px solid #efb7ad;font-size:10px;font-weight:800;letter-spacing:.06em}.services-flow{flex-wrap:wrap}.services-flow span{white-space:nowrap}</style>
 <style id="romano-service-status-buttons">.service-status-btn{background:#8a5a3b!important;color:#fff!important;border-color:#8a5a3b!important;font-weight:700}.service-status-btn.active{background:#2f80c9!important;color:#fff!important;border-color:#2f80c9!important}.service-status-btn:hover{background:#70472f!important;border-color:#70472f!important}.service-status-btn.active:hover{background:#256ea9!important;border-color:#256ea9!important}</style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style id="romano-premium-responsive">
@@ -1044,9 +1059,8 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
  <div class="romano-entry-shell">
   <section class="romano-entry-brand">
    <div class="romano-entry-brand-inner">
-    <img class="romano-entry-logo" src="/assets/romano-logo.svg" alt="ROMANO PROPERTY CARE">
-    <div class="romano-entry-brand-name">ROMANO<br><span>PARTNERS 2.0</span></div>
-    <div class="romano-entry-brand-sub">LUXURY PROPERTY CARE</div>
+    <div class="romano-logo-sprite" role="img" aria-label="Logótipo original ROMANO PROPERTY CARE"></div>
+    <div class="romano-app-title">ROMANO APP</div>
     <div class="romano-entry-rule"></div>
     <h2>Acesso à Plataforma</h2>
     <p>Gestão completa de serviços, equipas, propriedades e clientes em tempo real.</p>
@@ -1058,7 +1072,6 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
      <button class="primary romano-entry-submit" id="romanoLoginSubmit">↪ Entrar</button>
      <div class="romano-entry-divider"><span>Ou entrar com</span></div>
      <div class="romano-entry-biometrics"><button type="button" id="passkeyLoginBtn"><span>⌖</span>Face ID</button><button type="button" id="passkeyLoginFingerprint"><span>◎</span>Impressão Digital</button></div>
-     <div class="romano-entry-account"><button type="button" id="signupBtn">Criar primeiro acesso</button></div>
      <div id="loginMsg" class="msg hidden"></div>
     </form>
    </div>
@@ -1066,13 +1079,13 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
   <section class="romano-entry-main">
    <header class="romano-entry-heading"><h1>Selecione o seu perfil</h1><p>Aceda ao seu painel personalizado conforme a sua função</p></header>
    <div class="romano-profile-grid">
-    <button class="romano-profile-card" type="button" data-login-role="admin" aria-pressed="false"><span class="romano-profile-photo romano-photo-admin"><span class="romano-portrait"><i></i><b></b></span></span><span class="romano-profile-medal">♙</span><strong>Administrador</strong><small>Gestão total da empresa, equipas, clientes, financeiro e contratos.</small><span class="romano-profile-arrow">→</span></button>
-    <button class="romano-profile-card" type="button" data-login-role="supervisor" aria-pressed="false"><span class="romano-profile-photo romano-photo-supervisor"><span class="romano-portrait"><i></i><b></b></span></span><span class="romano-profile-medal">♜</span><strong>Supervisor</strong><small>Controlo operacional, equipas, qualidade e serviços em tempo real.</small><span class="romano-profile-arrow">→</span></button>
-    <button class="romano-profile-card" type="button" data-login-role="employee" aria-pressed="false"><span class="romano-profile-photo romano-photo-employee"><span class="romano-portrait"><i></i><b></b></span></span><span class="romano-profile-medal">♧</span><strong>Funcionário</strong><small>Serviços, agenda, ponto, folgas, checklists e comunicações.</small><span class="romano-profile-arrow">→</span></button>
-    <button class="romano-profile-card" type="button" data-login-role="client" aria-pressed="false"><span class="romano-profile-photo romano-photo-client"><span class="romano-portrait"><i></i><b></b></span></span><span class="romano-profile-medal">♙</span><strong>Cliente</strong><small>As suas propriedades, serviços, ocorrências, faturas e relatórios.</small><span class="romano-profile-arrow">→</span></button>
+    <button class="romano-profile-card" type="button" data-login-role="admin" aria-pressed="false"><span class="romano-profile-photo romano-photo-admin" aria-hidden="true"></span><span class="romano-profile-medal">♙</span><strong>Administrador</strong><small>Gestão total da empresa, equipas, clientes, financeiro e contratos.</small><span class="romano-profile-arrow">→</span></button>
+    <button class="romano-profile-card" type="button" data-login-role="supervisor" aria-pressed="false"><span class="romano-profile-photo romano-photo-supervisor" aria-hidden="true"></span><span class="romano-profile-medal">♜</span><strong>Supervisor</strong><small>Controlo operacional, equipas, qualidade e serviços em tempo real.</small><span class="romano-profile-arrow">→</span></button>
+    <button class="romano-profile-card" type="button" data-login-role="employee" aria-pressed="false"><span class="romano-profile-photo romano-photo-employee" aria-hidden="true"></span><span class="romano-profile-medal">♧</span><strong>Funcionário</strong><small>Serviços, agenda, ponto, folgas, checklists e comunicações.</small><span class="romano-profile-arrow">→</span></button>
+    <button class="romano-profile-card" type="button" data-login-role="client" aria-pressed="false"><span class="romano-profile-photo romano-photo-client" aria-hidden="true"></span><span class="romano-profile-medal">♙</span><strong>Cliente</strong><small>As suas propriedades, serviços, ocorrências, faturas e relatórios.</small><span class="romano-profile-arrow">→</span></button>
    </div>
    <div class="romano-entry-features"><div><b>♢</b><span>Segurança<br>Avançada</span></div><div><b>☁</b><span>Dados em<br>Tempo Real</span></div><div><b>▥</b><span>Gestão<br>Integrada</span></div><div><b>▦</b><span>Agenda<br>e Equipas</span></div><div><b>▤</b><span>Contratos<br>e Faturação</span></div><div><b>♧</b><span>Suporte<br>Dedicado</span></div></div>
-   <div class="romano-entry-footer"><span>ROMANO PARTNERS 2.0</span><span>ESPANHA · LUXURY PROPERTY CARE</span></div>
+   <div class="romano-entry-footer"><span>ROMANO APP</span><span>ESPANHA · LUXURY PROPERTY CARE</span></div>
   </section>
  </div>
 </div>
@@ -5243,14 +5256,6 @@ async function registerRomanoPasskey(){if(!window.PublicKeyCredential||!navigato
 async function removeRomanoPasskey(id){if(!confirm("Remover esta forma de acesso biométrico desta conta?"))return;const r=await sb.auth.passkey.delete({passkeyId:id});if(r.error){toast(r.error.message);return}toast("Passkey removida.");await renderSecurity()}
 
 if($("logout"))$("logout").onclick=async()=>{await sb.auth.signOut();currentUser=null;currentProfile=null;showLogin()};
-$("signupBtn").onclick=async()=>{
- const email=$("email").value.trim(),password=$("password").value;
- if(!email||password.length<8){toast("Informe email e uma contraseña de mínimo 8 caracteres.");return}
- const name=prompt("Nombre completo para el primer acceso:");
- const r=await sb.auth.signUp({email,password,options:{data:{full_name:name||"ROMANO User"}}});
- if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}
- toast("Cuenta creada. Si el proyecto exige confirmación, revise el correo.");
-};
 $("resetBtn").onclick=async()=>{
  const email=$("email").value.trim();if(!email){toast("Informe o email.");return}
  const r=await sendExistingAccessRecovery(email);
