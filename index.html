@@ -4021,6 +4021,40 @@ async function uploadServiceMedia(serviceId){
  toast(ok+" de "+files.length+" ficheiro(s) guardado(s)"+(failed?" · "+failed+" falha(s); mantenha a ficha aberta e tente novamente.":"." ));
  if(ok)await viewService(serviceId);
 }
+async function saveServiceOccurrence(serviceId){
+ const category=$("serviceOccurrenceCategory")?.value||"";
+ const observation=String($("serviceOccurrenceObservation")?.value||"").trim();
+ const files=Array.from($("serviceOccurrencePhotos")?.files||[]);
+ if(!category||(!observation&&!files.length)){toast("Escreva uma observação ou anexe pelo menos uma fotografia.");return}
+ const button=document.querySelector('#modalBody button[onclick*="saveServiceOccurrence"]');
+ if(button){button.disabled=true;button.textContent="A guardar…"}
+ const uploaded=[];
+ try{
+  for(const file of files){
+   if(!file.type.startsWith("image/"))throw new Error("Anexe apenas fotografias nesta área.");
+   const prepared=await romanoOptimizePhoto(file);
+   const ext=(prepared.name.split(".").pop()||"jpg").toLowerCase();
+   const path=currentProfile.company_id+"/"+serviceId+"/occurrence-"+crypto.randomUUID()+"."+ext;
+   const up=await sb.storage.from("service-media").upload(path,prepared,{upsert:false,contentType:prepared.type||file.type,cacheControl:"31536000"});
+   if(up.error)throw up.error;
+   const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:"occurrence_photo",storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size}).select("id").single();
+   if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
+   uploaded.push(ins.data.id);
+  }
+  const saved=await sb.rpc("record_service_occurrence",{p_service_id:serviceId,p_category:category,p_observation:observation||null,p_media_ids:uploaded});
+  if(saved.error)throw saved.error;
+  toast("Ocorrência guardada com as fotografias.");
+  await viewService(serviceId);
+ }catch(err){
+  for(const id of uploaded){
+   const q=await sb.from("service_media").select("storage_path").eq("id",id).maybeSingle();
+   if(q.data?.storage_path)await sb.storage.from("service-media").remove([q.data.storage_path]);
+   await sb.from("service_media").delete().eq("id",id);
+  }
+  toast("Não foi possível guardar a ocorrência: "+(err?.message||String(err)));
+  if(button){button.disabled=false;button.textContent="Guardar ocorrência e fotografias"}
+ }
+}
 async function downloadServiceMedia(path){
  const r=await sb.storage.from("service-media").createSignedUrl(path,300);
  if(r.error)toast(r.error.message);else window.open(r.data.signedUrl,"_blank","noopener")
