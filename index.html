@@ -3585,8 +3585,24 @@ function renderServiceStatusActions(x){
  if(x.status==="paused")return '<div class="actions" style="margin-top:12px"><span class="muted" style="align-self:center">Siguiente estado:</span>'+btn("▶ Continuar","in_progress",true)+(maint?btn("✓ Finalizar","completed",true):"")+'</div>';
  return "";
 }
+async function romanoSignedUrlMap(bucket,rows,expiresIn=600){
+ const paths=[...new Set((rows||[]).map(x=>x.storage_path).filter(Boolean))];
+ if(!paths.length)return {};
+ try{
+  const result=await sb.storage.from(bucket).createSignedUrls(paths,expiresIn);
+  if(!result.error&&Array.isArray(result.data)){
+   const map={};
+   result.data.forEach(x=>{if(x.path&&x.signedUrl)map[x.path]=x.signedUrl});
+   return map;
+  }
+ }catch(e){console.warn("Signed URL batch fallback:",e)}
+ const map={};
+ await Promise.all(paths.map(async path=>{try{const r=await sb.storage.from(bucket).createSignedUrl(path,expiresIn);if(!r.error&&r.data?.signedUrl)map[path]=r.data.signedUrl}catch(e){}}));
+ return map;
+}
 async function renderServiceArchiveEvidence(rows){
  if(!rows.length)return '<div class="empty">Ainda não há fotos ou vídeos do arquivo permanente vinculados a este serviço.</div>';
+ const signedMap=await romanoSignedUrlMap("property-media",rows,600);
  const grouped={};
  for(const m of rows){
   const beforeAfter=m.archive_group_name==="Fotos antes/depois do serviço";
@@ -3595,11 +3611,11 @@ async function renderServiceArchiveEvidence(rows){
   grouped[key].items.push(m);
  }
  return (await Promise.all(Object.entries(grouped).map(async([key,g])=>{
-  const files=await Promise.all(g.items.map(async m=>{
-   const signed=await sb.storage.from("property-media").createSignedUrl(m.storage_path,600);
+  const files=g.items.map(m=>{
+   const url=signedMap[m.storage_path]||"";
    const dt=new Intl.DateTimeFormat("pt-PT",{timeZone:"Europe/Madrid",dateStyle:"short",timeStyle:"medium"}).format(new Date(m.created_at));
-   return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(dt)+' · '+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(signed.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>';
-  }));
+   return '<div class="line"><span><b>'+(m.media_type==="video"?"🎥 ":"📷 ")+esc(m.file_name)+'</b><br><small>'+esc(dt)+' · '+esc((m.title||"").replace("[ARQUIVO PERMANENTE] ",""))+'</small></span><span class="actions"><button class="btn" data-url="'+esc(url)+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button>'+(role()==="admin"?'<button class="btn danger" data-id="'+m.id+'" onclick="deleteEvidenceArchiveItem(this.dataset.id)">Apagar</button>':"")+'</span></div>';
+  });
   return '<details class="panel" style="margin:10px 0;padding:12px"><summary style="cursor:pointer"><strong>📁 '+esc(g.name)+'</strong> <span class="pill">'+g.items.length+' ficheiro(s)</span></summary><div style="margin-top:10px">'+files.join("")+'</div></details>';
  }))).join("");
 }
@@ -3718,20 +3734,23 @@ async function viewService(id){
  
 const timerPanelHtml=await renderCleaningTimerPanel(x,id);
 const approvalQ=await sb.from('service_client_approvals').select('approved_at,approved_by').eq('service_id',id).maybeSingle(); const clientApprovalHtml=renderClientCleaningApproval(x,media.data||[],approvalQ.data||null); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
- const invoiceHtml=await Promise.all(invoiceDocs.map(async m=>{const u=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
  const occurrencePhotos=(media.data||[]).filter(m=>m.media_type==="occurrence_photo");
+ const servicePhotoRows=(media.data||[]).filter(m=>["photo","image","video"].includes(m.media_type));
+ const invoiceUrls=await romanoSignedUrlMap("service-media",invoiceDocs,600);
+ const occurrenceUrls=await romanoSignedUrlMap("service-media",occurrencePhotos,600);
+ const servicePhotoUrls=await romanoSignedUrlMap("service-media",servicePhotoRows,600);
+ const invoiceHtml=invoiceDocs.map(m=>'<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(invoiceUrls[m.storage_path]||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>');
  const occurrencePhotoUrls={};
- await Promise.all(occurrencePhotos.map(async m=>{const q=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);occurrencePhotoUrls[m.id]=q.data?.signedUrl||"";}));
+ occurrencePhotos.forEach(m=>{occurrencePhotoUrls[m.id]=occurrenceUrls[m.storage_path]||"";});
  const canAddOccurrence=["employee","supervisor","admin"].includes(role())&&(role()!=="employee"||x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&!["completed","supervision_pending","supervised","approved","cancelled","rejected"].includes(x.status);
  const occurrenceHistoryHtml=renderServiceOccurrenceHistory(serviceEventRows,occurrencePhotos,occurrencePhotoUrls,x.id,canAddOccurrence);
- const servicePhotoRows=(media.data||[]).filter(m=>["photo","image","video"].includes(m.media_type));
  const employeeCanRemovePhotos=role()==="employee"&&(x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&!["completed","supervision_pending","supervised","approved","cancelled","rejected"].includes(x.status)&&isCleaningServiceType(x.service_type);
- const servicePhotoGallery=await Promise.all(servicePhotoRows.map(async m=>{
-  const signed=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600),url=signed.data?.signedUrl||"";
+ const servicePhotoGallery=servicePhotoRows.map(m=>{
+  const url=servicePhotoUrls[m.storage_path]||"";
   const view=m.media_type==="video"?'<video controls playsinline preload="metadata" src="'+esc(url)+'" style="width:100%;height:108px;object-fit:cover;border-radius:9px"></video>':'<img loading="lazy" src="'+esc(url)+'" alt="'+esc(m.file_name||"Foto do serviço")+'" style="width:100%;height:108px;object-fit:cover;border-radius:9px">';
   const mayDelete=employeeCanRemovePhotos||["admin","supervisor"].includes(role());
   return '<div style="border:1px solid #e5dac8;border-radius:12px;padding:7px;background:#fff;min-width:0">'+view+'<small style="display:block;overflow-wrap:anywhere;margin:5px 0">'+esc(m.file_name||"Evidência")+'</small>'+(mayDelete?'<button type="button" class="btn danger" style="width:100%;padding:7px" onclick="deleteServiceMedia(\''+m.id+'\',\''+esc(m.storage_path)+'\',\''+x.id+'\')">Apagar foto</button>':"")+'</div>';
- }));
+ });
 
  const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
