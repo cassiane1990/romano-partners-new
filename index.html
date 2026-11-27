@@ -3702,7 +3702,7 @@ const approvalQ=await sb.from('service_client_approvals').select('approved_at,ap
  const canAddOccurrence=["employee","supervisor","admin"].includes(role())&&(role()!=="employee"||x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&!["completed","supervision_pending","supervised","approved","cancelled","rejected"].includes(x.status);
  const occurrenceHistoryHtml=renderServiceOccurrenceHistory(serviceEventRows,occurrencePhotos,occurrencePhotoUrls,x.id,canAddOccurrence);
  const servicePhotoRows=(media.data||[]).filter(m=>["photo","image","video"].includes(m.media_type));
- const employeeCanRemovePhotos=role()==="employee"&&(x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&["in_progress","paused"].includes(x.status)&&isCleaningServiceType(x.service_type);
+ const employeeCanRemovePhotos=role()==="employee"&&(x.assigned_employee_id===currentUser.id||window.__romanoCleaningTeamMember===true)&&!["completed","supervision_pending","supervised","approved","cancelled","rejected"].includes(x.status)&&isCleaningServiceType(x.service_type);
  const servicePhotoGallery=await Promise.all(servicePhotoRows.map(async m=>{
   const signed=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600),url=signed.data?.signedUrl||"";
   const view=m.media_type==="video"?'<video controls playsinline preload="metadata" src="'+esc(url)+'" style="width:100%;height:108px;object-fit:cover;border-radius:9px"></video>':'<img loading="lazy" src="'+esc(url)+'" alt="'+esc(m.file_name||"Foto do serviço")+'" style="width:100%;height:108px;object-fit:cover;border-radius:9px">';
