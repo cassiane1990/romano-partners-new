@@ -4040,34 +4040,44 @@ async function uploadServiceMedia(serviceId){
   status.appendChild(card);return {file,card,url};
  });
  let cursor=0,ok=0,failed=0,finished=0;
+ const uploaded=[];
  const worker=async()=>{
   while(cursor<cards.length){
    const item=cards[cursor++],file=item.file,state=item.card.querySelector("[data-upload-state]");
    let lastError=null,saved=false;
    for(let attempt=1;attempt<=3&&!saved;attempt++){
-    let path=null;
     try{
      if(state)state.textContent=attempt===1?"A preparar…":"A tentar novamente ("+attempt+"/3)…";
      const prepared=await romanoOptimizePhoto(file);
      const ext=(prepared.name.split(".").pop()||"bin").toLowerCase();
-     const type=prepared.type.startsWith("video")?"video":prepared.type.startsWith("audio")?"audio":(prepared.type.includes("pdf")||prepared.type.includes("word")||prepared.type.includes("excel")||/\.(pdf|docx?|xlsx?)$/i.test(file.name))?"document":"photo";
-     path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
+     const type=prepared.type.startsWith("video")?"video":prepared.type.startsWith("audio")?"audio":(prepared.type.includes("pdf")||prepared.type.includes("word")||prepared.type.includes("excel")||/\\.(pdf|docx?|xlsx?)$/i.test(file.name))?"document":"photo";
+     const path=currentProfile.company_id+"/"+serviceId+"/"+crypto.randomUUID()+"."+ext;
      if(state)state.textContent="A enviar…";
      const up=await sb.storage.from("service-media").upload(path,prepared,{upsert:false,contentType:prepared.type||"application/octet-stream",cacheControl:"31536000"});
      if(up.error)throw up.error;
-     const ins=await sb.from("service_media").insert({company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:type,storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size});
-     if(ins.error){await sb.storage.from("service-media").remove([path]);throw ins.error}
-     saved=true;ok++;
+     uploaded.push({item,path,record:{company_id:currentProfile.company_id,service_id:serviceId,uploaded_by:currentUser.id,media_type:type,storage_path:path,file_name:file.name,mime_type:file.type||prepared.type,size_bytes:prepared.size}});
+     saved=true;
     }catch(err){lastError=err;if(attempt<3)await new Promise(resolve=>setTimeout(resolve,700*attempt))}
    }
    finished++;
-   if(saved){if(state)state.textContent="✓ Enviada · "+finished+"/"+cards.length}
+   if(saved){if(state)state.textContent="A enviar registo…"}
    else{failed++;if(state)state.textContent="Falhou · "+(lastError?.message||"erro no envio")}
   }
  };
  try{
-  // Sem limite de quantidade: fila em pequenos lotes para evitar falhas no telemóvel/rede.
+  // Uploads em paralelo limitado; metadados gravados numa única operação.
   await Promise.all(Array.from({length:Math.min(2,cards.length)},()=>worker()));
+  if(uploaded.length){
+   const savedRows=await sb.from("service_media").insert(uploaded.map(x=>x.record));
+   if(savedRows.error){
+    await sb.storage.from("service-media").remove(uploaded.map(x=>x.path));
+    failed+=uploaded.length;
+    uploaded.forEach(x=>{const state=x.item.card.querySelector("[data-upload-state]");if(state)state.textContent="Falhou · "+savedRows.error.message});
+   }else{
+    ok=uploaded.length;
+    uploaded.forEach((x,i)=>{const state=x.item.card.querySelector("[data-upload-state]");if(state)state.textContent="✓ Guardada · "+(i+1)+"/"+uploaded.length});
+   }
+  }
  }finally{
   cards.forEach(x=>URL.revokeObjectURL(x.url));
   if(input){input.disabled=false;input.dataset.uploading="0";if(!failed)input.value=""}
