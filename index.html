@@ -1286,6 +1286,16 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
 body:has(#login:not(.hidden)) #app{display:none!important;visibility:hidden!important;pointer-events:none!important}
 #login:not(.hidden) ~ #app{display:none!important;visibility:hidden!important;pointer-events:none!important}
 </style>
+<script id="romano-canonical-origin-guard">
+/* Production auth (including Passkeys) must use the registered canonical RP origin. */
+(function(){
+ const canonical="romano-partners-new.pages.dev";
+ const host=String(location.hostname||"").toLowerCase();
+ if(host!==canonical && host.endsWith(".romano-partners-new.pages.dev")){
+  const target=new URL(location.href);target.protocol="https:";target.host=canonical;location.replace(target.href);
+ }
+})();
+</script>
 </head>
 <body>
 <div id="login" class="login romano-entry">
@@ -5487,7 +5497,18 @@ async function enterAppFromSession(session){
  catch(err){currentProfile=null;__authReadyId=null;showLogin("No se pudo completar el acceso: "+(err?.message||err))}
  finally{__authBusy=false}
 }
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginMsg").classList.add("hidden");const r=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){$("loginMsg").textContent=r.error.message;$("loginMsg").classList.remove("hidden");return}await enterAppFromSession(r.data.session)});
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();$("loginMsg").classList.add("hidden");
+ const email=$("email").value.trim().toLowerCase(),password=$("password").value;
+ const r=await sb.auth.signInWithPassword({email,password});
+ if(r.error){
+  const invalid=r.error.code==="invalid_credentials"||r.error.message==="Invalid login credentials";
+  $("password").value="";
+  $("loginMsg").textContent=invalid?"E-mail ou palavra-passe incorretos. Por segurança, use «Recuperar acesso?» para criar uma nova palavra-passe.":"Não foi possível entrar: "+r.error.message;
+  $("loginMsg").classList.remove("hidden");return;
+ }
+ await enterAppFromSession(r.data.session);
+});
 async function signInRomanoWithPasskey(){const box=$("loginMsg");box.classList.add("hidden");if(!window.PublicKeyCredential||!navigator.credentials){box.textContent="Este navegador/dispositivo não suporta passkeys. Entre com email e palavra-passe.";box.classList.remove("hidden");return}const btn=$("passkeyLoginBtn");btn.disabled=true;btn.textContent="A aguardar autenticação biométrica…";try{const r=await sb.auth.signInWithPasskey();if(r.error)throw r.error;await enterAppFromSession(r.data.session)}catch(e){box.textContent=(e?.message||"Não foi possível entrar com biometria.")+(String(e?.message||"").includes("passkey_disabled")?" Ative Passkeys nas definições de Authentication do Supabase.":"");box.classList.remove("hidden")}finally{btn.disabled=false;btn.textContent="🔐 Entrar com Face ID / impressão digital"}}
 $("passkeyLoginBtn").addEventListener("click",signInRomanoWithPasskey);
 async function registerRomanoPasskey(){if(!window.PublicKeyCredential||!navigator.credentials){toast("Este navegador/dispositivo não suporta passkeys.");return}try{const r=await sb.auth.registerPasskey();if(r.error)throw r.error;toast("Biometria registada com sucesso neste dispositivo.");await renderSecurity()}catch(e){toast("Não foi possível ativar a biometria: "+(e?.message||e))}}
