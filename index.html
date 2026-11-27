@@ -1,7 +1,7 @@
 <!-- ROMANO chat RLS final fix 2026-09-23 -->
 <!doctype html>
 <html lang="es">
-<head><meta name="romano-build" content="2026-11-27-romano-app-ipad-layout-v53">
+<head><meta name="romano-build" content="2026-11-27-romano-app-profile-photos-v54">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c69a4a">
@@ -1139,6 +1139,50 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
  .romano-profile-photo .romano-role-photo{object-fit:cover!important}
 }
 </style>
+
+<style id="romano-profile-photo-natural-v54">
+/* Portraits naturais: proporção original, sem sprite, zoom ou deformação */
+.romano-profile-photo{
+  display:block!important;
+  position:relative!important;
+  width:min(100%,250px)!important;
+  height:auto!important;
+  aspect-ratio:435 / 479!important;
+  max-height:none!important;
+  margin:0 auto!important;
+  overflow:hidden!important;
+  border-radius:22px 22px 16px 16px!important;
+  background:#e8d9c3!important;
+  background-image:none!important;
+  box-shadow:0 7px 18px rgba(58,37,17,.12);
+}
+.romano-profile-photo:after{display:none!important}
+.romano-profile-photo .romano-role-photo{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+  image-rendering:auto!important;
+  transform:none!important;
+  filter:none!important;
+}
+.romano-profile-card:hover .romano-role-photo,
+.romano-profile-card[aria-pressed="true"] .romano-role-photo{
+  transform:none!important;
+  filter:none!important;
+}
+@media(max-width:720px){
+  .romano-profile-photo{
+    width:min(100%,210px)!important;
+    aspect-ratio:435 / 479!important;
+    height:auto!important;
+    margin:0 auto!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div id="login" class="login romano-entry">
