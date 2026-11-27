@@ -1596,6 +1596,24 @@ async function renderServicesMaster(){
    return;
  }
  const rows=(r.data||[]).filter(x=>{const st=String(x.status||"").toLowerCase();if(st==="supervision_pending")return romanoIsServiceScheduledToday(x);return !["completed","approved","supervised","cancelled","rejected","returned"].includes(st)});
+ // Vista ligera y estable para el equipo: evita consultas y cálculos auxiliares que no son necesarios para abrir Servicios.
+ if(["employee","maintenance_technician"].includes(role())){
+   let propertyMap={};
+   const pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
+   if(pids.length){
+     const pq=await sb.from("properties").select("id,name,code,address,city").in("id",pids).eq("company_id",currentProfile.company_id);
+     if(!pq.error)propertyMap=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
+   }
+   const employeeCards=rows.length?rows.map(x=>{
+     const p=propertyMap[x.property_id]||{};
+     const title=serviceTypeLabel(x.service_type);
+     const date=x.scheduled_at?romanoMadridLabel(x.scheduled_at):"Sin programar";
+     const address=[p.address,p.city].filter(Boolean).join(" · ");
+     return '<article class="service-card"><div class="service-card-head"><div><span class="service-code">'+esc(x.code||"Servicio")+'</span><h3>'+esc(title)+'</h3>'+serviceUrgencyBadge(x)+'</div><span class="status '+esc(x.status||"")+'">'+esc(statusNames[x.status]||x.status||"—")+'</span></div><div class="service-card-context"><div><small>Apartamento</small><strong>'+esc(p.name||p.code||"—")+'</strong></div><div><small>Dirección</small><strong>'+esc(address||"—")+'</strong></div></div><div class="service-card-meta"><div><small>Tipología</small><strong>'+esc(x.typology||"—")+'</strong></div><div><small>Fecha</small><strong>'+esc(date)+'</strong></div><div><small>Prioridad</small><strong>'+esc(servicePriorityLabel(x.priority))+'</strong></div></div><div class="service-card-actions"><button class="btn gold" type="button" onclick="viewService(\''+x.id+'\')">Ver detalle</button>'+(x.status==="scheduled"&&x.assigned_employee_id===currentUser.id?'<button class="btn" type="button" onclick="acceptAssignedService(\''+x.id+'\')">Aceptar pedido</button>':"")+'</div></article>';
+   }).join(""):'<div class="empty service-empty">No hay servicios asignados en este momento.</div>';
+   $("content").innerHTML='<section class="services-shell"><div class="services-head"><div><div class="eyebrow">OPERACIÓN</div><h2>Servicios</h2><p>Seus serviços atribuídos, com acesso rápido aos detalhes.</p></div></div><div class="services-flow"><span>Programado</span><i>→</i><span>En camino</span><i>→</i><span>Iniciado</span><i>→</i><span>Finalizado</span></div><div class="services-grid">'+employeeCards+'</div></section>';
+   return;
+ }
  let propertiesMap={},clientsMap={};
  if(rows.length&&!demoMode){
    const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
