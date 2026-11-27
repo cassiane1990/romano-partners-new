@@ -1183,6 +1183,59 @@ button.primary,.primary{min-height:48px;border-radius:var(--rpc-button-radius)}
 }
 </style>
 
+
+<style id="romano-profile-photos-sharp-v55">
+/* Correção exclusiva das quatro fotografias: usar os ficheiros individuais originais,
+   sem sprite comprimido, sem esticar e sem alterar o layout aprovado. */
+.romano-profile-photo{
+  background-image:none!important;
+  background-size:auto!important;
+  background-position:center!important;
+  display:block!important;
+  position:relative!important;
+  width:calc(100% + 24px)!important;
+  max-width:none!important;
+  height:auto!important;
+  aspect-ratio:580 / 640!important;
+  margin:0 -12px!important;
+  overflow:hidden!important;
+  border-radius:22px 22px 16px 16px!important;
+  background-color:#e8d9c3!important;
+}
+.romano-profile-photo .romano-role-photo{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+  image-rendering:auto!important;
+  transform:none!important;
+  filter:none!important;
+}
+.romano-profile-card:hover .romano-role-photo,
+.romano-profile-card[aria-pressed="true"] .romano-role-photo{
+  transform:none!important;
+  filter:none!important;
+}
+@media(max-width:1000px){
+  .romano-profile-photo{
+    width:calc(100% + 16px)!important;
+    margin:0 -8px!important;
+    height:auto!important;
+    aspect-ratio:580 / 640!important;
+  }
+}
+@media(max-width:720px){
+  .romano-profile-photo{
+    width:calc(100% + 16px)!important;
+    margin:0 -8px!important;
+    height:auto!important;
+    aspect-ratio:580 / 640!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div id="login" class="login romano-entry">
