@@ -6,12 +6,26 @@
   "start_url": "/?app=romano",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay","standalone"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
   "orientation": "any",
   "background_color": "#f7f2e9",
-  "theme_color": "#1c1c19",
+  "theme_color": "#c69a4a",
   "prefer_related_applications": false,
   "icons": [
-    {"src": "/icon.svg","sizes": "any","type": "image/svg+xml","purpose": "any maskable"}
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }
