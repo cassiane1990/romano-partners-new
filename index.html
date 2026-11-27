@@ -1555,12 +1555,12 @@ function romanoMadridTimeLabel(date=new Date()){const d=romanoMadridValidDate(da
 function servicePriorityLabel(v){return ({low:"Baja",normal:"Normal",high:"Alta",urgent:"Urgente"})[v]||v||"—"}
 async function loadEmployeeOperationalServices(){
  if(!["employee","maintenance_technician"].includes(role()))return [];
- const base=await sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id,pricing").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
+ const basePromise=sb.from("services").select("id,code,service_type,typology,status,priority,scheduled_at,created_at,accepted_at,assigned_employee_id,assigned_supervisor_id,property_id,client_id,pricing").eq("assigned_employee_id",currentUser.id).order("created_at",{ascending:false}).limit(100);
+ const relatedPromise=isMaintenanceTechnician()?Promise.resolve({data:[],error:null}):Promise.race([sb.rpc("maintenance_employee_cleaning_context"),new Promise(resolve=>setTimeout(()=>resolve({data:[],error:null,__timedOut:true}),3500))]);
+ const [base,related]=await Promise.all([basePromise,relatedPromise]);
  if(base.error)throw base.error;
  const own=base.data||[];
  if(isMaintenanceTechnician()) return own.filter(x=>privateMaintenanceServiceType(x.service_type));
- const related=await sb.rpc("maintenance_employee_cleaning_context");
- if(related.error)throw related.error;
  const ownIds=new Set(own.map(x=>x.id));
  const relatedRows=(related.data||[]).filter(x=>!ownIds.has(x.id)).map(x=>({...x,__relatedCleaning:true}));
  return own.concat(relatedRows);
@@ -1606,7 +1606,7 @@ async function renderServicesMaster(){
    let propertyMap={};
    const pids=[...new Set(rows.map(x=>x.property_id).filter(Boolean))];
    if(pids.length){
-     const pq=await sb.from("properties").select("id,name,code,address,city").in("id",pids).eq("company_id",currentProfile.company_id);
+     const pq=await Promise.race([sb.from("properties").select("id,name,code,address,city").in("id",pids).eq("company_id",currentProfile.company_id),new Promise(resolve=>setTimeout(()=>resolve({data:[],error:{message:"Timeout ao carregar os dados dos apartamentos"}}),3500))]);
      if(!pq.error)propertyMap=Object.fromEntries((pq.data||[]).map(p=>[p.id,p]));
    }
    const employeeCards=rows.length?rows.map(x=>{
