@@ -3703,7 +3703,7 @@ async function viewService(id){
  if(r.error){toast(r.error.message);return}
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
- let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
+ const checklistPromise=ensureCleaningChecklist(x).catch(err=>{console.warn("Checklist:",err);return []});
  const [media,dispatch,clientQ,propQ,auditQ,eventsQ,archiveMedia]=await Promise.all([
   sb.from("service_media").select("id,media_type,file_name,storage_path,mime_type,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
   sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
@@ -3713,6 +3713,7 @@ async function viewService(id){
   sb.from("service_events").select("id,event_type,metadata,created_at,actor_id").eq("service_id",id).order("created_at",{ascending:false}).limit(40),
   sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at,archive_group_id,archive_group_name").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}).limit(40)
  ]);
+ const checklist=await checklistPromise;
  const client=clientQ.data,prop=propQ.data;
  const auditRows=auditQ?.data||[];
  const serviceEventRows=eventsQ?.data||[];
