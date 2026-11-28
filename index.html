@@ -3634,11 +3634,6 @@ function renderServiceOccurrenceHistory(events){
  return '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Ocorrências, extras e roupa danificada</h3><span class="pill">'+rows.length+' registo(s)</span></div>'+
  (rows.map(e=>'<div class="line-item"><span><b>'+esc(String(e.event_type||"Registo").replace(/_/g," "))+'</b><br><small>'+esc(new Date(e.created_at).toLocaleString("pt-PT"))+'</small><br><small>'+esc(JSON.stringify(e.metadata||{}))+'</small></span></div>').join("")||'<div class="empty">Ainda não existem ocorrências ou extras registados neste histórico.</div>')+'</div>';
 }
-function serviceDetailFallback(promise,fallback,ms=6000,label='dados complementares'){
- let timer;
- return Promise.race([Promise.resolve(promise).catch(err=>{console.warn('Ficha · '+label,err);return fallback;}),new Promise(resolve=>{timer=setTimeout(()=>{console.warn('Ficha · timeout: '+label);resolve(fallback);},ms);})]).finally(()=>clearTimeout(timer));
-}
-
 async function viewService(id){
  openModal("Ficha del servicio",'<div class="notice">Cargando ficha del servicio…</div>');
  try{
@@ -3657,37 +3652,32 @@ async function viewService(id){
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sin observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
- const coreQuery=["employee","maintenance_technician"].includes(role())
-  ? sb.rpc("employee_service_detail",{p_service_id:id})
-  : sb.from("services").select("*").eq("id",id).single();
- const r=await Promise.race([
-  coreQuery,
-  new Promise((_,reject)=>setTimeout(()=>reject(new Error("A consulta principal do serviço excedeu 12 segundos. Verifique a ligação e as permissões de acesso.")),12000))
- ]);
+ const r=["employee","maintenance_technician"].includes(role())
+  ? await sb.rpc("employee_service_detail",{p_service_id:id})
+  : await sb.from("services").select("*").eq("id",id).single();
  if(r.error){toast(r.error.message);return}
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
  if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
- let checklist=await serviceDetailFallback(ensureCleaningChecklist(x),[],5000,"checklist");
- const emptyRows={data:[],error:null},emptyOne={data:null,error:null};
+ let checklist=[];try{checklist=await ensureCleaningChecklist(x)}catch(err){console.warn("Checklist:",err)}
  const [media,dispatch,clientQ,propQ,auditQ,eventsQ,archiveMedia]=await Promise.all([
-  serviceDetailFallback(sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),emptyRows,6000,"fotos"),
-  serviceDetailFallback(sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),emptyRows,5000,"dispatch"),
-  serviceDetailFallback(sb.from("clients").select("id,name,profile_id,phone").eq("id",x.client_id).maybeSingle(),emptyOne,5000,"cliente"),
-  serviceDetailFallback(sb.from("properties").select("id,name,code,address,postal_code,city,country,latitude,longitude,photo_url,key_location,key_deposit_address,key_deposit_code,exterior_door_code,entry_instructions,beds_single,beds_double").eq("id",x.property_id).maybeSingle(),emptyOne,5000,"propriedade"),
-  serviceDetailFallback(sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30),emptyRows,5000,"auditoria"),
-  serviceDetailFallback(sb.from("service_events").select("id,event_type,metadata,created_at,actor_id").eq("service_id",id).order("created_at",{ascending:false}).limit(100),emptyRows,5000,"histórico"),
-  serviceDetailFallback(sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at,archive_group_id,archive_group_name").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false}),emptyRows,5000,"arquivo")
+  sb.from("service_media").select("id,media_type,file_name,storage_path,created_at,review_opened_at,reviewed_by").eq("service_id",id).order("created_at",{ascending:false}),
+  sb.from("service_dispatch_attempts").select("id,employee_id,response,expires_at,distance_m,responded_at,reason").eq("service_id",id).order("created_at",{ascending:false}).limit(10),
+  sb.from("clients").select("id,name,profile_id,phone").eq("id",x.client_id).maybeSingle(),
+  sb.from("properties").select("id,name,code,address,postal_code,city,country,latitude,longitude,photo_url,key_location,key_deposit_address,key_deposit_code,exterior_door_code,entry_instructions,beds_single,beds_double").eq("id",x.property_id).maybeSingle(),
+  sb.from("audit_logs").select("id,actor_id,action,metadata,created_at").eq("object_type","service").eq("object_id",id).order("created_at",{ascending:false}).limit(30),
+  sb.from("service_events").select("id,event_type,metadata,created_at,actor_id").eq("service_id",id).order("created_at",{ascending:false}).limit(100),
+  sb.from("property_media").select("id,media_type,file_name,storage_path,title,created_at,archive_group_id,archive_group_name").eq("service_id",id).eq("company_id",currentProfile.company_id).order("created_at",{ascending:false})
  ]);
  const client=clientQ.data,prop=propQ.data;
  const auditRows=auditQ?.data||[];
  const serviceEventRows=eventsQ?.data||[];
  const lastCleaningObservation=serviceEventRows.find(e=>e.event_type==="cleaning_work_observation_saved")?.metadata?.observation||"";
- const serviceArchiveHtml=await serviceDetailFallback(renderServiceArchiveEvidence(archiveMedia.data||[]),'<div class="empty">Arquivo temporariamente indisponível. Tente novamente.</div>',4500,"pré-visualização do arquivo");
+ const serviceArchiveHtml=await renderServiceArchiveEvidence(archiveMedia.data||[]);
  const actorIds=[...new Set(auditRows.map(a=>a.actor_id).filter(Boolean))];
  const dispatchEmployeeIds=[...new Set((dispatch.data||[]).map(d=>d.employee_id).filter(Boolean))];
  const nameIds=[...new Set([...actorIds,...dispatchEmployeeIds,x.assigned_employee_id].filter(Boolean))];
  let actorNames={};
- if(nameIds.length){const aq=await serviceDetailFallback(sb.from("profiles").select("id,full_name,email,role").in("id",nameIds),{data:[]},4000,"nomes dos responsáveis");(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usuario");}
+ if(nameIds.length){const aq=await sb.from("profiles").select("id,full_name,email,role").in("id",nameIds);(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usuario");}
  const canUpdate=["admin","supervisor","employee","maintenance_technician"].includes(role());
  const isPendingAdmin=role()==="supervisor"&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const isPendingAdminDirect=role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id;
@@ -3697,9 +3687,9 @@ async function viewService(id){
  const editServiceButton=canEditService?'<div class="actions" style="margin-top:12px"><button class="btn gold" type="button" onclick="openEditService(\''+x.id+'\')">✎ Editar serviço</button></div>':"";
  const clientAdvanceButton=canClientAdvance?'<div class="notice" style="margin-top:12px"><strong>¿Necesita este servicio antes?</strong><br>Puede solicitar un adelanto para este apartamento. El supervisor y el administrador recibirán una alerta visul y sonora para decidir.</div><div class="actions"><button class="btn gold" onclick="requestServiceAdvance(\''+x.id+'\')">⚡ Cambiar horario de check-in</button></div>':"";
  
-const timerPanelHtml=await serviceDetailFallback(renderCleaningTimerPanel(x,id),"",4500,"temporizador");
-const approvalQ=await serviceDetailFallback(sb.from('service_client_approvals').select('approved_at,approved_by').eq('service_id',id).maybeSingle(),emptyOne,4500,'aprovação do cliente'); const clientApprovalHtml=renderClientCleaningApproval(x,media.data||[],approvalQ.data||null); const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
- const invoiceHtml=await serviceDetailFallback(Promise.all(invoiceDocs.map(async m=>{const u=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'})),[],5000,"documentos anexos");
+const timerPanelHtml=await renderCleaningTimerPanel(x,id);
+const approvalQ=await sb.from('service_client_approvals').select('approved_at,approved_by').eq('service_id',id).maybeSingle(); const clientApprovalHtml=renderClientCleaningApproval(x,media.data||[],approvalQ.data||null); const cleaningFlowHtml=renderCleaningFlow(x,checklist,media.data||[]); const maintenanceFlowHtml=renderMaintenanceEmployeeFlow(x,media.data||[]); const invoiceDocs=(media.data||[]).filter(m=>m.media_type==="invoice_document");
+ const invoiceHtml=await Promise.all(invoiceDocs.map(async m=>{const u=await sb.storage.from("service-media").createSignedUrl(m.storage_path,600);return '<div class="line"><span>📄 <b>'+esc(m.file_name)+'</b><br><small>'+esc(new Date(m.created_at).toLocaleString("pt-PT"))+'</small></span><button class="btn" data-url="'+esc(u.data?.signedUrl||"")+'" onclick="openEvidenceFile(this.dataset.url)">Abrir</button></div>'}));
  const mediaTitle=isCleaningServiceType(x.service_type)?"Fotos / evidencias de limpieza":"Fotos / vídeos del mantenimiento"; const mediaHint=isCleaningServiceType(x.service_type)?"Supervisor y Administrador deben abrirlas una a una.":"Estas evidencias quedan visibles para el cliente cuando el mantenimiento termina.";
  openModal((isPendingAdmin||isPendingAdminDirect)?"Pedido recibido · "+esc(x.code):"Ficha del servicio",
   (isPendingAdmin?'<div class="notice"><strong>Pedido recibido</strong><br>Revise los datos antes de aceptar. La aceptación quedará registrada en su perfil.</div>':isPendingAdminDirect?'<div class="notice"><strong>Administración · control operativo</strong><br>Puede enviar este servicio directamente al funcionario adecuado. El funcionario seguirá teniendo que aceptar el llamado.</div>':"")+
