@@ -3659,12 +3659,16 @@ async function viewService(id){
    "<div class='panel' style='margin-top:12px'><div class='panel-head'><h3>Observaciones</h3></div><p>"+esc(x.instructions||"Sin observaciones.")+"</p><div class='notice'><b>Observaciones finales:</b><br>"+esc(note.final_observations||"Sem observaciones finales.")+"</div></div>"+demoAdvanceButton
   );return;
  }
- const r=["employee","maintenance_technician"].includes(role())
-  ? await sb.rpc("employee_service_detail",{p_service_id:id})
-  : await sb.from("services").select("*").eq("id",id).single();
- if(r.error){toast(r.error.message);return}
+ const primaryQuery=["employee","maintenance_technician"].includes(role())
+  ? sb.rpc("employee_service_detail",{p_service_id:id})
+  : sb.from("services").select("*").eq("id",id).single();
+ const r=await Promise.race([
+  Promise.resolve(primaryQuery),
+  new Promise((_,reject)=>setTimeout(()=>reject(new Error("A consulta principal do serviço excedeu 10 segundos. Verifique a ligação e as permissões de acesso.")),10000))
+ ]);
+ if(r.error)throw new Error("Não foi possível consultar este serviço: "+r.error.message);
  const x=["employee","maintenance_technician"].includes(role())?(Array.isArray(r.data)?r.data[0]:r.data):r.data;
- if(!x){toast("Servicio no disponible para este funcionario.");return}window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
+ if(!x)throw new Error("O serviço não foi encontrado ou o seu perfil não tem permissão para o consultar.");window.__romanoServiceVersions=window.__romanoServiceVersions||{};window.__romanoServiceVersions[id]=x.updated_at;
  let checklist=await serviceDetailFallback(ensureCleaningChecklist(x),[],5000,"checklist");
  const emptyRows={data:[],error:null},emptyOne={data:null,error:null};
  const [media,dispatch,clientQ,propQ,auditQ,eventsQ,archiveMedia]=await Promise.all([
