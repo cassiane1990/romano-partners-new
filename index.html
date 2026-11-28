@@ -3634,13 +3634,12 @@ function renderServiceOccurrenceHistory(events){
  return '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Ocorrências, extras e roupa danificada</h3><span class="pill">'+rows.length+' registo(s)</span></div>'+
  (rows.map(e=>'<div class="line-item"><span><b>'+esc(String(e.event_type||"Registo").replace(/_/g," "))+'</b><br><small>'+esc(new Date(e.created_at).toLocaleString("pt-PT"))+'</small><br><small>'+esc(JSON.stringify(e.metadata||{}))+'</small></span></div>').join("")||'<div class="empty">Ainda não existem ocorrências ou extras registados neste histórico.</div>')+'</div>';
 }
-async 
 function serviceDetailFallback(promise,fallback,ms=6000,label='dados complementares'){
  let timer;
  return Promise.race([Promise.resolve(promise).catch(err=>{console.warn('Ficha · '+label,err);return fallback;}),new Promise(resolve=>{timer=setTimeout(()=>{console.warn('Ficha · timeout: '+label);resolve(fallback);},ms);})]).finally(()=>clearTimeout(timer));
 }
 
-function viewService(id){
+async function viewService(id){
  openModal("Ficha del servicio",'<div class="notice">Cargando ficha del servicio…</div>');
  try{
  if(demoMode){
@@ -3684,7 +3683,7 @@ function viewService(id){
  const dispatchEmployeeIds=[...new Set((dispatch.data||[]).map(d=>d.employee_id).filter(Boolean))];
  const nameIds=[...new Set([...actorIds,...dispatchEmployeeIds,x.assigned_employee_id].filter(Boolean))];
  let actorNames={};
- if(nameIds.length){const aq=await sb.from("profiles").select("id,full_name,email,role").in("id",nameIds);(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usuario");}
+ if(nameIds.length){const aq=await serviceDetailFallback(sb.from("profiles").select("id,full_name,email,role").in("id",nameIds),{data:[]},4000,"nomes dos responsáveis");(aq.data||[]).forEach(a=>actorNames[a.id]=a.full_name||a.email||"Usuario");}
  const canUpdate=["admin","supervisor","employee","maintenance_technician"].includes(role());
  const isPendingAdmin=role()==="supervisor"&&["requested","scheduled"].includes(x.status)&&!x.accepted_at;
  const isPendingAdminDirect=role()==="admin"&&["requested","scheduled"].includes(x.status)&&!x.assigned_employee_id;
